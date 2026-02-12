@@ -5,11 +5,20 @@
   "scanRecursively": true,
   "courseDetection": "per-file",
   "courseFrontmatterKey": "course",
+  "startDateKey": "start",
+  "dueDateKey": "due",
+  "colorScheme": "inherit",
+  "colorMode": "course",
+  "colors": {
+    "overdue": "#e63946",
+    "urgent": "#fb8500",
+    "active": "#2a9d8f",
+    "completed": "#1c37a0"
+  },
   "allowNoDueDate": false,
   "showCompletedByDefault": false,
   "defaultSort": "due-date",
   "uiDensity": "comfortable",
-  "colorScheme": "inherit",
   "customColors": {
     "overdue": "#e74c3c",
     "upcoming": "#f39c12",

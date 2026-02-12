@@ -1,104 +1,129 @@
-import { Task, TaskStatus, TaskSortBy, taskMatchesStatus, getTaskStatus } from '../models/Task';
+import { TFile, Events, App } from 'obsidian';
+import { Task, TaskStatus, TaskSortBy, getTaskStatus } from '../models/Task';
 import { TaskParser } from './TaskParser';
-import { Events } from 'obsidian';
 
-/**
- * Manages task state, filtering, and sorting
- * Emits events when task data changes
- */
 export class TaskManager extends Events {
     private tasks: Task[] = [];
     private filteredTasks: Task[] = [];
 
-    private currentStatusFilter: TaskStatus = TaskStatus.Open; // Default to Open/Active
+    private currentStatusFilter: TaskStatus = TaskStatus.Open;
     private currentCourseFilter: string | null = null;
     private currentSortBy: TaskSortBy = TaskSortBy.DueDate;
 
-    constructor(private parser: TaskParser) {
+    constructor(private parser: TaskParser, private app: App) {
         super();
     }
 
-    /**
-     * Load all tasks from vault
-     */
     async loadTasks(): Promise<void> {
-        this.tasks = await this.parser.parseAllTasks();
+        this.tasks = await this.parser.findAllTasks();
         this.applyFiltersAndSort();
-        this.trigger('tasks-updated', this.filteredTasks);
+        this.trigger('tasks-updated');
+    }
+// ... inside TaskManager class ...
+
+    /**
+     * Delete a task from its file
+     */
+    async deleteTask(task: Task): Promise<void> {
+        const file = this.app.vault.getAbstractFileByPath(task.filePath);
+        if (file instanceof TFile) {
+            const content = await this.app.vault.read(file);
+            const lines = content.split('\n');
+
+            // Safety check: ensure the line hasn't moved
+            if (lines[task.lineNumber] && lines[task.lineNumber].includes(task.title)) {
+                lines.splice(task.lineNumber, 1); // Remove the line
+                await this.app.vault.modify(file, lines.join('\n'));
+                await this.refreshFileTask(task.filePath);
+            } else {
+                console.warn('Task line mismatch, skipping delete to prevent data loss.');
+            }
+        }
     }
 
     /**
-     * Refresh tasks from a specific file
+     * Update a task's title and/or due date
      */
+    async updateTask(task: Task, newTitle: string, newDate: Date | null): Promise<void> {
+        const file = this.app.vault.getAbstractFileByPath(task.filePath);
+        if (file instanceof TFile) {
+            const content = await this.app.vault.read(file);
+            const lines = content.split('\n');
+
+            if (lines[task.lineNumber]) {
+                const originalLine = lines[task.lineNumber];
+
+                // Preserve indentation and checkbox status
+                // Regex: (Whitespace)(- [x]) (Rest)
+                const match = originalLine.match(/^(\s*-\s\[.\]\s)(.*)$/);
+
+                if (match) {
+                    const prefix = match[1]; // "- [ ] "
+
+                    // Reconstruct the line
+                    let newLine = `${prefix}${newTitle}`;
+                    if (newDate) {
+                        const dateStr = this.formatDate(newDate);
+                        newLine += ` [due:: ${dateStr}]`;
+                    }
+
+                    // Keep other existing metadata if we didn't touch it?
+                    // For now, this replaces the end of the line.
+                    // To be safer, we'd need to parse the old line more carefully,
+                    // but this covers the [due::] format perfectly.
+
+                    lines[task.lineNumber] = newLine;
+                    await this.app.vault.modify(file, lines.join('\n'));
+                    await this.refreshFileTask(task.filePath);
+                }
+            }
+        }
+    }
     async refreshFileTask(filePath: string): Promise<void> {
-        // Remove existing tasks from this file
+        const fileTasks = await this.parser.getTasksFromFile(filePath);
         this.tasks = this.tasks.filter(t => t.filePath !== filePath);
-
-        // Add new tasks from this file
-        const newTasks = await this.parser.parseTasksFromFilePath(filePath);
-        this.tasks.push(...newTasks);
-
+        this.tasks.push(...fileTasks);
         this.applyFiltersAndSort();
-        this.trigger('tasks-updated', this.filteredTasks);
+        this.trigger('tasks-updated');
     }
 
-    /**
-     * Get all tasks
-     */
-    getAllTasks(): Task[] {
-        return [...this.tasks];
+    getAllTasks(): Task[] { return [...this.tasks]; }
+    getFilteredTasks(): Task[] { return [...this.filteredTasks]; }
+
+    getStatistics() {
+        const total = this.tasks.length;
+        const completed = this.tasks.filter(t => t.completed).length;
+        const overdue = this.tasks.filter(t => getTaskStatus(t) === TaskStatus.Overdue).length;
+        const upcoming = this.tasks.filter(t => getTaskStatus(t) === TaskStatus.UpcomingWeek).length;
+        const urgent = this.tasks.filter(t => getTaskStatus(t) === TaskStatus.Urgent).length;
+        const courses = new Set(this.tasks.map(t => t.fileName)).size;
+
+        return { total, completed, overdue, upcoming, urgent, courses };
     }
 
-    /**
-     * Get filtered and sorted tasks
-     */
-    getFilteredTasks(): Task[] {
-        return [...this.filteredTasks];
-    }
-
-    /**
-     * Get unique course names
-     */
     getCourseNames(): string[] {
-        const courses = new Set(this.tasks.map(t => t.fileName));
-        return Array.from(courses).sort();
+        return Array.from(new Set(this.tasks.map(t => t.fileName))).sort();
     }
 
-    /**
-     * Set status filter
-     */
-    setStatusFilter(status: TaskStatus): void {
+    setStatusFilter(status: TaskStatus) {
         this.currentStatusFilter = status;
         this.applyFiltersAndSort();
-        this.trigger('tasks-updated', this.filteredTasks);
+        this.trigger('tasks-updated');
     }
 
-    /**
-     * Set course filter
-     */
-    setCourseFilter(course: string | null): void {
+    setCourseFilter(course: string | null) {
         this.currentCourseFilter = course;
         this.applyFiltersAndSort();
-        this.trigger('tasks-updated', this.filteredTasks);
+        this.trigger('tasks-updated');
     }
 
-    /**
-     * Set sort order
-     */
-    setSortBy(sortBy: TaskSortBy): void {
+    setSortBy(sortBy: TaskSortBy) {
         this.currentSortBy = sortBy;
         this.applyFiltersAndSort();
-        this.trigger('tasks-updated', this.filteredTasks);
+        this.trigger('tasks-updated');
     }
 
-    /**
-     * Get current filters
-     */
-    getCurrentFilters(): {
-        status: TaskStatus;
-        course: string | null;
-        sortBy: TaskSortBy;
-    } {
+    getCurrentFilters() {
         return {
             status: this.currentStatusFilter,
             course: this.currentCourseFilter,
@@ -106,127 +131,59 @@ export class TaskManager extends Events {
         };
     }
 
-    /**
-     * Apply current filters and sorting
-     */
-    private applyFiltersAndSort(): void {
-        // Apply filters
-        this.filteredTasks = this.tasks.filter(task => {
-            // Status filter
-            if (this.currentStatusFilter !== TaskStatus.All) {
-                // "Open" view = anything not completed (overdue + urgent + upcoming + no-date)
-                if (this.currentStatusFilter === TaskStatus.Open) {
-                    if (task.completed) return false;
-                } else {
-                    if (!taskMatchesStatus(task, this.currentStatusFilter)) return false;
-                }
+    async addTask(title: string, date: Date | null, filePath: string): Promise<void> {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (file instanceof TFile) {
+            let content = await this.app.vault.read(file);
+            let taskLine = `\n- [ ] ${title}`;
+            if (date) {
+                const dateStr = this.formatDate(date);
+                taskLine += ` [due:: ${dateStr}]`;
             }
-
-            // Course filter
-            if (this.currentCourseFilter && task.fileName !== this.currentCourseFilter) {
-                return false;
-            }
-
-            return true;
-        });
-
-        // Apply sorting (Priority Sorting first: Overdue > Urgent > Open > Completed)
-        this.filteredTasks.sort((a, b) => {
-            const weightA = this.getStatusWeight(a);
-            const weightB = this.getStatusWeight(b);
-
-            if (weightA !== weightB) {
-                return weightA - weightB; // lower weight = higher priority
-            }
-
-            // Within same priority bucket, apply selected sort
-            switch (this.currentSortBy) {
-                case TaskSortBy.DueDate: {
-                    const byDue = this.compareDates(a.dueDate, b.dueDate);
-                    if (byDue !== 0) return byDue;
-                    return a.fileName.localeCompare(b.fileName);
-                }
-
-                case TaskSortBy.StartDate: {
-                    const byStart = this.compareDates(a.startDate, b.startDate);
-                    if (byStart !== 0) return byStart;
-                    return this.compareDates(a.dueDate, b.dueDate);
-                }
-
-                case TaskSortBy.FileName: {
-                    const byFile = a.fileName.localeCompare(b.fileName);
-                    if (byFile !== 0) return byFile;
-                    return this.compareDates(a.dueDate, b.dueDate);
-                }
-
-                default:
-                    return 0;
-            }
-        });
-    }
-
-    /**
-     * Status priority weight (Overdue > Urgent > Open > Completed)
-     * Note: "Open" is represented by UpcomingWeek + NoDate (i.e., not completed and not overdue/urgent)
-     */
-    private getStatusWeight(task: Task): number {
-        const status = getTaskStatus(task);
-
-        switch (status) {
-            case TaskStatus.Overdue:
-                return 1; // highest priority
-            case TaskStatus.Urgent:
-                return 2; // high priority
-            case TaskStatus.UpcomingWeek:
-                return 3; // normal open
-            case TaskStatus.NoDate:
-                return 4; // open, but less actionable
-            case TaskStatus.Completed:
-                return 5; // lowest priority
-            default:
-                return 3;
+            await this.app.vault.modify(file, content + taskLine);
+            await this.refreshFileTask(filePath);
         }
     }
 
-    /**
-     * Compare two dates for sorting (null dates go to end)
-     */
-    private compareDates(a: Date | undefined, b: Date | undefined): number {
-        if (!a && !b) return 0;
-        if (!a) return 1;
-        if (!b) return -1;
-        return a.getTime() - b.getTime();
+    private formatDate(date: Date): string {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
 
-    /**
-     * Get statistics
-     * - `upcoming` is the count of UpcomingWeek tasks (renamed from `upcomingWeek` to match the views)
-     */
-    getStatistics(): {
-        total: number;
-        completed: number;
-        overdue: number;
-        urgent: number;
-        upcoming: number;
-        courses: number;
-    } {
-        const total = this.tasks.length;
-        const completed = this.tasks.filter(t => t.completed).length;
+    private applyFiltersAndSort(): void {
+        this.filteredTasks = this.tasks.filter(task => {
+            if (this.currentStatusFilter !== TaskStatus.All) {
+                if (this.currentStatusFilter === TaskStatus.Open) {
+                    return !task.completed;
+                }
+                if (this.currentStatusFilter === TaskStatus.Completed && !task.completed) return false;
+            }
+            if (this.currentCourseFilter && task.fileName !== this.currentCourseFilter) return false;
+            return true;
+        });
 
-        // Use getTaskStatus for consistent logic
-        const overdue = this.tasks.filter(t => getTaskStatus(t) === TaskStatus.Overdue).length;
-        const urgent = this.tasks.filter(t => getTaskStatus(t) === TaskStatus.Urgent).length;
-        const upcoming = this.tasks.filter(t => getTaskStatus(t) === TaskStatus.UpcomingWeek).length;
+        this.filteredTasks.sort((a, b) => {
+            const weightA = this.getStatusWeight(a);
+            const weightB = this.getStatusWeight(b);
+            if (weightA !== weightB) return weightA - weightB;
+            if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+            if (a.dueDate) return -1;
+            if (b.dueDate) return 1;
+            return 0;
+        });
+    }
 
-        const courses = this.getCourseNames().length;
-
-        return {
-            total,
-            completed,
-            overdue,
-            urgent,
-            upcoming,
-            courses
-        };
+    private getStatusWeight(task: Task): number {
+        const status = getTaskStatus(task);
+        switch (status) {
+            case TaskStatus.Overdue: return 1;
+            case TaskStatus.Urgent: return 2;
+            case TaskStatus.UpcomingWeek: return 3;
+            case TaskStatus.NoDate: return 4;
+            case TaskStatus.Completed: return 5;
+            default: return 3;
+        }
     }
 }

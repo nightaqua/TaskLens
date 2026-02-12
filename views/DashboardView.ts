@@ -1,8 +1,9 @@
 import { ItemView, WorkspaceLeaf, MarkdownView, setIcon, ViewStateResult } from 'obsidian';
-import { Task, TaskStatus, getTaskStatus } from '../models/Task';
+import { Task, TaskStatus } from '../models/Task';
 import { TaskManager } from '../services/TaskManager';
 import SemesterDashboardPlugin from '../main';
 import { TimelineComponent } from './TimelineComponent';
+import { TaskListComponent } from './TaskListComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 
 export const VIEW_TYPE_DASHBOARD = 'semester-dashboard-view';
@@ -88,19 +89,13 @@ export class DashboardView extends ItemView {
         this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
         if (this.tabContainer) this.tabContainer.classList.add('semester-hide-tabs');
 
-        // 2. Add class to the correct parent
         this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
         if (this.leafRootEl) this.leafRootEl.classList.add('semester-chromeless');
 
         this.contentEl.empty();
         this.contentEl.addClass('semester-dashboard-view');
 
-        // Colors
-        this.contentEl.style.setProperty('--color-red', '#e63946');
-        this.contentEl.style.setProperty('--color-orange', '#fb8500');
-        this.contentEl.style.setProperty('--color-green', '#2a9d8f'); // Active
-        this.contentEl.style.setProperty('--color-blue', '#457b9d');  // Completed
-        this.contentEl.style.setProperty('--color-purple', '#7209b7'); // Total
+        this.applyColorTheme();
 
         await this.taskManager.loadTasks();
         this.render();
@@ -113,7 +108,7 @@ export class DashboardView extends ItemView {
         if (this.leafRootEl) this.leafRootEl.classList.remove('semester-chromeless');
     }
 
-    private render(): void {
+    public render(): void {
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -258,47 +253,35 @@ export class DashboardView extends ItemView {
     }
 
     private renderTaskList(): void {
-        const tasks = this.taskManager.getFilteredTasks();
-        const listContainer = this.contentEl.createDiv('dashboard-task-list');
+        const container = this.contentEl.createDiv();
 
-        if (tasks.length === 0) {
-            const empty = listContainer.createDiv('dashboard-empty-state');
-            empty.createEl('p', { text: 'No tasks found.' });
-            return;
-        }
-
-        tasks.forEach(task => {
-            const status = getTaskStatus(task);
-
-            let statusClass = 'status-active';
-            if (status === TaskStatus.Overdue) statusClass = 'status-overdue';
-            if (status === TaskStatus.Urgent) statusClass = 'status-urgent';
-            if (status === TaskStatus.Completed) statusClass = 'status-completed';
-
-            const taskEl = listContainer.createDiv({ cls: ['task-item', statusClass] });
-
-            const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
-            checkbox.checked = task.completed;
-            checkbox.addEventListener('change', () => this.toggleTaskCompletion(task));
-
-            const content = taskEl.createDiv('task-content');
-            content.createDiv('task-title').setText(task.title);
-
-            const meta = content.createDiv('task-meta');
-            meta.createSpan('task-course').setText(task.fileName);
-            if (task.dueDate) meta.createSpan('task-date').setText(`Due: ${this.formatDate(task.dueDate)}`);
-
-            (content.querySelector('.task-title') as HTMLElement).addEventListener('click', () => {
-                this.openTaskInEditor(task);
-            });
+        const list = new TaskListComponent(container, this.app, {
+            onToggle: (t) => this.toggleTaskCompletion(t),
+            onEdit: async (t, newTitle, newDate) => {
+                await this.taskManager.updateTask(t, newTitle, newDate);
+            },
+            onDelete: async (t) => {
+                await this.taskManager.deleteTask(t);
+            }
         });
+
+        list.render(this.taskManager.getFilteredTasks());
     }
 
-    private formatDate(date: Date): string {
-        const d = date.getDate().toString().padStart(2, '0');
-        const m = (date.getMonth() + 1).toString().padStart(2, '0');
-        const y = date.getFullYear();
-        return `${d}-${m}-${y}`;
+    public applyColorTheme(): void {
+        const cols = this.plugin.settings.colors;
+        this.contentEl.style.setProperty('--color-red', cols.overdue);
+        this.contentEl.style.setProperty('--color-orange', cols.urgent);
+        this.contentEl.style.setProperty('--color-green', cols.active);
+        this.contentEl.style.setProperty('--color-blue', cols.completed);
+        this.contentEl.style.setProperty('--color-purple', '#7209b7'); // Keep fixed or add setting later
+    }
+
+    public refreshFromSettings(): void {
+        if (!this.contentEl.isConnected) return;
+        this.applyColorTheme();
+        this.render();
+        this.app.workspace.requestSaveLayout();
     }
 
     private renderTimeline(): void {

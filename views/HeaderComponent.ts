@@ -13,12 +13,13 @@ export class HeaderComponent {
 
     private headerEl: HTMLElement | null = null;
     private sidebarHandleEl: HTMLElement | null = null;
-
     private isSaving: boolean = false;
 
+    // Callbacks
     private onStateChange: () => void;
     private onRefresh: () => void;
     private onSettings: (() => void) | null;
+    private onAdd: (() => void) | null; // NEW PROPERTY
 
     constructor(
         container: HTMLElement,
@@ -27,7 +28,8 @@ export class HeaderComponent {
         callbacks: {
             onStateChange: () => void,
             onRefresh: () => void,
-            onSettings?: () => void
+            onSettings?: () => void,
+            onAdd?: () => void  // NEW OPTIONAL CALLBACK
         }
     ) {
         this.container = container;
@@ -38,6 +40,7 @@ export class HeaderComponent {
         this.onStateChange = callbacks.onStateChange;
         this.onRefresh = callbacks.onRefresh;
         this.onSettings = callbacks.onSettings || null;
+        this.onAdd = callbacks.onAdd || null; // Store it
     }
 
     public render(): void {
@@ -48,11 +51,8 @@ export class HeaderComponent {
 
     private renderSidebarHandle(): void {
         if (this.sidebarHandleEl) this.sidebarHandleEl.remove();
-
-        this.sidebarHandleEl = this.container.createDiv('dashboard-sidebar-handle is-hidden');
+        this.sidebarHandleEl = this.container.createDiv('dashboard-sidebar-handle');
         setIcon(this.sidebarHandleEl, 'panel-left-open');
-        this.sidebarHandleEl.setAttribute('aria-label', 'Show Header');
-
         this.sidebarHandleEl.addEventListener('click', () => {
             this.isCollapsed = false;
             this.updateVisibility();
@@ -62,9 +62,9 @@ export class HeaderComponent {
 
     private renderHeader(): void {
         if (this.headerEl) this.headerEl.remove();
-
         this.headerEl = this.container.createDiv('dashboard-header');
 
+        // LEFT
         const leftGroup = this.headerEl.createDiv('header-actions-left');
         if (this.onSettings) {
             const settingsBtn = leftGroup.createEl('button', { cls: 'header-icon-btn' });
@@ -72,30 +72,36 @@ export class HeaderComponent {
             settingsBtn.addEventListener('click', () => this.onSettings!());
         }
 
+        // CENTER (Title)
         const titleWrapper = this.headerEl.createDiv('dashboard-title-wrapper');
-        titleWrapper.setAttribute('aria-label', 'Click to rename');
         const titleEl = titleWrapper.createEl('h2', { text: this.title });
         const editIcon = titleWrapper.createDiv('edit-title-icon');
         setIcon(editIcon, 'pencil');
+        titleWrapper.addEventListener('click', () => this.enterEditMode(titleWrapper));
 
-        titleWrapper.addEventListener('click', () => {
-            this.enterEditMode(titleWrapper);
-        });
-
+        // RIGHT
         const rightGroup = this.headerEl.createDiv('header-actions-right');
 
+        // NEW: Add Button
+        if (this.onAdd) {
+            const addBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
+            setIcon(addBtn, 'plus');
+            addBtn.setAttribute('aria-label', 'Quick Add Task');
+            addBtn.addEventListener('click', () => this.onAdd!());
+        }
+
+        // Refresh
         const refreshBtn = rightGroup.createEl('button', { cls: 'dashboard-refresh-btn header-icon-btn' });
         setIcon(refreshBtn, 'refresh-cw');
-        refreshBtn.setAttribute('aria-label', 'Refresh Data');
         refreshBtn.addEventListener('click', () => {
             refreshBtn.addClass('is-rotating');
             this.onRefresh();
             setTimeout(() => refreshBtn.removeClass('is-rotating'), 1000);
         });
 
+        // Hide
         const hideBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
         setIcon(hideBtn, 'panel-top-close');
-        hideBtn.setAttribute('aria-label', 'Hide Header');
         hideBtn.addEventListener('click', () => {
             this.isCollapsed = true;
             this.updateVisibility();
@@ -105,33 +111,19 @@ export class HeaderComponent {
 
     private enterEditMode(wrapper: HTMLElement) {
         wrapper.empty();
-        const input = wrapper.createEl('input', {
-            type: 'text',
-            value: this.title,
-            cls: 'dashboard-title-input'
-        });
-
-        input.focus();
-        input.select();
-
+        const input = wrapper.createEl('input', { type: 'text', value: this.title, cls: 'dashboard-title-input' });
+        input.focus(); input.select();
         this.isSaving = false;
-
         const save = () => {
             if (this.isSaving) return;
             this.isSaving = true;
-
             const newVal = input.value.trim();
             this.title = newVal.length > 0 ? newVal : this.defaultTitle;
             this.onStateChange();
         };
-
         input.addEventListener('blur', save);
         input.addEventListener('keydown', (e) => {
-            e.stopPropagation();
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                save();
-            }
+            if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); save(); }
         });
         input.addEventListener('keypress', (e) => e.stopPropagation());
     }
@@ -147,9 +139,6 @@ export class HeaderComponent {
     }
 
     public getState(): HeaderState {
-        return {
-            title: this.title,
-            isCollapsed: this.isCollapsed
-        };
+        return { title: this.title, isCollapsed: this.isCollapsed };
     }
 }

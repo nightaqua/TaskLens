@@ -1,17 +1,17 @@
-/**
- * Plugin settings structure
- */
+export type ColorMode = 'status' | 'course';
+
 export interface SemesterSettings {
+    // --- Scanning & Parsing ---
     /** Folders to scan for tasks (empty array = scan entire vault) */
     scanFolders: string[];
-    
+
     /** Whether to scan recursively in specified folders */
     scanRecursively: boolean;
-    
+
     /** How to identify courses */
     courseDetection: 'per-file' | 'per-folder' | 'frontmatter';
-    
-    /** Frontmatter property to use for course name (if courseDetection is 'frontmatter') */
+
+    /** Frontmatter property to use for course name */
     courseFrontmatterKey: string;
 
     /** Metadata key for start date */
@@ -19,48 +19,39 @@ export interface SemesterSettings {
 
     /** Metadata key for due date */
     dueDateKey: string;
-    
-    /** Whether to allow tasks without due dates */
-    allowNoDueDate: boolean;
-    
-    /** Whether to show completed tasks by default */
-    showCompletedByDefault: boolean;
-    
-    /** Default sort order */
-    defaultSort: 'due-date' | 'start-date' | 'file-name';
-    
-    /** UI density */
-    uiDensity: 'compact' | 'comfortable' | 'spacious';
-    
-    /** Color scheme */
+
+    // --- Visuals & UI ---
+    /** Color scheme mode */
     colorScheme: 'inherit' | 'custom';
-    
-    /** Custom colors (if colorScheme is 'custom') */
-    customColors: {
+
+    /** How to color tasks */
+    colorMode: ColorMode;
+
+    /** Custom Color Palette */
+    colors: {
         overdue: string;
-        upcoming: string;
+        urgent: string;
+        active: string;
         completed: string;
     };
 }
 
-/**
- * Default settings
- */
 export const DEFAULT_SETTINGS: SemesterSettings = {
+    // Scanning Defaults
     scanFolders: [],
     scanRecursively: true,
     courseDetection: 'per-file',
     courseFrontmatterKey: 'course',
     startDateKey: 'start',
     dueDateKey: 'due',
-    allowNoDueDate: true,
-    showCompletedByDefault: false,
-    defaultSort: 'due-date',
-    uiDensity: 'comfortable',
+
+    // Visual Defaults
     colorScheme: 'inherit',
-    customColors: {
-        overdue: '#e74c3c',
-        upcoming: '#f39c12',
-        completed: '#27ae60'
+    colorMode: 'status',
+    colors: {
+        overdue: '#e63946',
+        urgent: '#fb8500',
+        active: '#2a9d8f',
+        completed: '#457b9d'
     }
 };

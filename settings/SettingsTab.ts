@@ -1,7 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import SemesterDashboardPlugin from '../main';
 
-// Export as SettingsTab to match what main.ts imports
 export class SettingsTab extends PluginSettingTab {
     plugin: SemesterDashboardPlugin;
 
@@ -15,62 +14,79 @@ export class SettingsTab extends PluginSettingTab {
         containerEl.empty();
         containerEl.addClass('semester-dashboard-settings');
 
-        containerEl.createEl('h2', { text: 'Personal Dashboard Settings' });
+        containerEl.createEl('h2', { text: 'Semester Dashboard Settings' });
 
-        // 1. General Config
-        const generalDetails = containerEl.createEl('details');
-        generalDetails.open = true;
-        generalDetails.createEl('summary', { text: 'General Configuration' });
+        // 1. Scanning
+        const scanDetails = containerEl.createEl('details');
+        scanDetails.open = true;
+        scanDetails.createEl('summary', { text: 'Vault Scanning' });
 
-        new Setting(generalDetails)
-            .setName('Course Folders')
-            .setDesc('Specific folders to scan (comma separated). Leave empty to scan whole vault.')
-            .addText(text => text
-                .setPlaceholder('Uni/Sem1, Work/Projects')
-                .setValue(this.plugin.settings.scanFolders.join(', '))
-                .onChange(async (value) => {
-                    this.plugin.settings.scanFolders = value
-                        .split(',')
-                        .map(s => s.trim())
-                        .filter(s => s.length > 0);
-                    await this.plugin.saveSettings();
-                }));
+        new Setting(scanDetails)
+            .setName('Scan folders')
+            .setDesc('Folders to scan (one per line).')
+            .addTextArea(text => {
+                text.setPlaceholder('Uni/Courses')
+                    .setValue(this.plugin.settings.scanFolders.join('\n'))
+                    .onChange(async (value) => {
+                        this.plugin.settings.scanFolders = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                        await this.plugin.saveSettings();
+                    });
+            });
 
         // 2. Task Parsing
         const parserDetails = containerEl.createEl('details');
         parserDetails.createEl('summary', { text: 'Task Parsing' });
+        new Setting(parserDetails).setName('Start Key').addText(t => t.setValue(this.plugin.settings.startDateKey).onChange(async v => { this.plugin.settings.startDateKey = v; await this.plugin.saveSettings(); }));
+        new Setting(parserDetails).setName('Due Key').addText(t => t.setValue(this.plugin.settings.dueDateKey).onChange(async v => { this.plugin.settings.dueDateKey = v; await this.plugin.saveSettings(); }));
 
-        new Setting(parserDetails)
-            .setName('Start Date Key')
-            .setDesc('Inline field for start date (e.g. start::)')
-            .addText(text => text
-                .setValue(this.plugin.settings.startDateKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.startDateKey = value;
+
+        // 3. Visuals (NEW)
+        const uiDetails = containerEl.createEl('details');
+        uiDetails.createEl('summary', { text: 'Appearance & Colors' });
+
+        new Setting(uiDetails)
+            .setName('Color Mode')
+            .addDropdown(d => d
+                .addOption('status', 'By Status')
+                .addOption('course', 'By Course (Simple)')
+                .setValue(this.plugin.settings.colorMode)
+                .onChange(async (v) => {
+                    this.plugin.settings.colorMode = v as any;
                     await this.plugin.saveSettings();
                 }));
 
-        new Setting(parserDetails)
-            .setName('Due Date Key')
-            .setDesc('Inline field for due date (e.g. due::)')
-            .addText(text => text
-                .setValue(this.plugin.settings.dueDateKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.dueDateKey = value;
+        new Setting(uiDetails)
+            .setName('Overdue Color')
+            .addColorPicker(c => c
+                .setValue(this.plugin.settings.colors.overdue)
+                .onChange(async (v) => {
+                    this.plugin.settings.colors.overdue = v;
                     await this.plugin.saveSettings();
+                    this.plugin.refreshViews();
                 }));
 
-        // 3. View Preferences (Placeholder for future settings)
-        const viewDetails = containerEl.createEl('details');
-        viewDetails.createEl('summary', { text: 'View Preferences' });
+        new Setting(uiDetails)
+            .setName('Urgent Color')
+            .addColorPicker(c => c.setValue(this.plugin.settings.colors.urgent).onChange(async v => {
+                this.plugin.settings.colors.urgent = v;
+                await this.plugin.saveSettings();
+                this.plugin.refreshViews();
+            }));
 
-        new Setting(viewDetails)
-            .setName('Default View')
-            .setDesc('Choose what to show by default (Future feature)')
-            .addDropdown(drop => drop
-                .addOption('list', 'List')
-                .addOption('timeline', 'Timeline')
-                .setValue('list')
-                .setDisabled(true)); // Disabled for now, just visual placeholder
+        new Setting(uiDetails)
+            .setName('Active Color')
+            .addColorPicker(c => c.setValue(this.plugin.settings.colors.active).onChange(async v => {
+                this.plugin.settings.colors.active = v;
+                await this.plugin.saveSettings();
+                this.plugin.refreshViews();
+            }));
+
+        new Setting(uiDetails)
+            .setName('Completed Color')
+            .addColorPicker(c => c.setValue(this.plugin.settings.colors.completed).onChange(async v => {
+                this.plugin.settings.colors.completed = v;
+                await this.plugin.saveSettings();
+                this.plugin.refreshViews();
+            }));
     }
 }

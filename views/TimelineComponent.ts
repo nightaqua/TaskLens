@@ -27,7 +27,9 @@ export class TimelineComponent {
         this.container.addClass('timeline-wrapper');
         this.todayColumnIndex = -1;
 
-        if (this.tasks.length === 0) {
+        const validTasks = this.tasks.filter(t => t.dueDate instanceof Date && !isNaN(t.dueDate.getTime()));
+
+        if (validTasks.length === 0) {
             const scrollContainer = this.container.createDiv('timeline-container');
             const empty = scrollContainer.createDiv('dashboard-empty-state');
             empty.createEl('p', { text: 'No dated tasks to display.' });
@@ -43,7 +45,7 @@ export class TimelineComponent {
         this.setupEventListeners(this.scrollContainer);
 
         // 3) Determine Date Range
-        const dates = this.tasks
+        const dates = validTasks
             .map(t => [t.startDate, t.dueDate])
             .flat()
             .filter((d): d is Date => !!d)
@@ -102,7 +104,7 @@ export class TimelineComponent {
             }
         });
 
-        this.tasks.forEach((task, index) => {
+        validTasks.forEach((task, index) => {
             const taskStart = task.startDate ? task.startDate : task.dueDate!;
             const taskEnd = task.dueDate!;
 
