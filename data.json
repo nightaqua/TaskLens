@@ -1,0 +1,18 @@
+{
+  "scanFolders": [
+    "Uni/MUNI"
+  ],
+  "scanRecursively": true,
+  "courseDetection": "per-file",
+  "courseFrontmatterKey": "course",
+  "allowNoDueDate": false,
+  "showCompletedByDefault": false,
+  "defaultSort": "due-date",
+  "uiDensity": "comfortable",
+  "colorScheme": "inherit",
+  "customColors": {
+    "overdue": "#e74c3c",
+    "upcoming": "#f39c12",
+    "completed": "#27ae60"
+  }
+}

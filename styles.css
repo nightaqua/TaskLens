@@ -1,0 +1,578 @@
+/* --- Dashboard Container --- */
+.semester-dashboard-view {
+    padding: 16px !important;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: var(--background-primary);
+    box-sizing: border-box;
+    position: relative;
+}
+
+/* --- The Slide-Out Handle (New) --- */
+.dashboard-sidebar-handle {
+    position: absolute;
+    left: 0;
+    top: 10px;
+    z-index: 50;
+    background-color: var(--interactive-accent);
+    border: 1px solid var(--background-modifier-border);
+    border-left: none;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    padding: 8px 6px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+    transform: translateX(-70%);
+    opacity: 0.8;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    color: var(--text-on-accent);
+}
+
+.dashboard-sidebar-handle:hover {
+    transform: translateX(0);
+    opacity: 1;
+    background-color: var(--interactive-accent-hover);
+    box-shadow: 2px 2px 12px rgba(0,0,0,0.4);
+}
+
+.dashboard-sidebar-handle.is-hidden {
+    display: none;
+}
+
+/* --- Header Styles --- */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 4px 0;
+    min-height: 40px;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.dashboard-header.is-collapsed {
+    display: none !important;
+}
+
+.dashboard-title-wrapper {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 4px 8px;
+    min-width: 0;
+}
+
+.dashboard-title-wrapper h2 {
+    margin: 0;
+    font-size: 1.5em;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.dashboard-title-input {
+    font-size: 1.4em;
+    font-weight: 600;
+    background: var(--background-primary);
+    border: 1px solid var(--interactive-accent);
+    border-radius: 4px;
+    color: var(--text-normal);
+    text-align: center;
+    width: 100%;
+    max-width: 300px;
+    min-width: 120px;
+    box-sizing: border-box;
+}
+
+.edit-title-icon {
+    opacity: 0;
+    color: var(--text-muted);
+    transition: opacity 0.2s;
+}
+
+.dashboard-title-wrapper:hover .edit-title-icon {
+    opacity: 1;
+}
+
+.header-actions-left, .header-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+
+.header-icon-btn {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s, color 0.2s;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header-icon-btn:hover {
+    opacity: 1;
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+    border-radius: 6px;
+}
+
+.dashboard-refresh-btn.is-rotating svg {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* --- Controls Section --- */
+.dashboard-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 12px;
+    background-color: var(--background-secondary);
+    border-radius: 8px;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+    max-height: 500px;
+    opacity: 1;
+    overflow: visible;
+    /* NEW: Medium-light border as requested */
+    border: 1px solid var(--background-modifier-border-hover);
+}
+
+.dashboard-controls.is-hidden {
+    max-height: 0;
+    opacity: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-group label {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.control-group select {
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    /* Truncate long text */
+    max-width: 150px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* Toggle Buttons */
+.view-toggle-group {
+    display: flex;
+    gap: 4px;
+    background-color: var(--background-primary);
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.view-toggle-btn {
+    background: transparent;
+    border: 1px solid var(--background-modifier-border);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s;
+}
+
+.view-toggle-btn:hover {
+    color: var(--text-normal);
+    border-color: var(--text-muted);
+}
+
+.view-toggle-btn.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+    font-weight: 500;
+}
+
+/* --- Statistics Cards (Flexbox Layout) --- */
+.dashboard-stats {
+    display: flex; /* Changed from Grid to Flex */
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background-color: var(--background-secondary);
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--background-modifier-border);
+    position: relative;
+    overflow: hidden;
+    flex: 1 1 120px; /* Grow to fill, shrink if needed, base 120px */
+}
+
+/* Color Coding for Stats */
+.stat-card.stat-urgent { border-left: 4px solid var(--color-orange); }
+.stat-card.stat-overdue { border-left: 4px solid var(--color-red); }
+.stat-card.stat-completed { border-left: 4px solid var(--color-blue); } /* Changed to Blue per request for distinct completed */
+.stat-card.stat-active { border-left: 4px solid var(--color-green); } /* Active is Green */
+.stat-card.stat-total { border-left: 4px solid var(--color-purple); } /* Total is Purple */
+
+.stat-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--text-normal);
+}
+
+.stat-label {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* --- Task List --- */
+.dashboard-task-list {
+    min-height: 150px; /* Frame size */
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.task-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px;
+    background-color: var(--background-secondary);
+    border-radius: 6px;
+    border: 1px solid transparent;
+    border-left: 4px solid transparent;
+    transition: transform 0.1s ease;
+}
+
+.task-item:hover {
+    transform: translateX(2px);
+    background-color: var(--background-secondary-alt);
+}
+
+/* Task Status Colors */
+.task-item.status-overdue { border-left-color: var(--color-red); }
+.task-item.status-urgent { border-left-color: var(--color-orange); }
+.task-item.status-completed { border-left-color: var(--color-blue); opacity: 0.7; }
+.task-item.status-active { border-left-color: var(--color-green); }
+
+.task-checkbox {
+    margin-right: 12px;
+    margin-top: 4px;
+    cursor: pointer;
+}
+
+.task-content { flex: 1; }
+
+.task-title {
+    font-size: 1.05em;
+    font-weight: 500;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.task-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+.task-course {
+    background-color: var(--background-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+/* --- Timeline / Gantt View --- */
+/* --- Timeline / Gantt View --- */
+.dashboard-timeline-view {
+    margin-bottom: 24px;
+}
+
+.timeline-controls {
+    display: flex;
+    justify-content: space-between; /* Spread zoom and nav */
+    margin-bottom: 10px;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+/* Timeline Wrapper for Nav Bars */
+.timeline-wrapper {
+    position: relative;
+    width: 100%;
+    /* Ensure arrows sit on top */
+}
+
+/* Scrollable Container inside Wrapper */
+.timeline-container {
+    overflow-x: auto;
+    width: 100%;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background-color: var(--background-primary);
+    padding-bottom: 10px;
+    cursor: grab; /* Indicates drag capability */
+    user-select: none; /* Prevent text selection while dragging */
+    scrollbar-width: thin;
+}
+
+.timeline-container.is-dragging {
+    cursor: grabbing;
+}
+
+/* Navigation Overlay Bars */
+.timeline-nav-overlay {
+    background: transparent !important; /* No dark shadow */
+    /* ... keep positioning ... */
+    position: absolute;
+    top: 0;
+    bottom: 10px;
+    width: 40px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+/* Subtle feedback on hover instead */
+.timeline-nav-overlay:hover {
+    background: rgba(150, 150, 150, 0.1) !important; /* Very subtle light grey */
+}
+
+.timeline-nav-overlay.nav-left {
+    left: 0;
+}
+
+.timeline-nav-overlay.nav-right {
+    right: 0;
+}
+
+/* Show on hover of the wrapper */
+.timeline-wrapper:hover .timeline-nav-overlay {
+    opacity: 1;
+}
+
+.nav-arrow {
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--text-accent);
+    user-select: none;
+}
+
+.timeline-container {
+    overflow-x: auto;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background-color: var(--background-primary);
+    padding-bottom: 10px;
+}
+
+/* Grid Lines Logic is handled in JS via background-image,
+   but we need to ensure the grid sits on top of the background */
+.timeline-grid {
+    display: grid;
+    min-width: 100%;
+    /* The vertical lines will be applied here */
+}
+.timeline-grid {
+    display: grid;
+    min-width: 100%;
+}
+
+.timeline-header-cell {
+    padding: 8px;
+    font-size: 0.8em;
+    text-align: center;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+    border-right: 1px solid var(--background-modifier-border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+}
+
+/* Timeline Bars */
+.timeline-task-bar {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    margin: 2px 0;
+    opacity: 0.9;
+    z-index: 5;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.timeline-task-bar.status-overdue { background-color: var(--color-red); }
+.timeline-task-bar.status-urgent { background-color: var(--color-orange); }
+.timeline-task-bar.status-completed { background-color: var(--color-blue); opacity: 0.6; text-decoration: line-through; }
+.timeline-task-bar.status-active { background-color: var(--color-green); }
+
+.timeline-today-marker {
+    grid-row: 1 / -1;
+    background-color: var(--color-red); /* Today is red line */
+    width: 2px;
+    height: 100%;
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 4;
+    margin-left: 50%;
+}
+
+/* Settings Page */
+.semester-dashboard-settings .setting-item {
+    border: 1px solid var(--background-modifier-border);
+    background-color: var(--background-secondary);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+/* --- True CHROMELESS leaf (The "Widget" Look) --- */
+
+/* 1. Hide the pane header (the tab strip) */
+.workspace-leaf-content.semester-chromeless .workspace-leaf-header,
+.workspace-leaf-content.semester-chromeless .workspace-tab-header-container,
+.workspace-leaf-content.semester-chromeless .workspace-tab-header,
+.workspace-leaf-content.semester-chromeless .workspace-tab-header-inner {
+    display: none !important;
+}
+
+/* 2. Remove reserved header space */
+.workspace-leaf-content.semester-chromeless {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border: none !important; /* Optional: remove borders */
+    box-shadow: none !important;
+}
+
+.workspace-leaf-content.semester-chromeless .workspace-leaf-content {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* 3. Hide the inner view header (Breadcrumbs/Title) */
+.workspace-leaf-content.semester-chromeless .view-header {
+    display: none !important;
+}
+
+/* 4. Make content fill the space (but respect our inner padding) */
+.workspace-leaf-content.semester-chromeless .view-content {
+    height: 100% !important;
+    margin: 0 !important;
+    background-color: var(--background-primary);
+}
+
+/* Optional: Hover to reveal header (Commented out by default) */
+/* .workspace-leaf-content.semester-chromeless .workspace-leaf-header {
+    display: flex !important;
+    height: 6px !important;
+    min-height: 6px !important;
+    opacity: 0 !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+}
+.workspace-leaf-content.semester-chromeless:hover .workspace-leaf-header {
+    opacity: 1 !important;
+    height: 30px !important;
+}
+*/
+
+/* --- True Widget Mode (Hider Logic Adapted) --- */
+
+/* Target the Tab Container (parent of the leaf)
+   and hide the header strip specifically for this container.
+*/
+.workspace-tabs.semester-hide-tabs .workspace-tab-header-container {
+    display: none !important;
+}
+
+/* Optional: Remove the small gap/padding often left behind
+   by the tab container structure.
+*/
+.workspace-tabs.semester-hide-tabs .workspace-tab-header-container-inner {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Ensure the content expands to fill the missing header space
+*/
+.workspace-tabs.semester-hide-tabs .workspace-leaf {
+    height: 100% !important;
+}
+/* --- Empty States & List Frame --- */
+/* This ensures the list has a "Frame" even when empty or loading */
+.dashboard-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 20px;
+    background-color: var(--background-secondary);
+    /* Subtle grey box */
+    color: var(--text-muted);
+    text-align: center;
+    height: 100%;
+    width: 100%;
+    flex: 1;
+}
+
+.dashboard-empty-state p {
+    margin: 0;
+    font-size: 0.9em;
+}
