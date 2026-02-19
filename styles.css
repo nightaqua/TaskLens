@@ -539,6 +539,15 @@
     border-bottom: 2px solid var(--color-red);
 }
 
+.timeline-header-cell.is-month-start {
+    border-left: 2px solid var(--interactive-accent);
+}
+
+.timeline-bg-cell.is-month-start-bg {
+    border-left: 2px solid var(--interactive-accent);
+    opacity: 0.6;
+}
+
 .timeline-day-name {
     font-size: 0.7em;
     color: var(--text-muted);
@@ -548,12 +557,12 @@
 /* Solid Grid Lines */
 .timeline-bg-cell {
     border-right: 1px solid var(--background-modifier-border);
-    background-color: rgba(120, 120, 120, 0.02);
+    background-color: rgba(128, 128, 128, 0.05);
     pointer-events: none;
     z-index: 1;
 }
 .timeline-bg-cell.is-today-bg {
-    background-color: rgba(150, 150, 150, 0.05);
+    background-color: rgba(150, 150, 150, 0.1);
 }
 
 .timeline-row-bg {
@@ -666,8 +675,7 @@
 .scan-paths-setting textarea {
     width: 100%;
     resize: none !important;
-    min-height: 6px;
-    height: 80px;
+    min-height: 80px;
 }
 
 /* Adobe-lite Highlight Effect */

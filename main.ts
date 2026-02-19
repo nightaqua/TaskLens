@@ -13,7 +13,7 @@ import { WelcomeModal } from './modals/WelcomeModal';
 export default class SemesterDashboardPlugin extends Plugin {
     settings: SemesterSettings;
     taskManager: TaskManager;
-
+    isLayoutLocked: boolean = true;
     async onload() {
         await this.loadSettings();
 
@@ -85,23 +85,27 @@ export default class SemesterDashboardPlugin extends Plugin {
     }
 
     toggleLayoutMode() {
+        // Flip the master state
+        this.isLayoutLocked = !this.isLayoutLocked;
+
         const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
-        let anyUnlocked = false;
+
         viewTypes.forEach(type => {
             const leaves = this.app.workspace.getLeavesOfType(type);
             leaves.forEach(leaf => {
                 const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
                 if (tabContainer) {
-                    if (tabContainer.classList.contains('semester-hide-tabs')) {
-                        tabContainer.classList.remove('semester-hide-tabs');
-                        anyUnlocked = true;
-                    } else {
+                    // Force EVERY tab container to match the master state
+                    if (this.isLayoutLocked) {
                         tabContainer.classList.add('semester-hide-tabs');
+                    } else {
+                        tabContainer.classList.remove('semester-hide-tabs');
                     }
                 }
             });
         });
-        new Notice(anyUnlocked ? 'Dashboard Layout: Unlocked 🔓' : 'Dashboard Layout: Locked 🔒');
+
+        new Notice(this.isLayoutLocked ? 'Dashboard Layout: Locked 🔒' : 'Dashboard Layout: Unlocked 🔓');
     }
 
     async activateView(viewType: string) {

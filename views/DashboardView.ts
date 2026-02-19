@@ -23,26 +23,47 @@ export class DashboardView extends ItemView {
     private showTimeline: boolean = true;
     private showList: boolean = true;
     private showStats: boolean = true;
-    private timelineDaysToShow: number = 7;
+    private timelineDaysToShow: number = 10;
+    private renderTimer: NodeJS.Timeout | null = null;
+    private lastTimelineScroll: number | null = null;
+    private forceScrollToToday: boolean = false;
 
     constructor(leaf: WorkspaceLeaf, private plugin: SemesterDashboardPlugin) {
         super(leaf);
-        // Use the shared task manager from main plugin
         this.taskManager = this.plugin.taskManager;
 
-        this.taskManager.on('tasks-updated', () => this.render());
+        this.taskManager.on('tasks-updated', () => {
+            if (this.renderTimer) clearTimeout(this.renderTimer);
+
+            this.renderTimer = setTimeout(() => {
+                if (this.timelineComponent && !this.forceScrollToToday) {
+                    this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
+                }
+
+                this.render();
+
+                if (this.timelineComponent) {
+                    if (this.forceScrollToToday) {
+                        this.timelineComponent.scrollToToday();
+                        this.forceScrollToToday = false;
+                    } else if (this.lastTimelineScroll !== null) {
+                        this.timelineComponent.setScrollPosition(this.lastTimelineScroll);
+                    }
+                }
+            }, 500);
+        });
+
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
                 if (file.path.endsWith('.md')) this.taskManager.refreshFileTask(file.path);
             })
         );
 
-        // Default filter 'Active' (Internally 'Open')
         this.taskManager.setStatusFilter(TaskStatus.Open);
     }
 
     getViewType(): string { return VIEW_TYPE_DASHBOARD; }
-    getDisplayText(): string { return 'Personal Dashboard'; }
+    getDisplayText(): string { return 'TaskLens Dashboard'; }
     getIcon(): string { return 'layout-dashboard'; }
 
     // --- Persistence Logic ---
@@ -52,7 +73,7 @@ export class DashboardView extends ItemView {
             this.showTimeline = state.showTimeline ?? this.showTimeline;
             this.showList = state.showList ?? this.showList;
             this.showStats = state.showStats ?? this.showStats;
-            this.timelineDaysToShow = state.timelineDaysToShow ?? this.timelineDaysToShow;
+            this.timelineDaysToShow = state.zoomLevel ?? 14;
 
             if (state.statusFilter) this.taskManager.setStatusFilter(state.statusFilter);
             if (state.courseFilter) this.taskManager.setCourseFilter(state.courseFilter);
@@ -73,7 +94,7 @@ export class DashboardView extends ItemView {
             showTimeline: this.showTimeline,
             showList: this.showList,
             showStats: this.showStats,
-            timelineDaysToShow: this.timelineDaysToShow,
+            zoomLevel: this.timelineDaysToShow,
             statusFilter: filters.status,
             courseFilter: filters.course,
             headerState: this.headerState
@@ -88,7 +109,9 @@ export class DashboardView extends ItemView {
 
         // 1b) Find the parent Tab Container (The "Window") and add our hider class
         this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
-        if (this.tabContainer) this.tabContainer.classList.add('semester-hide-tabs');
+        if (this.plugin.isLayoutLocked && this.tabContainer) {
+            this.tabContainer.classList.add('semester-hide-tabs');
+        }
 
         this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
         if (this.leafRootEl) this.leafRootEl.classList.add('semester-chromeless');
@@ -100,6 +123,10 @@ export class DashboardView extends ItemView {
 
         await this.taskManager.loadTasks();
         this.render();
+
+        if (this.timelineComponent) {
+            this.timelineComponent.scrollToToday();
+        }
     }
 
     // 3. Remove class on close
@@ -128,10 +155,8 @@ export class DashboardView extends ItemView {
                     this.render();
                 },
                 onRefresh: async () => {
+                    this.forceScrollToToday = true;
                     await this.taskManager.loadTasks();
-                    if (this.timelineComponent) {
-                        this.timelineComponent.scrollToToday();
-                    }
                 },
                 onSettings: () => {
                     this.showControls = !this.showControls;

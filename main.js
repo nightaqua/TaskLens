@@ -509,11 +509,11 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     }));
     const parserDetails = containerEl.createEl("details");
     parserDetails.createEl("summary", { text: "Task Parsing" });
-    new import_obsidian4.Setting(parserDetails).setName("Start Key").addText((t) => t.setValue(this.plugin.settings.startDateKey).onChange(async (v) => {
+    new import_obsidian4.Setting(parserDetails).setName("Start Key").setDesc("Inline text used to find the start date. Example: [start:: 2026-02-02]").addText((t) => t.setValue(this.plugin.settings.startDateKey).onChange(async (v) => {
       this.plugin.settings.startDateKey = v;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(parserDetails).setName("Due Key").addText((t) => t.setValue(this.plugin.settings.dueDateKey).onChange(async (v) => {
+    new import_obsidian4.Setting(parserDetails).setName("Due Key").setDesc("Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]").addText((t) => t.setValue(this.plugin.settings.dueDateKey).onChange(async (v) => {
       this.plugin.settings.dueDateKey = v;
       await this.plugin.saveSettings();
     }));
@@ -649,6 +649,10 @@ var TimelineComponent = class {
       const bgCell = grid.createDiv("timeline-bg-cell");
       bgCell.style.gridColumn = `${idx + 1}`;
       bgCell.style.gridRow = `2 / -1`;
+      if (day.getDate() === 1) {
+        cell.addClass("is-month-start");
+        bgCell.addClass("is-month-start-bg");
+      }
       if (day.toDateString() === new Date().toDateString()) {
         cell.addClass("is-today");
         bgCell.addClass("is-today-bg");
@@ -661,8 +665,17 @@ var TimelineComponent = class {
       const rowBg = grid.createDiv("timeline-row-bg");
       rowBg.style.gridColumn = `1 / -1`;
       rowBg.style.gridRow = `${rowIndex + 2}`;
-      const dueIdx = allDays.findIndex((d) => d.toDateString() === task.dueDate.toDateString());
-      if (dueIdx >= 0) {
+      const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
+      const taskEnd = new Date(task.dueDate);
+      taskStart.setHours(0, 0, 0, 0);
+      taskEnd.setHours(0, 0, 0, 0);
+      let startIdx = allDays.findIndex((d) => d.toDateString() === taskStart.toDateString());
+      let dueIdx = allDays.findIndex((d) => d.toDateString() === taskEnd.toDateString());
+      if (startIdx === -1 && taskStart < allDays[0])
+        startIdx = 0;
+      if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1])
+        dueIdx = allDays.length - 1;
+      if (dueIdx >= 0 && startIdx >= 0) {
         const bar = grid.createDiv("timeline-task-bar");
         bar.setText(task.title);
         const status = getTaskStatus(task);
@@ -674,8 +687,9 @@ var TimelineComponent = class {
           bar.addClass("status-completed");
         if (status === "upcoming_week" /* UpcomingWeek */)
           bar.addClass("status-active");
-        bar.style.gridColumnStart = `${dueIdx + 1}`;
-        bar.style.gridColumnEnd = `span 1`;
+        const span2 = dueIdx - startIdx + 1;
+        bar.style.gridColumnStart = `${startIdx + 1}`;
+        bar.style.gridColumnEnd = `span ${span2}`;
         bar.style.gridRow = `${rowIndex + 2}`;
         bar.addEventListener("mouseenter", (e) => this.showTooltip(e, task));
         bar.addEventListener("mouseleave", () => this.hideTooltip());
@@ -687,7 +701,14 @@ var TimelineComponent = class {
       }
     });
     this.setupEventListeners(this.scrollContainer);
-    this.scrollToToday();
+  }
+  getScrollPosition() {
+    return this.scrollContainer ? this.scrollContainer.scrollLeft : 0;
+  }
+  setScrollPosition(pos) {
+    if (this.scrollContainer) {
+      this.scrollContainer.scrollTo({ left: pos, behavior: "auto" });
+    }
   }
   scrollToToday() {
     setTimeout(() => {
@@ -1097,9 +1118,29 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.showTimeline = true;
     this.showList = true;
     this.showStats = true;
-    this.timelineDaysToShow = 7;
+    this.timelineDaysToShow = 10;
+    this.renderTimer = null;
+    this.lastTimelineScroll = null;
+    this.forceScrollToToday = false;
     this.taskManager = this.plugin.taskManager;
-    this.taskManager.on("tasks-updated", () => this.render());
+    this.taskManager.on("tasks-updated", () => {
+      if (this.renderTimer)
+        clearTimeout(this.renderTimer);
+      this.renderTimer = setTimeout(() => {
+        if (this.timelineComponent && !this.forceScrollToToday) {
+          this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
+        }
+        this.render();
+        if (this.timelineComponent) {
+          if (this.forceScrollToToday) {
+            this.timelineComponent.scrollToToday();
+            this.forceScrollToToday = false;
+          } else if (this.lastTimelineScroll !== null) {
+            this.timelineComponent.setScrollPosition(this.lastTimelineScroll);
+          }
+        }
+      }, 500);
+    });
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
         if (file.path.endsWith(".md"))
@@ -1112,7 +1153,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     return VIEW_TYPE_DASHBOARD;
   }
   getDisplayText() {
-    return "Personal Dashboard";
+    return "TaskLens Dashboard";
   }
   getIcon() {
     return "layout-dashboard";
@@ -1125,7 +1166,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
       this.showTimeline = (_b = state.showTimeline) != null ? _b : this.showTimeline;
       this.showList = (_c = state.showList) != null ? _c : this.showList;
       this.showStats = (_d = state.showStats) != null ? _d : this.showStats;
-      this.timelineDaysToShow = (_e = state.timelineDaysToShow) != null ? _e : this.timelineDaysToShow;
+      this.timelineDaysToShow = (_e = state.zoomLevel) != null ? _e : 14;
       if (state.statusFilter)
         this.taskManager.setStatusFilter(state.statusFilter);
       if (state.courseFilter)
@@ -1146,7 +1187,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
       showTimeline: this.showTimeline,
       showList: this.showList,
       showStats: this.showStats,
-      timelineDaysToShow: this.timelineDaysToShow,
+      zoomLevel: this.timelineDaysToShow,
       statusFilter: filters.status,
       courseFilter: filters.course,
       headerState: this.headerState
@@ -1158,8 +1199,9 @@ var DashboardView = class extends import_obsidian9.ItemView {
     if (parent)
       parent.classList.add("semester-chromeless");
     this.tabContainer = this.containerEl.closest(".workspace-tabs");
-    if (this.tabContainer)
+    if (this.plugin.isLayoutLocked && this.tabContainer) {
       this.tabContainer.classList.add("semester-hide-tabs");
+    }
     this.leafRootEl = this.containerEl.closest(".workspace-leaf-content");
     if (this.leafRootEl)
       this.leafRootEl.classList.add("semester-chromeless");
@@ -1168,6 +1210,9 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.applyColorTheme();
     await this.taskManager.loadTasks();
     this.render();
+    if (this.timelineComponent) {
+      this.timelineComponent.scrollToToday();
+    }
   }
   // 3. Remove class on close
   async onClose() {
@@ -1194,10 +1239,8 @@ var DashboardView = class extends import_obsidian9.ItemView {
           this.render();
         },
         onRefresh: async () => {
+          this.forceScrollToToday = true;
           await this.taskManager.loadTasks();
-          if (this.timelineComponent) {
-            this.timelineComponent.scrollToToday();
-          }
         },
         onSettings: () => {
           this.showControls = !this.showControls;
@@ -1680,6 +1723,10 @@ var StatsView = class extends import_obsidian12.ItemView {
 
 // main.ts
 var SemesterDashboardPlugin = class extends import_obsidian13.Plugin {
+  constructor() {
+    super(...arguments);
+    this.isLayoutLocked = true;
+  }
   async onload() {
     await this.loadSettings();
     const parser = new TaskParser(this.app, this.settings);
@@ -1732,23 +1779,22 @@ var SemesterDashboardPlugin = class extends import_obsidian13.Plugin {
     this.addSettingTab(new SettingsTab(this.app, this));
   }
   toggleLayoutMode() {
+    this.isLayoutLocked = !this.isLayoutLocked;
     const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
-    let anyUnlocked = false;
     viewTypes.forEach((type) => {
       const leaves = this.app.workspace.getLeavesOfType(type);
       leaves.forEach((leaf) => {
         const tabContainer = leaf.view.containerEl.closest(".workspace-tabs");
         if (tabContainer) {
-          if (tabContainer.classList.contains("semester-hide-tabs")) {
-            tabContainer.classList.remove("semester-hide-tabs");
-            anyUnlocked = true;
-          } else {
+          if (this.isLayoutLocked) {
             tabContainer.classList.add("semester-hide-tabs");
+          } else {
+            tabContainer.classList.remove("semester-hide-tabs");
           }
         }
       });
     });
-    new import_obsidian13.Notice(anyUnlocked ? "Dashboard Layout: Unlocked \u{1F513}" : "Dashboard Layout: Locked \u{1F512}");
+    new import_obsidian13.Notice(this.isLayoutLocked ? "Dashboard Layout: Locked \u{1F512}" : "Dashboard Layout: Unlocked \u{1F513}");
   }
   async activateView(viewType) {
     const leaf = this.app.workspace.getLeaf(true);

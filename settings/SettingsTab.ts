@@ -68,11 +68,19 @@ export class SettingsTab extends PluginSettingTab {
                 await this.plugin.saveSettings();
             }));
 
-        // 2. Task Parsing
+        /// 2. Task Parsing
         const parserDetails = containerEl.createEl('details');
         parserDetails.createEl('summary', { text: 'Task Parsing' });
-        new Setting(parserDetails).setName('Start Key').addText(t => t.setValue(this.plugin.settings.startDateKey).onChange(async v => { this.plugin.settings.startDateKey = v; await this.plugin.saveSettings(); }));
-        new Setting(parserDetails).setName('Due Key').addText(t => t.setValue(this.plugin.settings.dueDateKey).onChange(async v => { this.plugin.settings.dueDateKey = v; await this.plugin.saveSettings(); }));
+
+        new Setting(parserDetails)
+            .setName('Start Key')
+            .setDesc('Inline text used to find the start date. Example: [start:: 2026-02-02]')
+            .addText(t => t.setValue(this.plugin.settings.startDateKey).onChange(async v => { this.plugin.settings.startDateKey = v; await this.plugin.saveSettings(); }));
+
+        new Setting(parserDetails)
+            .setName('Due Key')
+            .setDesc('Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]')
+            .addText(t => t.setValue(this.plugin.settings.dueDateKey).onChange(async v => { this.plugin.settings.dueDateKey = v; await this.plugin.saveSettings(); }));
 
         // 3. Visuals & Colors
         const uiDetails = containerEl.createEl('details');

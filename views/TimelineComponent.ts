@@ -108,6 +108,11 @@ export class TimelineComponent {
             bgCell.style.gridColumn = `${idx + 1}`;
             bgCell.style.gridRow = `2 / -1`;
 
+            if (day.getDate() === 1) {
+                cell.addClass('is-month-start');
+                bgCell.addClass('is-month-start-bg');
+            }
+
             if (day.toDateString() === new Date().toDateString()) {
                 cell.addClass('is-today');
                 bgCell.addClass('is-today-bg');
@@ -118,16 +123,30 @@ export class TimelineComponent {
             }
         });
 
-        // 5. TASKS & HORIZONTAL GRID
+        // 5. TASKS
         validTasks.forEach((task, rowIndex) => {
-            // ---> NEW: Create a horizontal grid line for every row <---
             const rowBg = grid.createDiv('timeline-row-bg');
-            rowBg.style.gridColumn = `1 / -1`; // Span entire width
+            rowBg.style.gridColumn = `1 / -1`;
             rowBg.style.gridRow = `${rowIndex + 2}`;
 
-            const dueIdx = allDays.findIndex(d => d.toDateString() === task.dueDate!.toDateString());
+            // Treat start date as due date if no start date exists
+            const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate!);
+            const taskEnd = new Date(task.dueDate!);
 
-            if (dueIdx >= 0) {
+            // Normalize times to midnight to avoid timezone shifting bugs
+            taskStart.setHours(0,0,0,0);
+            taskEnd.setHours(0,0,0,0);
+
+            // Find columns
+            let startIdx = allDays.findIndex(d => d.toDateString() === taskStart.toDateString());
+            let dueIdx = allDays.findIndex(d => d.toDateString() === taskEnd.toDateString());
+
+            // If task starts before our rendered timeline, snap it to the left edge
+            if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
+            // If task ends after our rendered timeline, snap it to the right edge
+            if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
+
+            if (dueIdx >= 0 && startIdx >= 0) {
                 const bar = grid.createDiv('timeline-task-bar');
                 bar.setText(task.title);
 
@@ -137,12 +156,13 @@ export class TimelineComponent {
                 if (status === TaskStatus.Completed) bar.addClass('status-completed');
                 if (status === TaskStatus.UpcomingWeek) bar.addClass('status-active');
 
-                // Grid Positioning (+2 because Row 1 is the header)
-                bar.style.gridColumnStart = `${dueIdx + 1}`;
-                bar.style.gridColumnEnd = `span 1`;
+                // Calculate how many days the task spans (minimum 1 day)
+                const span = (dueIdx - startIdx) + 1;
+
+                bar.style.gridColumnStart = `${startIdx + 1}`;
+                bar.style.gridColumnEnd = `span ${span}`;
                 bar.style.gridRow = `${rowIndex + 2}`;
 
-                // Hover & Click
                 bar.addEventListener('mouseenter', (e) => this.showTooltip(e, task));
                 bar.addEventListener('mouseleave', () => this.hideTooltip());
                 bar.addEventListener('mousemove', (e) => this.moveTooltip(e));
@@ -156,9 +176,17 @@ export class TimelineComponent {
 
         // 6. INITIALIZE DRAGGING & SCROLL
         this.setupEventListeners(this.scrollContainer);
-        this.scrollToToday();
     }
 
+    public getScrollPosition(): number {
+        return this.scrollContainer ? this.scrollContainer.scrollLeft : 0;
+    }
+
+    public setScrollPosition(pos: number): void {
+        if (this.scrollContainer) {
+            this.scrollContainer.scrollTo({ left: pos, behavior: 'auto' });
+        }
+    }
     public scrollToToday(): void {
         setTimeout(() => {
             if (!this.scrollContainer) return;
