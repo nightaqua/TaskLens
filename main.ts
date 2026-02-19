@@ -1,4 +1,4 @@
-import { Plugin, Notice } from 'obsidian';
+import { Plugin, Notice, Menu, addIcon } from 'obsidian';
 import { TaskManager } from './services/TaskManager';
 import { TaskParser } from './services/TaskParser';
 import { SemesterSettings, DEFAULT_SETTINGS } from './settings/Settings';
@@ -7,18 +7,25 @@ import { DashboardView, VIEW_TYPE_DASHBOARD } from './views/DashboardView';
 import { TimelineView, VIEW_TYPE_TIMELINE } from './views/TimelineView';
 import { TaskListView, VIEW_TYPE_LIST } from './views/TaskListView';
 import { StatsView, VIEW_TYPE_STATS } from './views/StatsView';
-import { QuickAddModal } from './modals/QuickAddModal'; // Import
+import { QuickAddModal } from './modals/QuickAddModal';
 import { WelcomeModal } from './modals/WelcomeModal';
+
+// 1. Define our custom TaskLens icon (Magnifying Glass + Checkmark)
+const TASKLENS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="11" cy="11" r="8"></circle>
+  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  <path d="M8 11.5L10 13.5L14 8.5"></path>
+</svg>`;
 
 export default class SemesterDashboardPlugin extends Plugin {
     settings: SemesterSettings;
     taskManager: TaskManager;
     isLayoutLocked: boolean = true;
+
     async onload() {
         await this.loadSettings();
 
         const parser = new TaskParser(this.app, this.settings);
-        // FIX: Pass 'this.app' to TaskManager
         this.taskManager = new TaskManager(parser, this.app);
 
         // Register Views
@@ -27,11 +34,48 @@ export default class SemesterDashboardPlugin extends Plugin {
         this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
         this.registerView(VIEW_TYPE_STATS, (leaf) => new StatsView(leaf, this));
 
-        // Ribbon Icons
-        this.addRibbonIcon('layout-dashboard', 'Open TaskLens Dashboard', () => {
-            this.activateView(VIEW_TYPE_DASHBOARD);
+        // 2. Add the custom icon to Obsidian's icon library
+        addIcon('tasklens-icon', TASKLENS_ICON);
+
+        // 3. Create the SINGLE unified Ribbon Icon with a Context Menu
+        this.addRibbonIcon('tasklens-icon', 'TaskLens', (evt: MouseEvent) => {
+            const menu = new Menu();
+
+            menu.addItem((item) =>
+                item
+                    .setTitle('Open Dashboard')
+                    .setIcon('layout-dashboard')
+                    .onClick(() => this.activateView(VIEW_TYPE_DASHBOARD))
+            );
+
+            menu.addItem((item) =>
+                item
+                    .setTitle('Quick Add Task')
+                    .setIcon('plus-circle')
+                    .onClick(() => new QuickAddModal(this.app, this.taskManager).open())
+            );
+
+            menu.addSeparator();
+
+            // Dynamically change title/icon based on current state
+            menu.addItem((item) =>
+                item
+                    .setTitle(this.isLayoutLocked ? 'Unlock Layout' : 'Lock Layout')
+                    .setIcon(this.isLayoutLocked ? 'unlock' : 'lock')
+                    .onClick(() => this.toggleLayoutMode())
+            );
+
+            // Greyed out "Shop" feature
+            menu.addItem((item) =>
+                item
+                    .setTitle('Layout Presets ▸')
+                    .setIcon('layout')
+                    .setDisabled(true) // Grays it out and makes it unclickable
+                    .onClick(() => {})
+            );
+
+            menu.showAtMouseEvent(evt);
         });
-        this.addRibbonIcon('move', 'Toggle Dashboard Layout', () => this.toggleLayoutMode());
 
         // Commands
         this.addCommand({
@@ -40,7 +84,6 @@ export default class SemesterDashboardPlugin extends Plugin {
             callback: () => this.activateView(VIEW_TYPE_DASHBOARD)
         });
 
-        // ... (Keep other open commands) ...
         this.addCommand({
             id: 'open-timeline',
             name: 'Open Timeline View',
@@ -59,7 +102,6 @@ export default class SemesterDashboardPlugin extends Plugin {
             callback: () => this.activateView(VIEW_TYPE_STATS)
         });
 
-        // NEW: Global Quick Add
         this.addCommand({
             id: 'quick-add-task',
             name: 'Quick Add Task',
@@ -85,7 +127,6 @@ export default class SemesterDashboardPlugin extends Plugin {
     }
 
     toggleLayoutMode() {
-        // Flip the master state
         this.isLayoutLocked = !this.isLayoutLocked;
 
         const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
@@ -95,7 +136,6 @@ export default class SemesterDashboardPlugin extends Plugin {
             leaves.forEach(leaf => {
                 const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
                 if (tabContainer) {
-                    // Force EVERY tab container to match the master state
                     if (this.isLayoutLocked) {
                         tabContainer.classList.add('semester-hide-tabs');
                     } else {
@@ -114,7 +154,9 @@ export default class SemesterDashboardPlugin extends Plugin {
         await this.app.workspace.revealLeaf(leaf);
         setTimeout(() => {
             const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
-            if (tabContainer) tabContainer.classList.add('semester-hide-tabs');
+            if (tabContainer && this.isLayoutLocked) {
+                tabContainer.classList.add('semester-hide-tabs');
+            }
         }, 100);
     }
 
@@ -131,7 +173,6 @@ export default class SemesterDashboardPlugin extends Plugin {
         const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD);
         leaves.forEach(leaf => {
             const view = leaf.view;
-            // Avoid instanceof due to hot-reload identity changes; rely on view type + method presence.
             const isDashboard =
                 typeof view?.getViewType === 'function' &&
                 view.getViewType() === VIEW_TYPE_DASHBOARD;

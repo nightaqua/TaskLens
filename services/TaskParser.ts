@@ -48,13 +48,11 @@ export class TaskParser {
                 const normalizedFolder = folder.replace(/^\/|\/$/g, '');
                 const filePath = file.path;
 
-                // Fix: Ensure we check if setting exists before using it
                 if (this.settings.scanRecursively) {
                     return filePath.startsWith(normalizedFolder);
-                } else {
-                    const fileFolder = file.parent?.path || '';
-                    return fileFolder === normalizedFolder;
                 }
+                const fileFolder = file.parent?.path || '';
+                return fileFolder === normalizedFolder;
             });
         });
     }
@@ -94,47 +92,50 @@ export class TaskParser {
 
     private getCourseName(file: TFile, cache: CachedMetadata | null): string {
         switch (this.settings.courseDetection) {
-            case 'per-file': return file.basename;
-            case 'per-folder': return file.parent?.name || file.basename;
+            case 'per-file':
+                return file.basename;
+            case 'per-folder':
+                return file.parent?.name || file.basename;
             case 'frontmatter':
                 if (cache?.frontmatter) {
                     const val = cache.frontmatter[this.settings.courseFrontmatterKey];
                     if (val) return String(val);
                 }
                 return file.basename;
-            default: return file.basename;
+            default:
+                return file.basename;
         }
     }
 
-    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; } {
+    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date } {
         let title = taskText;
         let startDate: Date | undefined;
         let dueDate: Date | undefined;
 
         // 1. START DATE Parsing
         // Matches: start:: YYYY-MM-DD | [start:: YYYY-MM-DD] | (start:: YYYY-MM-DD)
-        const startRegex = /\[?\(?start::\s*(\d{4}-\d{2}-\d{2})[\]\)]?/gi;
+        const startRegex = /\[?\(?start::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
         const startMatch = startRegex.exec(taskText);
         if (startMatch) {
             startDate = new Date(startMatch[1]);
-            title = title.replace(startRegex, ''); // Remove from title
+            title = title.replace(startRegex, '');
         }
 
-        // 2. DUE DATE Parsing (Crucial Fix)
+        // 2. DUE DATE Parsing
         // Matches: due:: YYYY-MM-DD | [due:: YYYY-MM-DD] | (due:: YYYY-MM-DD)
-        const dueRegex = /\[?\(?due::\s*(\d{4}-\d{2}-\d{2})[\]\)]?/gi;
+        const dueRegex = /\[?\(?due::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
         const dueMatch = dueRegex.exec(taskText);
         if (dueMatch) {
             dueDate = new Date(dueMatch[1]);
-            title = title.replace(dueRegex, ''); // Remove from title
+            title = title.replace(dueRegex, '');
         }
 
-        // 3. Emoji Fallback
+        // 3. Emoji Fallback (Calendar emoji: U+1F4C5)
         if (!dueDate) {
-            const emojiMatch = taskText.match(/📅\s*(\d{4}-\d{2}-\d{2})/);
+            const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/u);
             if (emojiMatch) {
                 dueDate = new Date(emojiMatch[1]);
-                title = title.replace(/📅\s*\d{4}-\d{2}-\d{2}\s*/g, '');
+                title = title.replace(/\u{1F4C5}\s*\d{4}-\d{2}-\d{2}\s*/gu, '');
             }
         }
 

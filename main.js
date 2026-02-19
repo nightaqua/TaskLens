@@ -287,10 +287,9 @@ var TaskParser = class {
         const filePath = file.path;
         if (this.settings.scanRecursively) {
           return filePath.startsWith(normalizedFolder);
-        } else {
-          const fileFolder = ((_a = file.parent) == null ? void 0 : _a.path) || "";
-          return fileFolder === normalizedFolder;
         }
+        const fileFolder = ((_a = file.parent) == null ? void 0 : _a.path) || "";
+        return fileFolder === normalizedFolder;
       });
     });
   }
@@ -345,23 +344,23 @@ var TaskParser = class {
     let title = taskText;
     let startDate;
     let dueDate;
-    const startRegex = /\[?\(?start::\s*(\d{4}-\d{2}-\d{2})[\]\)]?/gi;
+    const startRegex = /\[?\(?start::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
     const startMatch = startRegex.exec(taskText);
     if (startMatch) {
       startDate = new Date(startMatch[1]);
       title = title.replace(startRegex, "");
     }
-    const dueRegex = /\[?\(?due::\s*(\d{4}-\d{2}-\d{2})[\]\)]?/gi;
+    const dueRegex = /\[?\(?due::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
     const dueMatch = dueRegex.exec(taskText);
     if (dueMatch) {
       dueDate = new Date(dueMatch[1]);
       title = title.replace(dueRegex, "");
     }
     if (!dueDate) {
-      const emojiMatch = taskText.match(/📅\s*(\d{4}-\d{2}-\d{2})/);
+      const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/u);
       if (emojiMatch) {
         dueDate = new Date(emojiMatch[1]);
-        title = title.replace(/📅\s*\d{4}-\d{2}-\d{2}\s*/g, "");
+        title = title.replace(/\u{1F4C5}\s*\d{4}-\d{2}-\d{2}\s*/gu, "");
       }
     }
     title = title.replace(/\s+/g, " ").trim();
@@ -1722,6 +1721,11 @@ var StatsView = class extends import_obsidian12.ItemView {
 };
 
 // main.ts
+var TASKLENS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="11" cy="11" r="8"></circle>
+  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  <path d="M8 11.5L10 13.5L14 8.5"></path>
+</svg>`;
 var SemesterDashboardPlugin = class extends import_obsidian13.Plugin {
   constructor() {
     super(...arguments);
@@ -1735,10 +1739,25 @@ var SemesterDashboardPlugin = class extends import_obsidian13.Plugin {
     this.registerView(VIEW_TYPE_TIMELINE, (leaf) => new TimelineView(leaf, this));
     this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
     this.registerView(VIEW_TYPE_STATS, (leaf) => new StatsView(leaf, this));
-    this.addRibbonIcon("layout-dashboard", "Open TaskLens Dashboard", () => {
-      this.activateView(VIEW_TYPE_DASHBOARD);
+    (0, import_obsidian13.addIcon)("tasklens-icon", TASKLENS_ICON);
+    this.addRibbonIcon("tasklens-icon", "TaskLens", (evt) => {
+      const menu = new import_obsidian13.Menu();
+      menu.addItem(
+        (item) => item.setTitle("Open Dashboard").setIcon("layout-dashboard").onClick(() => this.activateView(VIEW_TYPE_DASHBOARD))
+      );
+      menu.addItem(
+        (item) => item.setTitle("Quick Add Task").setIcon("plus-circle").onClick(() => new QuickAddModal(this.app, this.taskManager).open())
+      );
+      menu.addSeparator();
+      menu.addItem(
+        (item) => item.setTitle(this.isLayoutLocked ? "Unlock Layout" : "Lock Layout").setIcon(this.isLayoutLocked ? "unlock" : "lock").onClick(() => this.toggleLayoutMode())
+      );
+      menu.addItem(
+        (item) => item.setTitle("Layout Presets \u25B8").setIcon("layout").setDisabled(true).onClick(() => {
+        })
+      );
+      menu.showAtMouseEvent(evt);
     });
-    this.addRibbonIcon("move", "Toggle Dashboard Layout", () => this.toggleLayoutMode());
     this.addCommand({
       id: "open-dashboard",
       name: "Open Dashboard (All-in-One)",
@@ -1802,8 +1821,9 @@ var SemesterDashboardPlugin = class extends import_obsidian13.Plugin {
     await this.app.workspace.revealLeaf(leaf);
     setTimeout(() => {
       const tabContainer = leaf.view.containerEl.closest(".workspace-tabs");
-      if (tabContainer)
+      if (tabContainer && this.isLayoutLocked) {
         tabContainer.classList.add("semester-hide-tabs");
+      }
     }, 100);
   }
   async loadSettings() {

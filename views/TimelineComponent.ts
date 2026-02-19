@@ -214,7 +214,7 @@ export class TimelineComponent {
 
         overlay.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.scroll(direction); // Reuse the public method
+            this.scroll(direction); // Reuse the release method
         });
     }
 
