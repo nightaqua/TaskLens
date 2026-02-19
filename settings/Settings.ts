@@ -1,39 +1,29 @@
 export type ColorMode = 'status' | 'course';
 
 export interface SemesterSettings {
-    // --- Scanning & Parsing ---
-    /** Folders to scan for tasks (empty array = scan entire vault) */
+    // ... (Keep existing scan, course, and date keys) ...
     scanFolders: string[];
-
-    /** Whether to scan recursively in specified folders */
     scanRecursively: boolean;
-
-    /** How to identify courses */
     courseDetection: 'per-file' | 'per-folder' | 'frontmatter';
-
-    /** Frontmatter property to use for course name */
     courseFrontmatterKey: string;
-
-    /** Metadata key for start date */
     startDateKey: string;
-
-    /** Metadata key for due date */
     dueDateKey: string;
 
-    // --- Visuals & UI ---
-    /** Color scheme mode */
+    // Visuals & UI
     colorScheme: 'inherit' | 'custom';
-
-    /** How to color tasks */
     colorMode: ColorMode;
 
-    /** Custom Color Palette */
+    // Status Colors
     colors: {
         overdue: string;
         urgent: string;
         active: string;
         completed: string;
     };
+
+    courseColors: string[];
+
+    hasSeenWelcome: boolean;
 }
 
 export const DEFAULT_SETTINGS: SemesterSettings = {
@@ -53,5 +43,10 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
         urgent: '#fb8500',
         active: '#2a9d8f',
         completed: '#457b9d'
-    }
+    },
+
+    // Default palette for courses
+    courseColors: ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'],
+
+    hasSeenWelcome: false
 };

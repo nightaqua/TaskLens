@@ -120,6 +120,9 @@ export class DashboardView extends ItemView {
                     if (this.headerComponent) {
                         this.headerState = this.headerComponent.getState();
                     }
+                    if (this.headerState.isCollapsed) {
+                        this.showControls = false;
+                    }
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
@@ -131,6 +134,9 @@ export class DashboardView extends ItemView {
                 },
                 onSettings: () => {
                     this.showControls = !this.showControls;
+                    if (this.showControls && this.headerState.isCollapsed) {
+                        this.headerState.isCollapsed = false;
+                    }
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 }
@@ -232,21 +238,22 @@ export class DashboardView extends ItemView {
 
     private renderStatistics(): void {
         const stats = this.taskManager.getStatistics();
-        const allTasks = this.taskManager.getAllTasks();
-        const activeCount = allTasks.filter(t => !t.completed).length;
-
         const container = this.contentEl.createDiv('dashboard-stats');
 
         const statCards = [
-            { label: 'Total', value: stats.total, cls: 'stat-total' }, // Purple
-            { label: 'Active', value: activeCount, cls: 'stat-active' }, // Green
-            { label: 'Urgent', value: stats.urgent, cls: 'stat-urgent' }, // Orange
-            { label: 'Overdue', value: stats.overdue, cls: 'stat-overdue' }, // Red
-            { label: 'Completed', value: stats.completed, cls: 'stat-completed' } // Blue
+            { label: 'Total', value: stats.total, cls: 'stat-total', filter: TaskStatus.All },
+            { label: 'Active', value: stats.upcoming, cls: 'stat-active', filter: TaskStatus.UpcomingWeek },
+            { label: 'Urgent', value: stats.urgent, cls: 'stat-urgent', filter: TaskStatus.Urgent },
+            { label: 'Overdue', value: stats.overdue, cls: 'stat-overdue', filter: TaskStatus.Overdue },
+            { label: 'Completed', value: stats.completed, cls: 'stat-completed', filter: TaskStatus.Completed }
         ];
 
         statCards.forEach(stat => {
             const card = container.createDiv({ cls: ['stat-card', stat.cls] });
+            card.addClass('is-clickable');
+            card.addEventListener('click', () => {
+                this.taskManager.setStatusFilter(stat.filter);
+            });
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
@@ -256,7 +263,7 @@ export class DashboardView extends ItemView {
         const container = this.contentEl.createDiv();
 
         const list = new TaskListComponent(container, this.app, {
-            onToggle: (t) => this.toggleTaskCompletion(t),
+            onToggle: (t) => this.taskManager.toggleTaskCompletion(t),
             onEdit: async (t, newTitle, newDate) => {
                 await this.taskManager.updateTask(t, newTitle, newDate);
             },
@@ -312,27 +319,17 @@ export class DashboardView extends ItemView {
         const scrollRight = navControls.createEl('button', { cls: 'view-toggle-btn' });
         setIcon(scrollRight, 'chevron-right');
 
-        this.timelineComponent = new TimelineComponent(container, this.taskManager.getFilteredTasks(), this.timelineDaysToShow);
+        this.timelineComponent = new TimelineComponent(
+            container,
+            this.app,
+            this.taskManager.getFilteredTasks(),
+            this.timelineDaysToShow
+        );
         this.timelineComponent.render();
 
         // Attach listeners
         scrollLeft.addEventListener('click', () => this.timelineComponent?.scroll('left'));
         scrollRight.addEventListener('click', () => this.timelineComponent?.scroll('right'));
-    }
-
-    // ... Helpers (toggleTaskCompletion, openTaskInEditor) remain same ...
-    private async toggleTaskCompletion(task: Task) {
-        const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file) {
-            const content = await this.app.vault.read(file as any);
-            const lines = content.split('\n');
-            if (lines[task.lineNumber]) {
-                lines[task.lineNumber] = lines[task.lineNumber].includes('[x]')
-                    ? lines[task.lineNumber].replace('[x]', '[ ]')
-                    : lines[task.lineNumber].replace('[ ]', '[x]');
-                await this.app.vault.modify(file as any, lines.join('\n'));
-            }
-        }
     }
 
     private async openTaskInEditor(task: Task) {

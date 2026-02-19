@@ -1,6 +1,6 @@
 # Example Course Files
 
-These example files demonstrate how to structure your course notes for use with the Semester Dashboard plugin.
+These example files demonstrate how to structure your notes for TaskLens.
 
 ## Example 1: Computer Science 101 (CS101.md)
 
@@ -56,23 +56,23 @@ semester: Spring 2024
 
 ## Example 3: Using Folder Structure
 
-If using "per-folder" course detection:
+If using per-folder course detection:
 
 ```
 Uni/
-├── Spring2024/
-│   ├── CS101/
-│   │   ├── Week1.md
-│   │   ├── Week2.md
-│   │   └── Week3.md
-│   ├── Math201/
-│   │   ├── Assignments.md
-│   │   └── Notes.md
-│   └── Physics101/
-│       └── Labs.md
+|-- Spring2024/
+|   |-- CS101/
+|   |   |-- Week1.md
+|   |   |-- Week2.md
+|   |   `-- Week3.md
+|   |-- Math201/
+|   |   |-- Assignments.md
+|   |   `-- Notes.md
+|   `-- Physics101/
+|       `-- Labs.md
 ```
 
-Each file can have tasks, and they'll be grouped by the folder name (CS101, Math201, Physics101).
+Each file can have tasks, and they will be grouped by the folder name (CS101, Math201, Physics101).
 
 ## Example 4: Mixed Metadata Formats
 
@@ -82,7 +82,7 @@ The parser supports multiple date formats:
 # Flexible Date Formats
 
 - [ ] Task with standard format due:: 2024-02-15
-- [ ] Task with emoji 📅 2024-02-20
+- [ ] Task with emoji date 2024-02-20
 - [ ] Task with both start:: 2024-02-10 due:: 2024-02-25
 - [ ] Task with no date (still shows in dashboard)
 ```
@@ -121,17 +121,17 @@ semester: Spring 2024
 
 ## Tips for Best Results
 
-1. **Consistent Naming**: Use consistent file names for courses
-2. **Date Format**: Always use YYYY-MM-DD for dates
-3. **Optional Start Dates**: Only add start dates for long-running tasks
-4. **Frontmatter**: Use frontmatter for course metadata if using that detection method
-5. **Organization**: Group related tasks under headings for better note organization
+1. Consistent naming for courses
+2. Use YYYY-MM-DD for dates
+3. Use start dates for long-running tasks
+4. Use frontmatter if you want explicit course metadata
+5. Group related tasks under headings
 
 ## Settings Configuration Examples
 
 ### Scan Specific Folders
 
-In plugin settings, set "Scan folders" to:
+In plugin settings, set Scan folders to:
 ```
 Uni/Spring2024
 Uni/Fall2024
@@ -139,21 +139,21 @@ Uni/Fall2024
 
 ### Use Frontmatter for Course Names
 
-1. Set "Course detection method" to "Frontmatter"
-2. Set "Frontmatter property" to "course"
-3. Add `course: CourseName` to each file's frontmatter
+1. Set course detection method to Frontmatter
+2. Set frontmatter property to course
+3. Add course: CourseName to each file's frontmatter
 
 ### Allow Tasks Without Due Dates
 
-Enable "Allow tasks without due dates" to see:
+Enable Allow tasks without due dates to see:
 - [ ] General todo items
 - [ ] Ongoing tasks
-- [ ] Tasks you haven't scheduled yet
+- [ ] Tasks you have not scheduled yet
 
 ## Dashboard Workflow
 
-1. **Morning Review**: Open dashboard, filter to "Upcoming (7 days)"
-2. **Priority Check**: See overdue tasks at a glance
-3. **Course Focus**: Filter by specific course when working on that subject
-4. **Quick Navigation**: Click task to jump to note and mark complete
-5. **Weekly Planning**: View all open tasks, sort by due date
+1. Morning review: filter to Upcoming Week
+2. Priority check: scan overdue tasks
+3. Course focus: filter by course
+4. Quick navigation: click a task to open it
+5. Weekly planning: view all open tasks sorted by due date

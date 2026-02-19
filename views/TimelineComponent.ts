@@ -1,209 +1,261 @@
 import { Task, getTaskStatus, TaskStatus } from '../models/Task';
+import { App, MarkdownView, TFile } from 'obsidian';
 
 export class TimelineComponent {
     private container: HTMLElement;
     private tasks: Task[];
     private daysToShow: number;
+    private app: App;
+
+    private scrollContainer: HTMLElement | null = null;
+    private tooltipEl: HTMLElement | null = null;
 
     // Drag state
     private isDragging = false;
     private startX = 0;
-    private scrollLeft = 0;
+    private scrollLeftPos = 0;
 
-    // The actual horizontally scrollable element (created in render)
-    private scrollContainer: HTMLElement | null = null;
-    private todayColumnIndex: number = -1;
-
-    constructor(container: HTMLElement, tasks: Task[], daysToShow: number = 7) {
+    constructor(container: HTMLElement, app: App, tasks: Task[], daysToShow: number = 14) {
         this.container = container;
-        this.tasks = tasks.filter(t => t.dueDate);
+        this.app = app;
+        this.tasks = tasks;
         this.daysToShow = daysToShow;
     }
 
     public render(): void {
         this.container.empty();
-
-        // Wrapper for positioning navigation overlays
         this.container.addClass('timeline-wrapper');
-        this.todayColumnIndex = -1;
 
-        const validTasks = this.tasks.filter(t => t.dueDate instanceof Date && !isNaN(t.dueDate.getTime()));
-
+        const validTasks = this.tasks.filter(t => t.dueDate && !isNaN(t.dueDate.getTime()));
         if (validTasks.length === 0) {
-            const scrollContainer = this.container.createDiv('timeline-container');
-            const empty = scrollContainer.createDiv('dashboard-empty-state');
+            const empty = this.container.createDiv('dashboard-empty-state');
             empty.createEl('p', { text: 'No dated tasks to display.' });
             return;
         }
 
-        // 1) Create navigation overlays ("scroll zones")
+        const dates = validTasks.map(t => t.dueDate!);
+        dates.push(new Date());
+
+        const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+        minDate.setDate(minDate.getDate() - 2);
+        maxDate.setDate(maxDate.getDate() + this.daysToShow + 2);
+
+        const allDays: Date[] = [];
+        const curr = new Date(minDate);
+        while (curr <= maxDate) {
+            allDays.push(new Date(curr));
+            curr.setDate(curr.getDate() + 1);
+        }
+
+        // 1. ADD NAVIGATION ARROWS (Hover Overlays)
         this.createNavigationOverlay('left');
         this.createNavigationOverlay('right');
 
-        // 2) Create the scrollable container
+        // 2. SETUP CONTAINERS
         this.scrollContainer = this.container.createDiv('timeline-container');
-        this.setupEventListeners(this.scrollContainer);
+        const scrollContent = this.scrollContainer.createDiv('timeline-scroll-content');
 
-        // 3) Determine Date Range
-        const dates = validTasks
-            .map(t => [t.startDate, t.dueDate])
-            .flat()
-            .filter((d): d is Date => !!d)
-            .sort((a, b) => a.getTime() - b.getTime());
+        // Ensure width scales perfectly to fit all days
+        const totalWidthPercent = (allDays.length / this.daysToShow) * 100;
+        scrollContent.style.width = `${totalWidthPercent}%`;
 
-        if (dates.length === 0) return;
+        const colWidthPercent = 100 / allDays.length;
 
-        // Add broad buffer for scrolling context
-        const minDate = new Date(dates[0]);
-        minDate.setDate(minDate.getDate() - 14);
+        // 3. MONTH HEADER ROW
+        const monthHeader = scrollContent.createDiv('timeline-month-row');
 
-        const maxDate = new Date(dates[dates.length - 1]);
-        maxDate.setDate(maxDate.getDate() + 14);
+        let currentMonth = -1;
+        let monthStartIdx = 0;
 
-        // Generate days
-        const allDays: Date[] = [];
-        const current = new Date(minDate);
-        while (current <= maxDate) {
-            allDays.push(new Date(current));
-            current.setDate(current.getDate() + 1);
-        }
-
-        // 4) Build Grid (append to scrollContainer, not wrapper)
-        const grid = this.scrollContainer.createDiv('timeline-grid');
-        const colWidthPercent = 100 / this.daysToShow;
-        grid.style.gridTemplateColumns = `repeat(${allDays.length}, ${colWidthPercent}%)`;
-        // NEW: Background Grid using CSS Gradient (vertical divider at end of each column)
-        const borderColor = 'rgba(200, 200, 200, 0.15)';
-        grid.style.backgroundImage = `linear-gradient(to right, transparent 0%, transparent calc(100% - 1px), ${borderColor} 100%)`;
-        grid.style.backgroundSize = `${colWidthPercent}% 100%`;
-
-        // 5) Render Header & Tasks
-        const todayStr = new Date().toDateString();
-        let todayColumn = -1;
-
-        allDays.forEach((day, index) => {
-            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-
-            const cell = grid.createDiv('timeline-header-cell');
-            if (isWeekend) cell.addClass('weekend');
-
-            const dayName = day.toLocaleDateString(undefined, { weekday: 'short' });
-            const dayNum = day.getDate();
-            const month = day.toLocaleDateString(undefined, { month: 'short' });
-
-            const label = dayNum === 1 || index === 0 ? `${month} ${dayNum}` : `${dayName} ${dayNum}`;
-            cell.setText(label);
-            cell.style.gridColumn = `${index + 1}`;
-            cell.style.gridRow = '1';
-
-            if (day.toDateString() === todayStr) {
-                const marker = grid.createDiv('timeline-today-marker');
-                marker.style.gridColumn = `${index + 1}`;
-                todayColumn = index;
-                this.todayColumnIndex = index;
+        allDays.forEach((day, idx) => {
+            const m = day.getMonth();
+            if (m !== currentMonth) {
+                if (currentMonth !== -1) {
+                    const span = idx - monthStartIdx;
+                    const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
+                    const mDiv = monthHeader.createDiv('timeline-month-cell');
+                    mDiv.setText(monthName);
+                    mDiv.style.width = `${span * colWidthPercent}%`;
+                    mDiv.style.left = `${monthStartIdx * colWidthPercent}%`;
+                }
+                currentMonth = m;
+                monthStartIdx = idx;
             }
         });
 
-        validTasks.forEach((task, index) => {
-            const taskStart = task.startDate ? task.startDate : task.dueDate!;
-            const taskEnd = task.dueDate!;
+        const span = allDays.length - monthStartIdx;
+        const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
+        const mDiv = monthHeader.createDiv('timeline-month-cell');
+        mDiv.setText(monthName);
+        mDiv.style.width = `${span * colWidthPercent}%`;
+        mDiv.style.left = `${monthStartIdx * colWidthPercent}%`;
 
-            // Calculate offsets
-            const startIndex = this.getDayDiff(minDate, taskStart) + 1;
-            const endIndex = this.getDayDiff(minDate, taskEnd) + 1;
-            const visualStart = Math.min(startIndex, endIndex);
-            const visualEnd = Math.max(startIndex, endIndex);
+        // 4. GRID & DAYS (Solid grid lines)
+        const grid = scrollContent.createDiv('timeline-grid');
+        grid.style.gridTemplateColumns = `repeat(${allDays.length}, 1fr)`;
 
-            const bar = grid.createDiv('timeline-task-bar');
-            bar.setText(task.title);
+        allDays.forEach((day, idx) => {
+            const cell = grid.createDiv('timeline-header-cell');
+            cell.setText(day.getDate().toString());
+            const dayName = day.toLocaleString('default', { weekday: 'short' });
+            cell.createDiv('timeline-day-name').setText(dayName);
+            cell.style.gridColumn = `${idx + 1}`;
+            cell.style.gridRow = `1`;
 
-            const status = getTaskStatus(task);
-            if (status === TaskStatus.Overdue) bar.addClass('status-overdue');
-            else if (status === TaskStatus.Urgent) bar.addClass('status-urgent');
-            else if (status === TaskStatus.Completed) bar.addClass('status-completed');
-            else bar.addClass('status-active'); // Default Green/Active
+            const bgCell = grid.createDiv('timeline-bg-cell');
+            bgCell.style.gridColumn = `${idx + 1}`;
+            bgCell.style.gridRow = `2 / -1`;
 
-            bar.style.gridColumn = `${visualStart} / ${visualEnd + 1}`;
-            bar.style.gridRow = `${index + 2}`;
+            if (day.toDateString() === new Date().toDateString()) {
+                cell.addClass('is-today');
+                bgCell.addClass('is-today-bg');
 
-            const dateStr = task.dueDate ? task.dueDate.toLocaleDateString() : 'No date';
-            bar.setAttribute('title', `${task.title}\n${task.fileName}\nDue: ${dateStr}`);
+                const marker = grid.createDiv('timeline-today-marker');
+                marker.style.gridColumn = `${idx + 1}`;
+                marker.style.gridRow = `1 / -1`;
+            }
         });
 
-        // 6) Center on Today initially
+        // 5. TASKS & HORIZONTAL GRID
+        validTasks.forEach((task, rowIndex) => {
+            // ---> NEW: Create a horizontal grid line for every row <---
+            const rowBg = grid.createDiv('timeline-row-bg');
+            rowBg.style.gridColumn = `1 / -1`; // Span entire width
+            rowBg.style.gridRow = `${rowIndex + 2}`;
+
+            const dueIdx = allDays.findIndex(d => d.toDateString() === task.dueDate!.toDateString());
+
+            if (dueIdx >= 0) {
+                const bar = grid.createDiv('timeline-task-bar');
+                bar.setText(task.title);
+
+                const status = getTaskStatus(task);
+                if (status === TaskStatus.Overdue) bar.addClass('status-overdue');
+                if (status === TaskStatus.Urgent) bar.addClass('status-urgent');
+                if (status === TaskStatus.Completed) bar.addClass('status-completed');
+                if (status === TaskStatus.UpcomingWeek) bar.addClass('status-active');
+
+                // Grid Positioning (+2 because Row 1 is the header)
+                bar.style.gridColumnStart = `${dueIdx + 1}`;
+                bar.style.gridColumnEnd = `span 1`;
+                bar.style.gridRow = `${rowIndex + 2}`;
+
+                // Hover & Click
+                bar.addEventListener('mouseenter', (e) => this.showTooltip(e, task));
+                bar.addEventListener('mouseleave', () => this.hideTooltip());
+                bar.addEventListener('mousemove', (e) => this.moveTooltip(e));
+
+                bar.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.openTaskFile(task);
+                });
+            }
+        });
+
+        // 6. INITIALIZE DRAGGING & SCROLL
+        this.setupEventListeners(this.scrollContainer);
         this.scrollToToday();
     }
 
     public scrollToToday(): void {
-        if (this.todayColumnIndex !== -1 && this.scrollContainer) {
-            setTimeout(() => {
-                if (!this.scrollContainer) return;
-                const containerWidth = this.scrollContainer.clientWidth;
-                const columnWidth = containerWidth / this.daysToShow;
-                const scrollPos = (this.todayColumnIndex * columnWidth) - (containerWidth / 2) + (columnWidth / 2);
+        setTimeout(() => {
+            if (!this.scrollContainer) return;
+            const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today') as HTMLElement;
+            if (todayCell) {
+                const scrollPos = todayCell.offsetLeft - (this.scrollContainer.clientWidth / 2) + (todayCell.clientWidth / 2);
                 this.scrollContainer.scrollTo({ left: scrollPos, behavior: 'smooth' });
-            }, 100);
-        }
+            }
+        }, 100);
+    }
+
+    // --- PUBLIC SCROLL METHOD (Fixes DashboardView error) ---
+    public scroll(direction: 'left' | 'right'): void {
+        if (!this.scrollContainer) return;
+        const scrollAmount = this.scrollContainer.clientWidth * 0.8;
+        this.scrollContainer.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
     }
 
     private createNavigationOverlay(direction: 'left' | 'right'): void {
         const overlay = this.container.createDiv(`timeline-nav-overlay nav-${direction}`);
-        const arrow = overlay.createDiv('nav-arrow');
+        overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
 
-        // Simple chevron text (CSS can style it nicely)
-        arrow.setText(direction === 'left' ? '‹' : '›');
-
-        // Scroll on click
         overlay.addEventListener('click', (e) => {
-            e.stopPropagation(); // prevent drag interference
-            const scroller = this.scrollContainer ?? (this.container.querySelector('.timeline-container') as HTMLElement | null);
-            if (!scroller) return;
-
-            const amount = scroller.clientWidth / 2;
-            scroller.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+            e.stopPropagation();
+            this.scroll(direction); // Reuse the public method
         });
     }
 
-    private setupEventListeners(target: HTMLElement): void {
-        target.addEventListener('mousedown', (e) => {
+    private setupEventListeners(container: HTMLElement): void {
+        container.addEventListener('mousedown', (e) => {
             this.isDragging = true;
-            target.addClass('is-dragging');
-            this.startX = e.pageX - target.offsetLeft;
-            this.scrollLeft = target.scrollLeft;
+            container.addClass('is-dragging');
+            this.startX = e.pageX - container.offsetLeft;
+            this.scrollLeftPos = container.scrollLeft;
         });
 
-        target.addEventListener('mouseleave', () => {
+        container.addEventListener('mouseleave', () => {
             this.isDragging = false;
-            target.removeClass('is-dragging');
+            container.removeClass('is-dragging');
         });
 
-        target.addEventListener('mouseup', () => {
+        container.addEventListener('mouseup', () => {
             this.isDragging = false;
-            target.removeClass('is-dragging');
+            container.removeClass('is-dragging');
         });
 
-        target.addEventListener('mousemove', (e) => {
+        container.addEventListener('mousemove', (e) => {
             if (!this.isDragging) return;
             e.preventDefault();
-            const x = e.pageX - target.offsetLeft;
-            const walk = (x - this.startX) * 1.5; // Scroll speed multiplier
-            target.scrollLeft = this.scrollLeft - walk;
+            const x = e.pageX - container.offsetLeft;
+            const walk = (x - this.startX) * 1.5;
+            container.scrollLeft = this.scrollLeftPos - walk;
         });
     }
 
-    public scroll(direction: 'left' | 'right'): void {
-        const scroller = this.scrollContainer ?? this.container;
-        const scrollAmount = scroller.clientWidth / 2; // Scroll half screen
-        const newPos = direction === 'left'
-            ? scroller.scrollLeft - scrollAmount
-            : scroller.scrollLeft + scrollAmount;
+    private showTooltip(e: MouseEvent, task: Task): void {
+        if (!this.tooltipEl) {
+            this.tooltipEl = document.body.createDiv('dashboard-tooltip');
+        }
+        this.tooltipEl.empty();
+        this.tooltipEl.createDiv('tooltip-title').setText(task.title);
+        this.tooltipEl.createDiv('tooltip-meta').setText(`📂 ${task.fileName}`);
+        if (task.dueDate) {
+            this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${task.dueDate.toDateString()}`);
+        }
 
-        scroller.scrollTo({ left: newPos, behavior: 'smooth' });
+        this.tooltipEl.style.display = 'block';
+        this.moveTooltip(e);
     }
 
-    private getDayDiff(start: Date, end: Date): number {
-        const oneDay = 1000 * 60 * 60 * 24;
-        const diff = end.getTime() - start.getTime();
-        return Math.floor(diff / oneDay);
+    private moveTooltip(e: MouseEvent): void {
+        if (this.tooltipEl) {
+            this.tooltipEl.style.top = `${e.clientY + 15}px`;
+            this.tooltipEl.style.left = `${e.clientX + 15}px`;
+        }
+    }
+
+    private hideTooltip(): void {
+        if (this.tooltipEl) {
+            this.tooltipEl.style.display = 'none';
+        }
+    }
+
+    private async openTaskFile(task: Task): Promise<void> {
+        const file = this.app.vault.getAbstractFileByPath(task.filePath);
+        if (file instanceof TFile) {
+            const leaf = this.app.workspace.getLeaf(false);
+            await leaf.openFile(file);
+
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (view) {
+                view.editor.setCursor({ line: task.lineNumber, ch: 0 });
+                view.editor.scrollIntoView({ from: {line: task.lineNumber, ch: 0}, to: {line: task.lineNumber, ch: 0} }, true);
+            }
+        }
     }
 }

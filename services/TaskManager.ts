@@ -19,6 +19,24 @@ export class TaskManager extends Events {
         this.applyFiltersAndSort();
         this.trigger('tasks-updated');
     }
+
+    /**
+     * Toggle a task's completion state in its file
+     */
+    async toggleTaskCompletion(task: Task): Promise<void> {
+        const file = this.app.vault.getAbstractFileByPath(task.filePath);
+        if (file instanceof TFile) {
+            const content = await this.app.vault.read(file);
+            const lines = content.split('\n');
+            if (lines[task.lineNumber]) {
+                lines[task.lineNumber] = lines[task.lineNumber].includes('[x]')
+                    ? lines[task.lineNumber].replace('[x]', '[ ]')
+                    : lines[task.lineNumber].replace('[ ]', '[x]');
+                await this.app.vault.modify(file, lines.join('\n'));
+                await this.refreshFileTask(task.filePath);
+            }
+        }
+    }
 // ... inside TaskManager class ...
 
     /**
@@ -156,9 +174,10 @@ export class TaskManager extends Events {
         this.filteredTasks = this.tasks.filter(task => {
             if (this.currentStatusFilter !== TaskStatus.All) {
                 if (this.currentStatusFilter === TaskStatus.Open) {
-                    return !task.completed;
+                    if (task.completed) return false;
+                } else {
+                    if (getTaskStatus(task) !== this.currentStatusFilter) return false;
                 }
-                if (this.currentStatusFilter === TaskStatus.Completed && !task.completed) return false;
             }
             if (this.currentCourseFilter && task.fileName !== this.currentCourseFilter) return false;
             return true;

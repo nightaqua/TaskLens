@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Timeline month header row with hover tooltip.
+- Timeline bars open the source file on click.
+- Clickable stats cards that apply status filters.
+
+### Changed
+- TaskListComponent now requires callback object (onToggle/onEdit/onDelete).
+- TimelineComponent constructor now requires the App instance.
+- Status filtering uses TaskStatus for non-Open statuses.
+- Settings scan folders placeholder is now generic.
+
+### Fixed
+- Timeline grid lines render using borders to avoid theme gaps.
+- Settings button no longer uses the highlight class.
+
 ## Version 1.0.0 - Fixed Build Issues
 
 ### Fixed TypeScript Errors

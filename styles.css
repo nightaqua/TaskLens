@@ -1,4 +1,7 @@
-/* --- Dashboard Container --- */
+/* =========================================
+   1. DASHBOARD LAYOUT & STRUCTURE
+   ========================================= */
+
 .semester-dashboard-view {
     padding: 16px !important;
     height: 100%;
@@ -12,7 +15,7 @@
     position: relative;
 }
 
-/* --- The Slide-Out Handle (New) --- */
+/* --- The Slide-Out Handle --- */
 .dashboard-sidebar-handle {
     position: absolute;
     left: 0;
@@ -39,9 +42,7 @@
     box-shadow: 2px 2px 12px rgba(0,0,0,0.4);
 }
 
-.dashboard-sidebar-handle.is-hidden {
-    display: none;
-}
+.dashboard-sidebar-handle.is-hidden { display: none; }
 
 /* --- Header Styles --- */
 .dashboard-header {
@@ -55,9 +56,7 @@
     transition: all 0.3s ease;
 }
 
-.dashboard-header.is-collapsed {
-    display: none !important;
-}
+.dashboard-header.is-collapsed { display: none !important; }
 
 .dashboard-title-wrapper {
     flex-grow: 1;
@@ -101,16 +100,13 @@
     transition: opacity 0.2s;
 }
 
-.dashboard-title-wrapper:hover .edit-title-icon {
-    opacity: 1;
-}
+.dashboard-title-wrapper:hover .edit-title-icon { opacity: 1; }
 
 .header-actions-left, .header-actions-right {
     display: flex;
     align-items: center;
     gap: 4px;
 }
-
 
 .header-icon-btn {
     background: transparent;
@@ -133,13 +129,14 @@
     border-radius: 6px;
 }
 
-.dashboard-refresh-btn.is-rotating svg {
-    animation: spin 1s linear infinite;
-}
-
+.dashboard-refresh-btn.is-rotating svg { animation: spin 1s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* --- Controls Section --- */
+
+/* =========================================
+   2. CONTROLS & STATS
+   ========================================= */
+
 .dashboard-controls {
     display: flex;
     flex-wrap: wrap;
@@ -154,7 +151,6 @@
     max-height: 500px;
     opacity: 1;
     overflow: visible;
-    /* NEW: Medium-light border as requested */
     border: 1px solid var(--background-modifier-border-hover);
 }
 
@@ -184,21 +180,10 @@
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
     padding: 4px 8px;
-    /* Truncate long text */
     max-width: 150px;
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
-}
-
-/* Toggle Buttons */
-.view-toggle-group {
-    display: flex;
-    gap: 4px;
-    background-color: var(--background-primary);
-    padding: 4px;
-    border-radius: 6px;
-    border: 1px solid var(--background-modifier-border);
 }
 
 .view-toggle-btn {
@@ -224,9 +209,9 @@
     font-weight: 500;
 }
 
-/* --- Statistics Cards (Flexbox Layout) --- */
+/* --- Statistics Cards --- */
 .dashboard-stats {
-    display: flex; /* Changed from Grid to Flex */
+    display: flex;
     flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 24px;
@@ -240,15 +225,25 @@
     border: 1px solid var(--background-modifier-border);
     position: relative;
     overflow: hidden;
-    flex: 1 1 120px; /* Grow to fill, shrink if needed, base 120px */
+    flex: 1 1 120px;
 }
 
-/* Color Coding for Stats */
 .stat-card.stat-urgent { border-left: 4px solid var(--color-orange); }
 .stat-card.stat-overdue { border-left: 4px solid var(--color-red); }
-.stat-card.stat-completed { border-left: 4px solid var(--color-blue); } /* Changed to Blue per request for distinct completed */
-.stat-card.stat-active { border-left: 4px solid var(--color-green); } /* Active is Green */
-.stat-card.stat-total { border-left: 4px solid var(--color-purple); } /* Total is Purple */
+.stat-card.stat-completed { border-left: 4px solid var(--color-blue); }
+.stat-card.stat-active { border-left: 4px solid var(--color-green); }
+.stat-card.stat-total { border-left: 4px solid var(--color-purple); }
+
+.stat-card.is-clickable {
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.stat-card.is-clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    background-color: var(--background-modifier-hover);
+}
 
 .stat-value {
     font-size: 1.5em;
@@ -262,9 +257,16 @@
     margin-top: 4px;
 }
 
-/* --- Task List --- */
+
+/* =========================================
+   3. TASK LIST & RESPONSIVE DESIGN
+   ========================================= */
+
+/* The Container Query setup */
 .dashboard-task-list {
-    min-height: 150px; /* Frame size */
+    container-type: inline-size;
+    container-name: tasklist;
+    min-height: 150px;
     border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
     padding: 12px;
@@ -272,6 +274,7 @@
     flex-direction: column;
     gap: 8px;
     margin-bottom: 24px;
+    transition: all 0.2s ease;
 }
 
 .task-item {
@@ -282,7 +285,7 @@
     border-radius: 6px;
     border: 1px solid transparent;
     border-left: 4px solid transparent;
-    transition: transform 0.1s ease;
+    transition: transform 0.1s ease, background-color 0.1s ease;
 }
 
 .task-item:hover {
@@ -290,35 +293,55 @@
     background-color: var(--background-secondary-alt);
 }
 
-/* Task Status Colors */
+/* Status Colors */
 .task-item.status-overdue { border-left-color: var(--color-red); }
 .task-item.status-urgent { border-left-color: var(--color-orange); }
 .task-item.status-completed { border-left-color: var(--color-blue); opacity: 0.7; }
 .task-item.status-active { border-left-color: var(--color-green); }
 
+/* Checkbox (Fixed alignment & shrinking) */
 .task-checkbox {
     margin-right: 12px;
-    margin-top: 4px;
+    margin-top: 2.5px !important; /* Perfect baseline alignment */
     cursor: pointer;
+    flex-shrink: 0; /* Prevents squishing */
 }
 
-.task-content { flex: 1; }
+/* Task Text & Layout */
+.task-content {
+    flex: 1;
+    min-width: 0; /* CRITICAL: Stops titles from bursting horizontally */
+}
+
+.task-view-mode {
+    display: flex;
+    flex-direction: column; /* Stack title above meta naturally */
+    align-items: flex-start;
+    width: 100%;
+}
 
 .task-title {
     font-size: 1.05em;
     font-weight: 500;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     cursor: pointer;
+    white-space: normal; /* Allows text to wrap */
+    word-break: break-word; /* Prevents unbreakable overflow */
+    line-height: 1.3;
+    width: 100%;
 }
 
 .task-meta {
     display: flex;
+    flex-wrap: wrap; /* Allows dates to drop to a new line if screen is too narrow */
     gap: 8px;
     font-size: 0.85em;
     color: var(--text-muted);
     align-items: center;
+    width: 100%;
 }
 
+/* Badges (Course name truncation & date protection) */
 .task-course, .task-date {
     background-color: var(--background-primary);
     padding: 2px 8px;
@@ -326,27 +349,34 @@
     border: 1px solid var(--background-modifier-border);
     font-size: 0.85em;
     font-weight: 500;
+    white-space: nowrap;
+}
+
+.task-course {
+    flex-shrink: 1; /* Allow course name to squish */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+    display: inline-block; /* Helps with ellipsis */
 }
 
 .task-date {
-    color: var(--text-normal);
+    flex-shrink: 0; /* Protect date from squishing */
 }
 
-/* Hide actions by default */
+/* Action Buttons */
 .task-actions {
     display: flex;
     gap: 4px;
     opacity: 0;
     transition: opacity 0.2s;
     margin-left: 8px;
+    flex-shrink: 0;
 }
 
-/* Show actions on hover */
-.task-item:hover .task-actions {
-    opacity: 1;
-}
+.task-item:hover .task-actions { opacity: 1; }
 
-/* Action Buttons (Pencil / Trash) */
 .task-action-btn {
     background: transparent;
     border: none;
@@ -369,58 +399,45 @@
     background-color: rgba(255, 0, 0, 0.1);
 }
 
-/* --- Edit Mode Styles --- */
-.task-edit-mode {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
-    align-items: center;
+/* --- Container Query (Borderless Mobile/Narrow View) --- */
+@container tasklist (max-width: 450px) {
+    .dashboard-task-list {
+        border: none !important;
+        padding: 0 !important;
+        background-color: transparent !important;
+        gap: 0 !important;
+    }
+
+    .task-item {
+        background-color: transparent !important;
+        border-radius: 0 !important;
+        border-bottom: 1px solid var(--background-modifier-border) !important;
+        padding: 12px 6px !important; /* Minimal side padding */
+        margin: 0 !important;
+    }
+
+    .task-item:last-child {
+        border-bottom: none !important;
+    }
+
+    .task-item:hover {
+        background-color: var(--background-secondary) !important;
+        transform: none !important; /* Disable shift effect */
+    }
 }
 
-.task-edit-input {
-    flex-grow: 1;
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    padding: 4px 8px;
-    border-radius: 4px;
-}
 
-.task-edit-date {
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    padding: 4px 8px;
-    border-radius: 4px;
-    color: var(--text-muted);
-}
+/* =========================================
+   4. TIMELINE / GANTT VIEW
+   ========================================= */
 
-.task-save-btn, .task-cancel-btn {
-    padding: 4px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    border: 1px solid var(--background-modifier-border);
-    background-color: var(--background-secondary);
-}
-
-.task-save-btn {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border: none;
-}
-
-.task-save-btn:hover {
-    opacity: 0.9;
-}
-
-/* --- Timeline / Gantt View --- */
-/* --- Timeline / Gantt View --- */
 .dashboard-timeline-view {
     margin-bottom: 24px;
 }
 
 .timeline-controls {
     display: flex;
-    justify-content: space-between; /* Spread zoom and nav */
+    justify-content: space-between;
     margin-bottom: 10px;
     gap: 8px;
     align-items: center;
@@ -428,93 +445,84 @@
     color: var(--text-muted);
 }
 
-/* Timeline Wrapper for Nav Bars */
 .timeline-wrapper {
     position: relative;
     width: 100%;
-    /* Ensure arrows sit on top */
 }
 
-/* Scrollable Container inside Wrapper */
 .timeline-container {
     overflow-x: auto;
     width: 100%;
     border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
-    background-color: var(--background-primary);
+    background-color: var(--background-secondary) !important;
     padding-bottom: 10px;
-    cursor: grab; /* Indicates drag capability */
-    user-select: none; /* Prevent text selection while dragging */
+    color: var(--text-normal);
+    cursor: grab;
+    user-select: none;
     scrollbar-width: thin;
+    position: relative;
 }
 
-.timeline-container.is-dragging {
-    cursor: grabbing;
-}
+.timeline-container.is-dragging { cursor: grabbing; }
 
-/* Navigation Overlay Bars */
+.timeline-scroll-content { min-height: 100%; }
+
 .timeline-nav-overlay {
-    background: transparent !important; /* No dark shadow */
-    /* ... keep positioning ... */
     position: absolute;
     top: 0;
     bottom: 10px;
-    width: 40px;
+    width: 24px;
     z-index: 20;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background 0.2s;
+    background: transparent;
 }
 
-/* Subtle feedback on hover instead */
-.timeline-nav-overlay:hover {
-    background: rgba(150, 150, 150, 0.1) !important; /* Very subtle light grey */
-}
+.timeline-nav-overlay:hover { background: rgba(150, 150, 150, 0.1) !important; }
+.timeline-nav-overlay.nav-left { left: 0; }
+.timeline-nav-overlay.nav-right { right: 0; }
 
-.timeline-nav-overlay.nav-left {
-    left: 0;
-}
-
-.timeline-nav-overlay.nav-right {
-    right: 0;
-}
-
-/* Show on hover of the wrapper */
-.timeline-wrapper:hover .timeline-nav-overlay {
-    opacity: 1;
-}
+.timeline-wrapper:hover .timeline-nav-overlay { opacity: 1; }
 
 .nav-arrow {
     font-size: 2em;
     font-weight: bold;
-    color: var(--text-accent);
+    color: var(--text-muted);
     user-select: none;
 }
 
-.timeline-container {
-    overflow-x: auto;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    background-color: var(--background-primary);
-    padding-bottom: 10px;
+.timeline-month-row {
+    position: relative;
+    height: 24px;
+    background-color: var(--background-secondary-alt);
+    border-bottom: 1px solid var(--background-modifier-border);
+    width: 100%;
 }
 
-/* Grid Lines Logic is handled in JS via background-image,
-   but we need to ensure the grid sits on top of the background */
-.timeline-grid {
-    display: grid;
-    min-width: 100%;
-    /* The vertical lines will be applied here */
+.timeline-month-cell {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    padding-left: 8px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text-muted);
+    line-height: 24px;
+    border-left: 1px solid var(--background-modifier-border);
+    white-space: nowrap;
 }
+
 .timeline-grid {
     display: grid;
     min-width: 100%;
 }
 
 .timeline-header-cell {
-    padding: 8px;
+    padding: 8px 4px;
     font-size: 0.8em;
     text-align: center;
     background-color: var(--background-secondary);
@@ -526,7 +534,35 @@
     white-space: nowrap;
 }
 
-/* Timeline Bars */
+.timeline-header-cell.is-today {
+    background-color: var(--background-modifier-hover);
+    border-bottom: 2px solid var(--color-red);
+}
+
+.timeline-day-name {
+    font-size: 0.7em;
+    color: var(--text-muted);
+    display: block;
+}
+
+/* Solid Grid Lines */
+.timeline-bg-cell {
+    border-right: 1px solid var(--background-modifier-border);
+    background-color: rgba(120, 120, 120, 0.02);
+    pointer-events: none;
+    z-index: 1;
+}
+.timeline-bg-cell.is-today-bg {
+    background-color: rgba(150, 150, 150, 0.05);
+}
+
+.timeline-row-bg {
+    border-bottom: 1px solid var(--background-modifier-border);
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Timeline Task Bars */
 .timeline-task-bar {
     padding: 4px 8px;
     border-radius: 4px;
@@ -535,11 +571,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: pointer;
-    margin: 2px 0;
+    margin: 2px 4px;
     opacity: 0.9;
     z-index: 5;
     color: #fff;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    transition: transform 0.1s, filter 0.1s;
+}
+
+.timeline-task-bar:hover {
+    transform: scale(1.02);
+    filter: brightness(1.1);
 }
 
 .timeline-task-bar.status-overdue { background-color: var(--color-red); }
@@ -548,17 +590,37 @@
 .timeline-task-bar.status-active { background-color: var(--color-green); }
 
 .timeline-today-marker {
-    grid-row: 1 / -1;
-    background-color: var(--color-red); /* Today is red line */
+    background-color: var(--color-red);
     width: 2px;
     height: 100%;
-    opacity: 0.5;
+    opacity: 0.6;
     pointer-events: none;
     z-index: 4;
-    margin-left: 50%;
+    justify-self: center;
 }
 
-/* Settings Page */
+/* Tooltip */
+.dashboard-tooltip {
+    position: fixed;
+    z-index: 1000;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    padding: 8px 12px;
+    border-radius: 6px;
+    pointer-events: none;
+    display: none;
+    min-width: 150px;
+}
+
+.tooltip-title { font-weight: 600; margin-bottom: 4px; font-size: 0.9em; }
+.tooltip-meta, .tooltip-date { font-size: 0.8em; color: var(--text-muted); }
+
+
+/* =========================================
+   5. SETTINGS UI & HIGHLIGHTS
+   ========================================= */
+
 .semester-dashboard-settings .setting-item {
     border: 1px solid var(--background-modifier-border);
     background-color: var(--background-secondary);
@@ -567,83 +629,79 @@
     margin-bottom: 12px;
 }
 
-/* --- True CHROMELESS leaf (The "Widget" Look) --- */
-
-/* 1. Hide the pane header (the tab strip) */
-.workspace-leaf-content.semester-chromeless .workspace-leaf-header,
-.workspace-leaf-content.semester-chromeless .workspace-tab-header-container,
-.workspace-leaf-content.semester-chromeless .workspace-tab-header,
-.workspace-leaf-content.semester-chromeless .workspace-tab-header-inner {
-    display: none !important;
+.semester-dashboard-settings details summary {
+    margin-bottom: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    padding-left: 4px;
 }
 
-/* 2. Remove reserved header space */
-.workspace-leaf-content.semester-chromeless {
-    padding-top: 0 !important;
-    margin-top: 0 !important;
-    border: none !important; /* Optional: remove borders */
-    box-shadow: none !important;
+.semester-dashboard-settings details {
+    margin-left: 12px;
 }
 
-.workspace-leaf-content.semester-chromeless .workspace-leaf-content {
-    padding-top: 0 !important;
-    margin-top: 0 !important;
+.semester-dashboard-settings details[open] summary ~ .setting-item:first-of-type {
+    margin-top: 12px;
 }
 
-/* 3. Hide the inner view header (Breadcrumbs/Title) */
-.workspace-leaf-content.semester-chromeless .view-header {
-    display: none !important;
+/* Scan Paths Custom Alignment */
+.scan-paths-setting {
+    align-items: flex-start !important;
 }
 
-/* 4. Make content fill the space (but respect our inner padding) */
-.workspace-leaf-content.semester-chromeless .view-content {
-    height: 100% !important;
-    margin: 0 !important;
-    background-color: var(--background-primary);
+.scan-paths-setting .setting-item-info {
+    flex: 1 1 50%;
+    max-width: 50%;
+    white-space: pre-wrap;
+    line-height: 1.4;
 }
 
-/* Optional: Hover to reveal header (Commented out by default) */
-/* .workspace-leaf-content.semester-chromeless .workspace-leaf-header {
-    display: flex !important;
-    height: 6px !important;
-    min-height: 6px !important;
-    opacity: 0 !important;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 50;
-}
-.workspace-leaf-content.semester-chromeless:hover .workspace-leaf-header {
-    opacity: 1 !important;
-    height: 30px !important;
-}
-*/
-
-/* --- True Widget Mode (Hider Logic Adapted) --- */
-
-/* Target the Tab Container (parent of the leaf)
-   and hide the header strip specifically for this container.
-*/
-.workspace-tabs.semester-hide-tabs .workspace-tab-header-container {
-    display: none !important;
+.scan-paths-setting .setting-item-control {
+    flex: 0 0 50%;
+    width: 50%;
+    justify-content: flex-end;
+    padding-right: 16px;
 }
 
-/* Optional: Remove the small gap/padding often left behind
-   by the tab container structure.
-*/
-.workspace-tabs.semester-hide-tabs .workspace-tab-header-container-inner {
-    padding: 0 !important;
-    margin: 0 !important;
+.scan-paths-setting textarea {
+    width: 100%;
+    resize: none !important;
+    min-height: 65px;
+    height: 65px;
 }
 
-/* Ensure the content expands to fill the missing header space
-*/
-.workspace-tabs.semester-hide-tabs .workspace-leaf {
-    height: 100% !important;
+/* Adobe-lite Highlight Effect */
+@keyframes pulse-purple {
+    0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(124, 58, 237, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
 }
-/* --- Empty States & List Frame --- */
-/* This ensures the list has a "Frame" even when empty or loading */
+
+.feature-highlight {
+    animation: pulse-purple 2s infinite;
+    border-radius: 50%;
+    color: var(--interactive-accent) !important;
+}
+
+.feature-highlight:hover {
+    animation: none;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent) !important;
+}
+
+
+/* =========================================
+   6. CHROMELESS / EDIT MODES / MISC
+   ========================================= */
+
+.task-edit-mode { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: center; }
+.task-edit-input { flex-grow: 1; background: var(--background-primary); border: 1px solid var(--background-modifier-border); padding: 4px 8px; border-radius: 4px; }
+.task-edit-date { background: var(--background-primary); border: 1px solid var(--background-modifier-border); padding: 4px 8px; border-radius: 4px; color: var(--text-muted); }
+.task-save-btn, .task-cancel-btn { padding: 4px 12px; border-radius: 4px; cursor: pointer; border: 1px solid var(--background-modifier-border); background-color: var(--background-secondary); }
+.task-save-btn { background-color: var(--interactive-accent); color: var(--text-on-accent); border: none; }
+.task-save-btn:hover { opacity: 0.9; }
+
+/* Empty States */
 .dashboard-empty-state {
     display: flex;
     flex-direction: column;
@@ -651,7 +709,6 @@
     justify-content: center;
     padding: 30px 20px;
     background-color: var(--background-secondary);
-    /* Subtle grey box */
     color: var(--text-muted);
     text-align: center;
     height: 100%;
@@ -659,7 +716,28 @@
     flex: 1;
 }
 
-.dashboard-empty-state p {
-    margin: 0;
-    font-size: 0.9em;
+/* Chromeless Logic */
+.workspace-leaf-content.semester-chromeless .workspace-leaf-header,
+.workspace-leaf-content.semester-chromeless .workspace-tab-header-container,
+.workspace-leaf-content.semester-chromeless .workspace-tab-header,
+.workspace-leaf-content.semester-chromeless .workspace-tab-header-inner,
+.workspace-leaf-content.semester-chromeless .view-header {
+    display: none !important;
 }
+
+.workspace-leaf-content.semester-chromeless {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.workspace-leaf-content.semester-chromeless .view-content {
+    height: 100% !important;
+    margin: 0 !important;
+    background-color: var(--background-primary);
+}
+
+.workspace-tabs.semester-hide-tabs .workspace-tab-header-container { display: none !important; }
+.workspace-tabs.semester-hide-tabs .workspace-tab-header-container-inner { padding: 0 !important; margin: 0 !important; }
+.workspace-tabs.semester-hide-tabs .workspace-leaf { height: 100% !important; }

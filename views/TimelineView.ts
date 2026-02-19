@@ -78,7 +78,7 @@ export class TimelineView extends ItemView {
         );
         this.headerComponent.render();
 
-        const timeline = new TimelineComponent(this.contentEl, this.plugin.taskManager.getFilteredTasks(), 7);
+        const timeline = new TimelineComponent(this.contentEl, this.app, this.plugin.taskManager.getFilteredTasks(), 7);
         timeline.render();
     }
 }

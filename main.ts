@@ -8,6 +8,7 @@ import { TimelineView, VIEW_TYPE_TIMELINE } from './views/TimelineView';
 import { TaskListView, VIEW_TYPE_LIST } from './views/TaskListView';
 import { StatsView, VIEW_TYPE_STATS } from './views/StatsView';
 import { QuickAddModal } from './modals/QuickAddModal'; // Import
+import { WelcomeModal } from './modals/WelcomeModal';
 
 export default class SemesterDashboardPlugin extends Plugin {
     settings: SemesterSettings;
@@ -69,6 +70,16 @@ export default class SemesterDashboardPlugin extends Plugin {
             name: 'Reload Dashboard Colors/Styles',
             callback: () => this.refreshViews()
         });
+
+        // CHECK FIRST RUN
+        if (!this.settings.hasSeenWelcome) {
+            // Show the welcome modal
+            new WelcomeModal(this.app).open();
+
+            // Set flag to true and save
+            this.settings.hasSeenWelcome = true;
+            await this.saveSettings();
+        }
 
         this.addSettingTab(new SettingsTab(this.app, this));
     }

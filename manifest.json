@@ -1,10 +1,10 @@
 {
     "id": "semester-dashboard",
-    "name": "Semester Dashboard",
+    "name": "TaskLens",
     "version": "1.0.0",
     "minAppVersion": "0.15.0",
-    "description": "A comprehensive dashboard for managing university courses and task deadlines in Obsidian",
-    "author": "Your Name",
-    "authorUrl": "https://github.com/yourusername",
+    "description": "Your personal command center. Widget-based dashboard for task and timelines visualization and goal tracking.",
+    "author": "nightaqua",
+    "authorUrl": "https://github.com/nightaqua/tasklens",
     "isDesktopOnly": false
 }

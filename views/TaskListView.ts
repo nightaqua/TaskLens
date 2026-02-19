@@ -3,53 +3,69 @@ import SemesterDashboardPlugin from '../main';
 import { TaskListComponent } from './TaskListComponent';
 import { Task } from '../models/Task';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
-import { QuickAddModal } from '../modals/QuickAddModal'; // Import Modal
+import { QuickAddModal } from '../modals/QuickAddModal'; // <--- Ensure this import exists
 
 export const VIEW_TYPE_LIST = 'semester-list-view';
 
-interface ListViewState {
-    headerState: HeaderState;
-}
-
 export class TaskListView extends ItemView {
-    private headerComponent: HeaderComponent;
-    private headerState: HeaderState = { title: null, isCollapsed: false };
     private leafRootEl: HTMLElement | null = null;
+    private tabContainer: HTMLElement | null = null;
+    private isOpen = false;
+    private headerComponent: HeaderComponent | null = null;
+    private headerState: HeaderState = { title: null, isCollapsed: false };
+
+    private onTasksUpdated = () => {
+        if (!this.isOpen || !this.contentEl?.isConnected) return;
+        this.render();
+    };
 
     constructor(leaf: WorkspaceLeaf, private plugin: SemesterDashboardPlugin) {
         super(leaf);
-        this.plugin.taskManager.on('tasks-updated', () => this.render());
+        this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
     }
 
     getViewType() { return VIEW_TYPE_LIST; }
     getDisplayText() { return 'Task List'; }
     getIcon() { return 'list-todo'; }
 
-    async onOpen() {
-        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
-        if (this.leafRootEl) this.leafRootEl.classList.add('semester-chromeless');
-        this.contentEl.empty();
-        this.contentEl.addClass('semester-dashboard-view');
-        this.contentEl.addClass('is-single-view');
-        this.render();
-    }
-
-    async onClose() {
-        if (this.leafRootEl) this.leafRootEl.classList.remove('semester-chromeless');
-    }
-
     async setState(state: any, result: ViewStateResult): Promise<void> {
-        if (state?.headerState) this.headerState = state.headerState;
+        if (state?.headerState) {
+            this.headerState = state.headerState;
+        }
         await super.setState(state, result);
         this.render();
     }
 
     getState(): any {
-        if (this.headerComponent) this.headerState = this.headerComponent.getState();
+        if (this.headerComponent) {
+            this.headerState = this.headerComponent.getState();
+        }
         return { headerState: this.headerState };
     }
 
+    async onOpen() {
+        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
+        if (this.leafRootEl) this.leafRootEl.classList.add('semester-chromeless');
+
+        this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
+        if (this.tabContainer) this.tabContainer.classList.add('semester-hide-tabs');
+
+        this.contentEl.empty();
+        this.contentEl.addClass('semester-dashboard-view');
+        this.contentEl.addClass('is-single-view');
+        this.isOpen = true;
+        this.render();
+    }
+
+    async onClose(): Promise<void> {
+        this.isOpen = false;
+        if (this.tabContainer) this.tabContainer.classList.remove('semester-hide-tabs');
+        if (this.leafRootEl) this.leafRootEl.classList.remove('semester-chromeless');
+    }
+
     render() {
+        if (!this.isOpen || !this.contentEl?.isConnected) return;
+
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -58,14 +74,16 @@ export class TaskListView extends ItemView {
             'My Tasks',
             {
                 onStateChange: () => {
-                    this.headerState = this.headerComponent.getState();
+                    if (this.headerComponent) {
+                        this.headerState = this.headerComponent.getState();
+                    }
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
                 onRefresh: async () => {
                     await this.plugin.taskManager.loadTasks();
                 },
-                // NEW: Open Quick Add Modal
+                // <--- Pass the callback to open the modal
                 onAdd: () => {
                     new QuickAddModal(this.app, this.plugin.taskManager).open();
                 }
@@ -74,28 +92,14 @@ export class TaskListView extends ItemView {
         this.headerComponent.render();
 
         const list = new TaskListComponent(this.contentEl, this.app, {
-            onToggle: (t) => this.toggleTask(t),
-            onEdit: async (t, newTitle, newDate) => {
+            onToggle: (t: Task) => this.plugin.taskManager.toggleTaskCompletion(t),
+            onEdit: async (t: Task, newTitle: string, newDate: Date | null) => {
                 await this.plugin.taskManager.updateTask(t, newTitle, newDate);
             },
-            onDelete: async (t) => {
+            onDelete: async (t: Task) => {
                 await this.plugin.taskManager.deleteTask(t);
             }
         });
         list.render(this.plugin.taskManager.getFilteredTasks());
-    }
-
-    async toggleTask(task: Task) {
-        const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file) {
-            const content = await this.app.vault.read(file as any);
-            const lines = content.split('\n');
-            if (lines[task.lineNumber]) {
-                lines[task.lineNumber] = lines[task.lineNumber].includes('[x]')
-                    ? lines[task.lineNumber].replace('[x]', '[ ]')
-                    : lines[task.lineNumber].replace('[ ]', '[x]');
-                await this.app.vault.modify(file as any, lines.join('\n'));
-            }
-        }
     }
 }

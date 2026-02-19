@@ -1,33 +1,7 @@
-# Quick Start Guide
+# Legacy Quick Start (Deprecated)
 
-## Installation
-
-1. **Copy files** to your vault:
-   ```
-   YourVault/.obsidian/plugins/semester-dashboard/
-   ```
-
-2. **Install dependencies** (for development):
-   ```bash
-   cd semester-dashboard
-   npm cache clean --force
-   npm audit
-   npm install
-   ```
-
-3. **Build the plugin**:
-   ```bash
-   npm run build
-   ```
-
-4. **Enable in Obsidian**:
-   - Settings → Community Plugins
-   - Reload plugins
-   - Enable "Semester Dashboard"
-
-## First Use
-
-### 1. Prepare Your Notes
+This guide is kept for historical reference. Use the current Quick Start in:
+- documents/release files/QUICKSTART.md
 
 Add tasks to your course notes with optional dates:
 

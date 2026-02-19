@@ -13,8 +13,17 @@
     "overdue": "#e63946",
     "urgent": "#fb8500",
     "active": "#2a9d8f",
-    "completed": "#1c37a0"
+    "completed": "#adb2c7"
   },
+  "courseColors": [
+    "#4cc9f0",
+    "#f72585",
+    "#ff0000",
+    "#3a0ca3",
+    "#4361ee",
+    "#4caf50"
+  ],
+  "hasSeenWelcome": true,
   "allowNoDueDate": false,
   "showCompletedByDefault": false,
   "defaultSort": "due-date",
