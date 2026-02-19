@@ -1,36 +1,65 @@
 import { App, Modal, Setting } from 'obsidian';
+import SemesterDashboardPlugin from '../main';
 
 export class WelcomeModal extends Modal {
-    constructor(app: App) {
+    private dontShowAgain: boolean = false;
+
+    // We now require the plugin instance to save settings
+    constructor(app: App, private plugin: SemesterDashboardPlugin) {
         super(app);
     }
 
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.addClass('dashboard-welcome-modal');
+        contentEl.addClass('tasklens-welcome-modal');
 
         // Header
-        contentEl.createEl('h1', { text: 'Welcome to Personal Dashboard! 🚀' });
-        contentEl.createEl('p', { text: 'Your new command center for assignments, tasks, and deadlines.' });
+        const header = contentEl.createDiv('welcome-header');
+        header.style.textAlign = 'center';
+        header.style.marginBottom = '20px';
+        header.createEl('h1', { text: 'Welcome to TaskLens 🚀' });
+        header.createEl('p', { text: 'Your command center for tasks, timelines, and projects.', cls: 'text-muted' });
 
         // Tutorial Section
         const tutorial = contentEl.createDiv('welcome-tutorial');
 
-        this.createStep(tutorial, '📊', 'Widgets', 'Open different views (Timeline, List, Stats) using the command palette or ribbon icon.');
-        this.createStep(tutorial, '🖱️', 'Drag & Drop', 'Click the "Move" icon in the left ribbon to unlock dragging. Arrange windows, then lock them back.');
-        this.createStep(tutorial, '➕', 'Quick Add', 'Click the "+" icon in any task list header to capture new tasks instantly.');
-        this.createStep(tutorial, '🎨', 'Customize', 'Rename any widget by clicking its title. Hide headers for a clean look.');
+        this.createStep(tutorial, '📊', 'The Dashboard', 'Click the new Dashboard icon in the left ribbon to open your master view. It combines your Timeline, Stats, and Task List.');
+        this.createStep(tutorial, '🖱️', 'Move & Resize', 'By default, the layout is locked for a clean look. Click the "Move" icon (arrow cross) in the left ribbon to unlock tabs and arrange widgets.');
+        this.createStep(tutorial, '➕', 'Quick Add', 'Click the pulsing "+" icon at the top right of the dashboard to instantly create tasks in any file.');
+        this.createStep(tutorial, '📝', 'Inline Editing', 'Hover over any task in the list to reveal the Pencil (edit) and Trash (delete) icons.');
+        this.createStep(tutorial, '🎯', 'Smart Filters', 'Click any statistic card (like "Urgent") to instantly filter your task list!');
 
-        // Footer
         contentEl.createEl('hr');
-        contentEl.createEl('p', { text: 'You can find these settings and more in the plugin settings menu.', cls: 'text-muted' });
 
+        // ---> NEW: Don't show again toggle <---
         new Setting(contentEl)
+            .setName('Do not show this tutorial on startup')
+            .setDesc('You can always reopen this from the TaskLens Settings tab.')
+            .addToggle(toggle => toggle
+                .setValue(this.dontShowAgain)
+                .onChange(value => {
+                    this.dontShowAgain = value;
+                })
+            );
+
+        const btnContainer = contentEl.createDiv();
+        btnContainer.style.display = 'flex';
+        btnContainer.style.justifyContent = 'center';
+        btnContainer.style.marginTop = '15px';
+
+        new Setting(btnContainer)
             .addButton(btn => btn
-                .setButtonText('Let\'s Go!')
+                .setButtonText('Got it!')
                 .setCta()
-                .onClick(() => this.close()));
+                .onClick(async () => {
+                    // Only save the "don't show" flag if the user checked the box
+                    if (this.dontShowAgain) {
+                        this.plugin.settings.hasSeenWelcome = true;
+                        await this.plugin.saveSettings();
+                    }
+                    this.close();
+                }));
     }
 
     private createStep(container: HTMLElement, icon: string, title: string, desc: string) {
@@ -38,16 +67,23 @@ export class WelcomeModal extends Modal {
         row.style.display = 'flex';
         row.style.gap = '15px';
         row.style.marginBottom = '15px';
-        row.style.alignItems = 'center';
+        row.style.alignItems = 'flex-start';
+        row.style.padding = '10px';
+        row.style.backgroundColor = 'var(--background-secondary)';
+        row.style.borderRadius = '8px';
 
         const iconEl = row.createDiv('step-icon');
         iconEl.setText(icon);
         iconEl.style.fontSize = '24px';
+        iconEl.style.lineHeight = '1.2';
 
         const textDiv = row.createDiv('step-text');
         const titleEl = textDiv.createEl('h3', { text: title });
         titleEl.style.margin = '0 0 4px 0';
-        textDiv.createEl('span', { text: desc, cls: 'text-muted' });
+        titleEl.style.fontSize = '1.1em';
+        const descEl = textDiv.createEl('span', { text: desc, cls: 'text-muted' });
+        descEl.style.fontSize = '0.9em';
+        descEl.style.lineHeight = '1.4';
     }
 
     onClose() {

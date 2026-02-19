@@ -666,8 +666,8 @@
 .scan-paths-setting textarea {
     width: 100%;
     resize: none !important;
-    min-height: 65px;
-    height: 65px;
+    min-height: 6px;
+    height: 80px;
 }
 
 /* Adobe-lite Highlight Effect */

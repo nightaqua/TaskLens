@@ -1,5 +1,6 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import SemesterDashboardPlugin from '../main';
+import { WelcomeModal } from '../modals/WelcomeModal';
 
 export class SettingsTab extends PluginSettingTab {
     plugin: SemesterDashboardPlugin;
@@ -14,8 +15,30 @@ export class SettingsTab extends PluginSettingTab {
         containerEl.empty();
         containerEl.addClass('semester-dashboard-settings');
 
-        containerEl.createEl('h2', { text: 'TaskLens Settings' });
+        // Header with Help Icon
+        const headerDiv = containerEl.createDiv();
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'space-between';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.marginBottom = '20px';
 
+        const headerTitle = headerDiv.createEl('h2', { text: 'TaskLens Settings' });
+        headerTitle.style.margin = '0';
+
+        const helpBtn = headerDiv.createEl('button', {
+            cls: 'clickable-icon',
+            attr: { 'aria-label': 'Show Tutorial' }
+        });
+        helpBtn.style.background = 'transparent';
+        helpBtn.style.border = 'none';
+        helpBtn.style.cursor = 'pointer';
+        helpBtn.style.color = 'var(--text-muted)';
+        helpBtn.style.padding = '4px';
+        setIcon(helpBtn, 'help-circle');
+
+        helpBtn.addEventListener('click', () => {
+            new WelcomeModal(this.app, this.plugin).open();
+        });
         // 1. Scanning
         const scanDetails = containerEl.createEl('details');
         scanDetails.open = true;

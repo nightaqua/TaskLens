@@ -107,7 +107,9 @@ export class TaskManager extends Events {
 
     getAllTasks(): Task[] { return [...this.tasks]; }
     getFilteredTasks(): Task[] { return [...this.filteredTasks]; }
-
+    getScannedFiles(): string[] {
+        return this.parser.getFilesToScan().map(file => file.path);
+    }
     getStatistics() {
         const total = this.tasks.length;
         const completed = this.tasks.filter(t => t.completed).length;

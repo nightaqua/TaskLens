@@ -5,6 +5,7 @@ import SemesterDashboardPlugin from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { TaskListComponent } from './TaskListComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
+import { QuickAddModal } from '../modals/QuickAddModal';
 
 export const VIEW_TYPE_DASHBOARD = 'semester-dashboard-view';
 
@@ -114,7 +115,7 @@ export class DashboardView extends ItemView {
         this.headerComponent = new HeaderComponent(
             this.contentEl,
             this.headerState,
-            'Personal Dashboard',
+            'TaskLens Dashboard',
             {
                 onStateChange: () => {
                     if (this.headerComponent) {
@@ -139,6 +140,9 @@ export class DashboardView extends ItemView {
                     }
                     this.app.workspace.requestSaveLayout();
                     this.render();
+                },
+                onAdd: () => {
+                    new QuickAddModal(this.app, this.taskManager).open();
                 }
             }
         );

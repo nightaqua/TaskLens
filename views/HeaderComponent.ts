@@ -92,8 +92,8 @@ export class HeaderComponent {
 
         // <--- 4. THE MISSING ADD BUTTON LOGIC ---
         if (this.onAdd) {
-            // Added 'feature-highlight' class so you can't miss it
-            const addBtn = rightGroup.createEl('button', { cls: 'header-icon-btn feature-highlight' });
+            // REMOVED 'feature-highlight' class so it stops glowing!
+            const addBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
             setIcon(addBtn, 'plus');
             addBtn.setAttribute('aria-label', 'Quick Add Task');
             addBtn.addEventListener('click', () => this.onAdd!());

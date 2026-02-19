@@ -36,7 +36,7 @@ export class TaskParser {
 
     // --- Private Helpers ---
 
-    private getFilesToScan(): TFile[] {
+    public getFilesToScan(): TFile[] {
         const allMarkdownFiles = this.app.vault.getMarkdownFiles();
 
         if (this.settings.scanFolders.length === 0) {

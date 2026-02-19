@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+    <defs>
+        <linearGradient id="lensGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#7209b7" />
+            <stop offset="100%" stop-color="#4361ee" />
+        </linearGradient>
+        <linearGradient id="checkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#25671E" />
+            <stop offset="100%" stop-color="#48A111" />
+        </linearGradient>
+    </defs>
+
+    <line x1="66" y1="68" x2="88" y2="88" stroke="url(#lensGrad)" stroke-width="10" stroke-linecap="round" />
+
+    <circle cx="45" cy="45" r="30" stroke="url(#lensGrad)" stroke-width="8" fill="none" />
+
+    <polyline points="30,45 40,55 60,35" stroke="url(#checkGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+</svg>

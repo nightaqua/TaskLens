@@ -27,7 +27,10 @@ export default class SemesterDashboardPlugin extends Plugin {
         this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
         this.registerView(VIEW_TYPE_STATS, (leaf) => new StatsView(leaf, this));
 
-        // Ribbon Icon
+        // Ribbon Icons
+        this.addRibbonIcon('layout-dashboard', 'Open TaskLens Dashboard', () => {
+            this.activateView(VIEW_TYPE_DASHBOARD);
+        });
         this.addRibbonIcon('move', 'Toggle Dashboard Layout', () => this.toggleLayoutMode());
 
         // Commands
@@ -73,12 +76,9 @@ export default class SemesterDashboardPlugin extends Plugin {
 
         // CHECK FIRST RUN
         if (!this.settings.hasSeenWelcome) {
-            // Show the welcome modal
-            new WelcomeModal(this.app).open();
-
-            // Set flag to true and save
-            this.settings.hasSeenWelcome = true;
-            await this.saveSettings();
+            setTimeout(async () => {
+                new WelcomeModal(this.app, this).open();
+            }, 1000);
         }
 
         this.addSettingTab(new SettingsTab(this.app, this));
@@ -107,7 +107,7 @@ export default class SemesterDashboardPlugin extends Plugin {
     async activateView(viewType: string) {
         const leaf = this.app.workspace.getLeaf(true);
         await leaf.setViewState({ type: viewType, active: true });
-        this.app.workspace.revealLeaf(leaf);
+        await this.app.workspace.revealLeaf(leaf);
         setTimeout(() => {
             const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
             if (tabContainer) tabContainer.classList.add('semester-hide-tabs');
@@ -120,7 +120,7 @@ export default class SemesterDashboardPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
-        this.taskManager.loadTasks();
+        await this.taskManager.loadTasks();
     }
 
     refreshViews() {
