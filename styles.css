@@ -371,11 +371,15 @@
     gap: 4px;
     opacity: 0;
     transition: opacity 0.2s;
-    margin-left: 8px;
+    /* ---> FIX: Push to the right side of the meta row! <--- */
+    margin-left: auto; 
     flex-shrink: 0;
 }
 
-.task-item:hover .task-actions { opacity: 1; }
+/* Ensure the hover still works when they are nested inside content */
+.task-item:hover .task-actions { 
+    opacity: 1; 
+}
 
 .task-action-btn {
     background: transparent;

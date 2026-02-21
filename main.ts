@@ -65,13 +65,12 @@ export default class SemesterDashboardPlugin extends Plugin {
                     .onClick(() => this.toggleLayoutMode())
             );
 
-            // Greyed out "Shop" feature
+            // Replace the disabled "Layout Presets" with the "Hide All" action!
             menu.addItem((item) =>
                 item
-                    .setTitle('Layout Presets ▸')
-                    .setIcon('layout')
-                    .setDisabled(true) // Grays it out and makes it unclickable
-                    .onClick(() => {})
+                    .setTitle('Close All Widgets')
+                    .setIcon('eye-off')
+                    .onClick(() => this.closeAllWidgets())
             );
 
             menu.showAtMouseEvent(evt);
@@ -148,16 +147,46 @@ export default class SemesterDashboardPlugin extends Plugin {
         new Notice(this.isLayoutLocked ? 'Dashboard Layout: Locked 🔒' : 'Dashboard Layout: Unlocked 🔓');
     }
 
+    // ---> NEW: Closes all widgets to focus on notes <---
+    closeAllWidgets() {
+        const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
+        let closedCount = 0;
+        
+        viewTypes.forEach(type => {
+            const leaves = this.app.workspace.getLeavesOfType(type);
+            leaves.forEach(leaf => {
+                leaf.detach();
+                closedCount++;
+            });
+        });
+
+        if (closedCount > 0) {
+            new Notice('TaskLens widgets hidden.');
+        } else {
+            new Notice('No TaskLens widgets were open.');
+        }
+    }
+
+    // ---> UPDATED: Smart Spawning Logic <---
     async activateView(viewType: string) {
-        const leaf = this.app.workspace.getLeaf(true);
+        // 1. Don't overwrite an active note. Split the view instead!
+        let leaf = this.app.workspace.getLeaf(false);
+        if (leaf && leaf.view.getViewType() !== 'empty') {
+            leaf = this.app.workspace.getLeaf('split');
+        }
+        
         await leaf.setViewState({ type: viewType, active: true });
-        await this.app.workspace.revealLeaf(leaf);
-        setTimeout(() => {
+        this.app.workspace.revealLeaf(leaf);
+
+        // 2. If the layout is locked, auto-unlock it so they can drag the new widget!
+        if (this.isLayoutLocked) {
+            this.toggleLayoutMode();
+            new Notice('Layout auto-unlocked for placement 🔓');
+        } else {
+            // If it's already unlocked, just make sure tabs aren't hidden
             const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
-            if (tabContainer && this.isLayoutLocked) {
-                tabContainer.classList.add('semester-hide-tabs');
-            }
-        }, 100);
+            if (tabContainer) tabContainer.classList.remove('semester-hide-tabs');
+        }
     }
 
     async loadSettings() {

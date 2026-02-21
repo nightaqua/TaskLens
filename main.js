@@ -839,28 +839,20 @@ var TaskListComponent = class {
     const titleEl = viewMode.createDiv("task-title");
     titleEl.setText(task.title);
     const meta = viewMode.createDiv("task-meta");
-    meta.createSpan("task-course").setText(task.fileName);
-    if (task.dueDate) {
-      const d = task.dueDate.getDate().toString().padStart(2, "0");
-      const m = (task.dueDate.getMonth() + 1).toString().padStart(2, "0");
-      meta.createSpan("task-date").setText(`Due: ${d}-${m}-${task.dueDate.getFullYear()}`);
+    if (task.fileName) {
+      const courseLabel = meta.createDiv("task-course");
+      courseLabel.setText(task.fileName);
     }
-    titleEl.addEventListener("click", () => this.openTaskInEditor(task));
-    const actions = taskEl.createDiv("task-actions");
+    if (task.dueDate) {
+      const dateLabel = meta.createDiv("task-date");
+      dateLabel.setText(task.dueDate.toDateString());
+    }
+    const actions = meta.createDiv("task-actions");
     const editBtn = actions.createEl("button", { cls: "task-action-btn" });
     (0, import_obsidian6.setIcon)(editBtn, "pencil");
-    editBtn.setAttribute("aria-label", "Edit Task");
-    const deleteBtn = actions.createEl("button", { cls: "task-action-btn btn-danger" });
-    (0, import_obsidian6.setIcon)(deleteBtn, "trash-2");
-    deleteBtn.setAttribute("aria-label", "Delete Task");
-    deleteBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.callbacks.onDelete(task);
-    });
     editBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      viewMode.hide();
-      actions.hide();
+      viewMode.style.display = "none";
       const editMode = content.createDiv("task-edit-mode");
       const titleInput = editMode.createEl("input", {
         type: "text",
@@ -888,8 +880,7 @@ var TaskListComponent = class {
       };
       const cancel = () => {
         editMode.remove();
-        viewMode.show();
-        actions.show();
+        viewMode.style.display = "flex";
       };
       saveBtn.addEventListener("click", save);
       cancelBtn.addEventListener("click", cancel);
@@ -901,6 +892,13 @@ var TaskListComponent = class {
       });
       titleInput.focus();
     });
+    const deleteBtn = actions.createEl("button", { cls: "task-action-btn btn-danger" });
+    (0, import_obsidian6.setIcon)(deleteBtn, "trash-2");
+    deleteBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await this.callbacks.onDelete(task);
+    });
+    titleEl.addEventListener("click", () => this.openTaskInEditor(task));
   }
   async openTaskInEditor(task) {
     const file = this.app.vault.getAbstractFileByPath(task.filePath);
@@ -1753,8 +1751,7 @@ var SemesterDashboardPlugin = class extends import_obsidian13.Plugin {
         (item) => item.setTitle(this.isLayoutLocked ? "Unlock Layout" : "Lock Layout").setIcon(this.isLayoutLocked ? "unlock" : "lock").onClick(() => this.toggleLayoutMode())
       );
       menu.addItem(
-        (item) => item.setTitle("Layout Presets \u25B8").setIcon("layout").setDisabled(true).onClick(() => {
-        })
+        (item) => item.setTitle("Close All Widgets").setIcon("eye-off").onClick(() => this.closeAllWidgets())
       );
       menu.showAtMouseEvent(evt);
     });
@@ -1815,16 +1812,39 @@ var SemesterDashboardPlugin = class extends import_obsidian13.Plugin {
     });
     new import_obsidian13.Notice(this.isLayoutLocked ? "Dashboard Layout: Locked \u{1F512}" : "Dashboard Layout: Unlocked \u{1F513}");
   }
+  // ---> NEW: Closes all widgets to focus on notes <---
+  closeAllWidgets() {
+    const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
+    let closedCount = 0;
+    viewTypes.forEach((type) => {
+      const leaves = this.app.workspace.getLeavesOfType(type);
+      leaves.forEach((leaf) => {
+        leaf.detach();
+        closedCount++;
+      });
+    });
+    if (closedCount > 0) {
+      new import_obsidian13.Notice("TaskLens widgets hidden.");
+    } else {
+      new import_obsidian13.Notice("No TaskLens widgets were open.");
+    }
+  }
+  // ---> UPDATED: Smart Spawning Logic <---
   async activateView(viewType) {
-    const leaf = this.app.workspace.getLeaf(true);
+    let leaf = this.app.workspace.getLeaf(false);
+    if (leaf && leaf.view.getViewType() !== "empty") {
+      leaf = this.app.workspace.getLeaf("split");
+    }
     await leaf.setViewState({ type: viewType, active: true });
-    await this.app.workspace.revealLeaf(leaf);
-    setTimeout(() => {
+    this.app.workspace.revealLeaf(leaf);
+    if (this.isLayoutLocked) {
+      this.toggleLayoutMode();
+      new import_obsidian13.Notice("Layout auto-unlocked for placement \u{1F513}");
+    } else {
       const tabContainer = leaf.view.containerEl.closest(".workspace-tabs");
-      if (tabContainer && this.isLayoutLocked) {
-        tabContainer.classList.add("semester-hide-tabs");
-      }
-    }, 100);
+      if (tabContainer)
+        tabContainer.classList.remove("semester-hide-tabs");
+    }
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());

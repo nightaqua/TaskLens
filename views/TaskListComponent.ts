@@ -56,44 +56,26 @@ export class TaskListComponent {
         titleEl.setText(task.title);
 
         const meta = viewMode.createDiv('task-meta');
-        meta.createSpan('task-course').setText(task.fileName);
-        if (task.dueDate) {
-            const d = task.dueDate.getDate().toString().padStart(2, '0');
-            const m = (task.dueDate.getMonth() + 1).toString().padStart(2, '0');
-            meta.createSpan('task-date').setText(`Due: ${d}-${m}-${task.dueDate.getFullYear()}`);
+
+        if (task.fileName) {
+            const courseLabel = meta.createDiv('task-course');
+            courseLabel.setText(task.fileName);
         }
 
-        // Click title to jump to file
-        titleEl.addEventListener('click', () => this.openTaskInEditor(task));
+        if (task.dueDate) {
+            const dateLabel = meta.createDiv('task-date');
+            dateLabel.setText(task.dueDate.toDateString());
+        }
 
-        // --- ACTIONS (Hover) ---
-        const actions = taskEl.createDiv('task-actions');
-
-        // Edit Button
+        // ---> FIX: Move actions INSIDE the meta div <---
+        const actions = meta.createDiv('task-actions');
+        
         const editBtn = actions.createEl('button', { cls: 'task-action-btn' });
         setIcon(editBtn, 'pencil');
-        editBtn.setAttribute('aria-label', 'Edit Task');
-
-        // Delete Button
-        const deleteBtn = actions.createEl('button', { cls: 'task-action-btn btn-danger' });
-        setIcon(deleteBtn, 'trash-2');
-        deleteBtn.setAttribute('aria-label', 'Delete Task');
-
-        // --- EVENTS ---
-
-        // DELETE
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            // Optional: Add confirmation dialog here
-            this.callbacks.onDelete(task);
-        });
-
-        // EDIT: Switch to Input Mode
         editBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            viewMode.hide();
-            actions.hide(); // Hide buttons while editing
-
+            viewMode.style.display = 'none';
+            
             // Create Input Mode UI
             const editMode = content.createDiv('task-edit-mode');
 
@@ -129,13 +111,11 @@ export class TaskListComponent {
                     const newDate = dateInput.value ? new Date(dateInput.value) : null;
                     this.callbacks.onEdit(task, newTitle, newDate);
                 }
-                // UI will refresh automatically via TaskManager event
             };
 
             const cancel = () => {
                 editMode.remove();
-                viewMode.show();
-                actions.show();
+                viewMode.style.display = 'flex';
             };
 
             saveBtn.addEventListener('click', save);
@@ -149,6 +129,16 @@ export class TaskListComponent {
 
             titleInput.focus();
         });
+
+        const deleteBtn = actions.createEl('button', { cls: 'task-action-btn btn-danger' });
+        setIcon(deleteBtn, 'trash-2');
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await this.callbacks.onDelete(task);
+        });
+
+        // Click title to jump to file
+        titleEl.addEventListener('click', () => this.openTaskInEditor(task));
     }
 
     private async openTaskInEditor(task: Task) {
