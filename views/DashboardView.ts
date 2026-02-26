@@ -23,7 +23,7 @@ export class DashboardView extends ItemView {
     private showTimeline: boolean = true;
     private showList: boolean = true;
     private showStats: boolean = true;
-    private timelineDaysToShow: number = 10;
+    private timelineDaysToShow: number = 10; 
     private renderTimer: NodeJS.Timeout | null = null;
     private lastTimelineScroll: number | null = null;
     private forceScrollToToday: boolean = false;
@@ -73,7 +73,7 @@ export class DashboardView extends ItemView {
             this.showTimeline = state.showTimeline ?? this.showTimeline;
             this.showList = state.showList ?? this.showList;
             this.showStats = state.showStats ?? this.showStats;
-            this.timelineDaysToShow = state.zoomLevel ?? 14;
+            this.timelineDaysToShow = state.zoomLevel ?? 10;
 
             if (state.statusFilter) this.taskManager.setStatusFilter(state.statusFilter);
             if (state.courseFilter) this.taskManager.setCourseFilter(state.courseFilter);
@@ -120,13 +120,15 @@ export class DashboardView extends ItemView {
         this.contentEl.addClass('semester-dashboard-view');
 
         this.applyColorTheme();
-
         await this.taskManager.loadTasks();
         this.render();
-
-        if (this.timelineComponent) {
-            this.timelineComponent.scrollToToday();
-        }
+        
+        // 2. Add a slight delay to ensure the DOM is ready on Obsidian launch
+        setTimeout(() => {
+            if (this.timelineComponent) {
+                this.timelineComponent.scrollToToday();
+            }
+        }, 250);
     }
 
     // 3. Remove class on close
@@ -293,13 +295,9 @@ export class DashboardView extends ItemView {
 
         const list = new TaskListComponent(container, this.app, {
             onToggle: (t) => this.taskManager.toggleTaskCompletion(t),
-            onEdit: async (t, newTitle, newDate) => {
-                await this.taskManager.updateTask(t, newTitle, newDate);
-            },
-            onDelete: async (t) => {
-                await this.taskManager.deleteTask(t);
-            }
-        });
+            onEdit: async (t, newTitle, newDate) => { await this.taskManager.updateTask(t, newTitle, newDate); },
+            onDelete: async (t) => { await this.taskManager.deleteTask(t); }
+        }, this.plugin.settings);
 
         list.render(this.taskManager.getFilteredTasks());
     }
@@ -313,11 +311,9 @@ export class DashboardView extends ItemView {
         this.contentEl.style.setProperty('--color-purple', '#7209b7'); // Keep fixed or add setting later
     }
 
-    public refreshFromSettings(): void {
-        if (!this.contentEl.isConnected) return;
+    public refreshFromSettings() {
         this.applyColorTheme();
-        this.render();
-        this.app.workspace.requestSaveLayout();
+        this.render(); // This forces TaskListComponent to request the new palette colors!
     }
 
     private renderTimeline(): void {
@@ -349,10 +345,11 @@ export class DashboardView extends ItemView {
         setIcon(scrollRight, 'chevron-right');
 
         this.timelineComponent = new TimelineComponent(
-            container,
-            this.app,
-            this.taskManager.getFilteredTasks(),
-            this.timelineDaysToShow
+            container, 
+            this.app, 
+            this.taskManager.getFilteredTasks(), 
+            this.timelineDaysToShow,
+            this.plugin.settings
         );
         this.timelineComponent.render();
 

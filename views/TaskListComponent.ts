@@ -1,6 +1,6 @@
 import { Task, getTaskStatus, TaskStatus } from '../models/Task';
 import { App, MarkdownView, setIcon, TFile } from 'obsidian';
-// (Note: You might need to import TaskManager logic via callback or pass it down)
+import { SemesterSettings } from '../settings/Settings';
 
 export class TaskListComponent {
     // We need callbacks for the new actions
@@ -11,8 +11,20 @@ export class TaskListComponent {
             onToggle: (t: Task) => void,
             onEdit: (t: Task, newTitle: string, newDate: Date | null) => void,
             onDelete: (t: Task) => void
-        }
+        },
+        private settings: SemesterSettings
     ) {}
+
+    private getCourseColor(courseName: string): string {
+        if (this.settings?.topicColors && this.settings.topicColors[courseName]) {
+            return this.settings.topicColors[courseName];
+        }
+        
+        const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
+        let hash = 0;
+        for (let i = 0; i < courseName.length; i++) hash = courseName.charCodeAt(i) + ((hash << 5) - hash);
+        return defaultPalette[Math.abs(hash) % defaultPalette.length];
+    }
 
     render(tasks: Task[], groupBy: string = 'none') {
         this.container.empty();
@@ -34,13 +46,19 @@ export class TaskListComponent {
     }
 
     private renderTaskItem(container: HTMLElement, task: Task) {
-        const status = getTaskStatus(task);
-        let statusClass = 'status-active';
-        if (status === TaskStatus.Overdue) statusClass = 'status-overdue';
-        if (status === TaskStatus.Urgent) statusClass = 'status-urgent';
-        if (status === TaskStatus.Completed) statusClass = 'status-completed';
+        const taskEl = container.createDiv({ cls: ['task-item'] });
 
-        const taskEl = container.createDiv({ cls: ['task-item', statusClass] });
+        if (this.settings?.colorMode === 'course' && task.fileName) {
+            // Apply dynamic course color
+            taskEl.style.borderLeftColor = this.getCourseColor(task.fileName);
+        } else {
+            // Apply standard urgency color
+            const status = getTaskStatus(task);
+            if (status === TaskStatus.Overdue) taskEl.addClass('status-overdue');
+            if (status === TaskStatus.Urgent) taskEl.addClass('status-urgent');
+            if (status === TaskStatus.Completed) taskEl.addClass('status-completed');
+            if (status === TaskStatus.UpcomingWeek) taskEl.addClass('status-active');
+        }
 
         // 1. Checkbox
         const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
@@ -67,10 +85,9 @@ export class TaskListComponent {
             dateLabel.setText(task.dueDate.toDateString());
         }
 
-        // ---> FIX: Move actions INSIDE the meta div <---
         const actions = meta.createDiv('task-actions');
-        
-        const editBtn = actions.createEl('button', { cls: 'task-action-btn' });
+
+        /* const editBtn = actions.createEl('button', { cls: 'task-action-btn' });
         setIcon(editBtn, 'pencil');
         editBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -135,7 +152,7 @@ export class TaskListComponent {
         deleteBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             await this.callbacks.onDelete(task);
-        });
+        }); */
 
         // Click title to jump to file
         titleEl.addEventListener('click', () => this.openTaskInEditor(task));

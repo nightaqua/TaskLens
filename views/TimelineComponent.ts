@@ -1,11 +1,13 @@
 import { Task, getTaskStatus, TaskStatus } from '../models/Task';
 import { App, MarkdownView, TFile } from 'obsidian';
+import { SemesterSettings } from '../settings/Settings';
 
 export class TimelineComponent {
     private container: HTMLElement;
     private tasks: Task[];
     private daysToShow: number;
     private app: App;
+    private settings: SemesterSettings;
 
     private scrollContainer: HTMLElement | null = null;
     private tooltipEl: HTMLElement | null = null;
@@ -15,11 +17,23 @@ export class TimelineComponent {
     private startX = 0;
     private scrollLeftPos = 0;
 
-    constructor(container: HTMLElement, app: App, tasks: Task[], daysToShow: number = 14) {
+    constructor(container: HTMLElement, app: App, tasks: Task[], daysToShow: number = 10, settings: SemesterSettings) {
         this.container = container;
         this.app = app;
         this.tasks = tasks;
         this.daysToShow = daysToShow;
+        this.settings = settings;
+    }
+
+    private getCourseColor(courseName: string): string {
+        if (this.settings?.topicColors && this.settings.topicColors[courseName]) {
+            return this.settings.topicColors[courseName];
+        }
+        
+        const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
+        let hash = 0;
+        for (let i = 0; i < courseName.length; i++) hash = courseName.charCodeAt(i) + ((hash << 5) - hash);
+        return defaultPalette[Math.abs(hash) % defaultPalette.length];
     }
 
     public render(): void {
@@ -150,11 +164,15 @@ export class TimelineComponent {
                 const bar = grid.createDiv('timeline-task-bar');
                 bar.setText(task.title);
 
-                const status = getTaskStatus(task);
-                if (status === TaskStatus.Overdue) bar.addClass('status-overdue');
-                if (status === TaskStatus.Urgent) bar.addClass('status-urgent');
-                if (status === TaskStatus.Completed) bar.addClass('status-completed');
-                if (status === TaskStatus.UpcomingWeek) bar.addClass('status-active');
+                if (this.settings?.colorMode === 'course' && task.fileName) {
+                    bar.style.backgroundColor = this.getCourseColor(task.fileName);
+                } else {
+                    const status = getTaskStatus(task);
+                    if (status === TaskStatus.Overdue) bar.addClass('status-overdue');
+                    if (status === TaskStatus.Urgent) bar.addClass('status-urgent');
+                    if (status === TaskStatus.Completed) bar.addClass('status-completed');
+                    if (status === TaskStatus.UpcomingWeek) bar.addClass('status-active');
+                }
 
                 // Calculate how many days the task spans (minimum 1 day)
                 const span = (dueIdx - startIdx) + 1;

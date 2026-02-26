@@ -99,7 +99,7 @@ export class TaskListView extends ItemView {
             onDelete: async (t: Task) => {
                 await this.plugin.taskManager.deleteTask(t);
             }
-        });
+        }, this.plugin.settings);
         list.render(this.plugin.taskManager.getFilteredTasks());
     }
 }

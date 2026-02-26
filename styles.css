@@ -166,7 +166,10 @@
 .control-group {
     display: flex;
     align-items: center;
+    flex-wrap: wrap; /* NEW: Allows inner buttons to wrap to a new line */
     gap: 8px;
+    flex: 1 1 auto; /* NEW: Allows the entire group to shrink smoothly */
+    min-width: 0; /* NEW: Prevents rigid elements from bursting the container */
 }
 
 .control-group label {
@@ -753,3 +756,21 @@
 .workspace-tabs.semester-hide-tabs .workspace-tab-header-container { display: none !important; }
 .workspace-tabs.semester-hide-tabs .workspace-tab-header-container-inner { padding: 0 !important; margin: 0 !important; }
 .workspace-tabs.semester-hide-tabs .workspace-leaf { height: 100% !important; }
+
+/* --- Adaptive Padding Fixes --- */
+.semester-dashboard-view {
+    padding: 12px !important; /* Slightly tighter outer padding */
+}
+
+/* Remove bottom margin from whichever widget is currently last in the view */
+.semester-dashboard-view > *:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Slightly tighter default margins for widgets */
+.dashboard-task-list, 
+.dashboard-timeline-view, 
+.dashboard-stats {
+    margin-bottom: 16px; 
+}
+

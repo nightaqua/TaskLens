@@ -87,36 +87,69 @@ export class SettingsTab extends PluginSettingTab {
         uiDetails.open = true;
         uiDetails.createEl('summary', { text: 'Appearance & Colors' });
 
-        /* --- COMMENTED OUT: Advanced Course Color Logic ---
         new Setting(uiDetails)
             .setName('Color Mode')
             .addDropdown(d => d
-                .addOption('status', 'By Status (Urgent, Active)')
-                .addOption('course', 'By Topic/File Palette')
+                .addOption('status', 'By Urgency (Overdue, Active)')
+                .addOption('course', 'By Topic (File Palette)')
                 .setValue(this.plugin.settings.colorMode)
                 .onChange(async (v) => {
                     this.plugin.settings.colorMode = v as any;
                     await this.plugin.saveSettings();
                     this.plugin.refreshViews();
+                    renderColorPickers();
                 }));
-        ---------------------------------------------------- */
 
-        // Render only Status Colors
-        new Setting(uiDetails)
-            .setName('Overdue Color')
-            .addColorPicker(c => c.setValue(this.plugin.settings.colors.overdue).onChange(async v => { this.plugin.settings.colors.overdue = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+        const colorPickersContainer = uiDetails.createDiv();
 
-        new Setting(uiDetails)
-            .setName('Urgent Color')
-            .addColorPicker(c => c.setValue(this.plugin.settings.colors.urgent).onChange(async v => { this.plugin.settings.colors.urgent = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+        const renderColorPickers = () => {
+            colorPickersContainer.empty();
 
-        new Setting(uiDetails)
-            .setName('Active Color')
-            .addColorPicker(c => c.setValue(this.plugin.settings.colors.active).onChange(async v => { this.plugin.settings.colors.active = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+            if (this.plugin.settings.colorMode === 'status') {
+                new Setting(colorPickersContainer).setName('Overdue Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.overdue).onChange(async v => { this.plugin.settings.colors.overdue = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+                new Setting(colorPickersContainer).setName('Urgent Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.urgent).onChange(async v => { this.plugin.settings.colors.urgent = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+                new Setting(colorPickersContainer).setName('Active Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.active).onChange(async v => { this.plugin.settings.colors.active = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+                new Setting(colorPickersContainer).setName('Completed Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.completed).onChange(async v => { this.plugin.settings.colors.completed = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+            } else {
+                const helperText = colorPickersContainer.createEl('p', {
+                    text: 'Assign a custom color to each of your active topics.',
+                    cls: 'text-muted'
+                });
+                helperText.style.marginLeft = '14px';
+                helperText.style.marginBottom = '12px';
+                helperText.style.fontSize = '0.9em';
 
-        new Setting(uiDetails)
-            .setName('Completed Color')
-            .addColorPicker(c => c.setValue(this.plugin.settings.colors.completed).onChange(async v => { this.plugin.settings.colors.completed = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
+                const allTasks = this.plugin.taskManager.getAllTasks();
+                const uniqueTopics = Array.from(new Set(allTasks.map(t => t.fileName).filter((t): t is string => Boolean(t))));
+
+                if (uniqueTopics.length === 0) {
+                    const emptyText = colorPickersContainer.createEl('p', { text: 'No active topics found. Add some tasks first!' });
+                    emptyText.style.marginLeft = '14px';
+                    emptyText.style.fontStyle = 'italic';
+                    return;
+                }
+
+                const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
+
+                uniqueTopics.forEach(topic => {
+                    let hash = 0;
+                    for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
+                    const defaultColor = defaultPalette[Math.abs(hash) % defaultPalette.length];
+
+                    const savedColor = this.plugin.settings.topicColors[topic] || defaultColor;
+
+                    new Setting(colorPickersContainer)
+                        .setName(`${topic} Color`)
+                        .addColorPicker(c => c.setValue(savedColor).onChange(async v => {
+                            this.plugin.settings.topicColors[topic] = v;
+                            await this.plugin.saveSettings();
+                            this.plugin.refreshViews();
+                        }));
+                });
+            }
+        };
+
+        renderColorPickers();
 
         // 4. Support (Keep existing)
         containerEl.createEl('hr');

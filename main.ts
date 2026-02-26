@@ -21,6 +21,8 @@ export default class SemesterDashboardPlugin extends Plugin {
     settings: SemesterSettings;
     taskManager: TaskManager;
     isLayoutLocked: boolean = true;
+    isFocusMode: boolean = false;
+    private savedLayout: any = null;
 
     async onload() {
         await this.loadSettings();
@@ -34,10 +36,10 @@ export default class SemesterDashboardPlugin extends Plugin {
         this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
         this.registerView(VIEW_TYPE_STATS, (leaf) => new StatsView(leaf, this));
 
-        // 2. Add the custom icon to Obsidian's icon library
+        // Add the custom icon to Obsidian's icon library
         addIcon('tasklens-icon', TASKLENS_ICON);
 
-        // 3. Create the SINGLE unified Ribbon Icon with a Context Menu
+        // Create the SINGLE unified Ribbon Icon with a Context Menu
         this.addRibbonIcon('tasklens-icon', 'TaskLens', (evt: MouseEvent) => {
             const menu = new Menu();
 
@@ -57,7 +59,6 @@ export default class SemesterDashboardPlugin extends Plugin {
 
             menu.addSeparator();
 
-            // Dynamically change title/icon based on current state
             menu.addItem((item) =>
                 item
                     .setTitle(this.isLayoutLocked ? 'Unlock Layout' : 'Lock Layout')
@@ -65,12 +66,11 @@ export default class SemesterDashboardPlugin extends Plugin {
                     .onClick(() => this.toggleLayoutMode())
             );
 
-            // Replace the disabled "Layout Presets" with the "Hide All" action!
             menu.addItem((item) =>
                 item
-                    .setTitle('Close All Widgets')
-                    .setIcon('eye-off')
-                    .onClick(() => this.closeAllWidgets())
+                    .setTitle(this.isFocusMode ? 'Exit Focus Mode' : 'Enter Focus Mode')
+                    .setIcon(this.isFocusMode ? 'eye' : 'eye-off')
+                    .onClick(() => this.toggleFocusMode())
             );
 
             menu.showAtMouseEvent(evt);
@@ -147,34 +147,53 @@ export default class SemesterDashboardPlugin extends Plugin {
         new Notice(this.isLayoutLocked ? 'Dashboard Layout: Locked 🔒' : 'Dashboard Layout: Unlocked 🔓');
     }
 
-    // ---> NEW: Closes all widgets to focus on notes <---
-    closeAllWidgets() {
-        const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
-        let closedCount = 0;
-        
-        viewTypes.forEach(type => {
-            const leaves = this.app.workspace.getLeavesOfType(type);
-            leaves.forEach(leaf => {
-                leaf.detach();
-                closedCount++;
-            });
-        });
+    async toggleFocusMode() {
+        if (!this.isFocusMode) {
+            this.savedLayout = this.app.workspace.getLayout();
+            this.isFocusMode = true;
 
-        if (closedCount > 0) {
-            new Notice('TaskLens widgets hidden.');
+            const workspace = this.app.workspace as any;
+            if (workspace.leftSplit && typeof workspace.leftSplit.collapse === 'function') {
+                workspace.leftSplit.collapse();
+            }
+            if (workspace.rightSplit && typeof workspace.rightSplit.collapse === 'function') {
+                workspace.rightSplit.collapse();
+            }
+
+            const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
+            let closedCount = 0;
+
+            viewTypes.forEach(type => {
+                this.app.workspace.getLeavesOfType(type).forEach(leaf => {
+                    leaf.detach();
+                    closedCount++;
+                });
+            });
+
+            if (closedCount > 0) {
+                new Notice('Focus Mode enabled');
+            } else {
+                this.isFocusMode = false;
+                this.savedLayout = null;
+                new Notice('No Task Lenses were open');
+            }
         } else {
-            new Notice('No TaskLens widgets were open.');
+            this.isFocusMode = false;
+            if (this.savedLayout) {
+                await (this.app.workspace as any).setLayout(this.savedLayout);
+                this.savedLayout = null;
+                new Notice('Focus Mode disabled');
+            }
         }
     }
 
-    // ---> UPDATED: Smart Spawning Logic <---
     async activateView(viewType: string) {
         // 1. Don't overwrite an active note. Split the view instead!
         let leaf = this.app.workspace.getLeaf(false);
         if (leaf && leaf.view.getViewType() !== 'empty') {
             leaf = this.app.workspace.getLeaf('split');
         }
-        
+
         await leaf.setViewState({ type: viewType, active: true });
         this.app.workspace.revealLeaf(leaf);
 
@@ -199,16 +218,17 @@ export default class SemesterDashboardPlugin extends Plugin {
     }
 
     refreshViews() {
-        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD);
-        leaves.forEach(leaf => {
-            const view = leaf.view;
-            const isDashboard =
-                typeof view?.getViewType === 'function' &&
-                view.getViewType() === VIEW_TYPE_DASHBOARD;
-            const canRefresh = typeof (view as { refreshFromSettings?: unknown })?.refreshFromSettings === 'function';
-            if (isDashboard && canRefresh) {
-                (view as DashboardView).refreshFromSettings();
-            }
+        const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
+        viewTypes.forEach(type => {
+            this.app.workspace.getLeavesOfType(type).forEach(leaf => {
+                const view = leaf.view as any;
+                if (typeof view.refreshFromSettings === 'function') {
+                    view.refreshFromSettings();
+                } else if (typeof view.render === 'function') {
+                    if (typeof view.applyColorTheme === 'function') view.applyColorTheme();
+                    view.render();
+                }
+            });
         });
     }
 }

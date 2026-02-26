@@ -8,13 +8,17 @@
   "startDateKey": "start",
   "dueDateKey": "due",
   "colorScheme": "inherit",
-  "colorMode": "course",
+  "colorMode": "status",
   "colors": {
-    "overdue": "#e63946",
-    "urgent": "#fb8500",
-    "active": "#2a9d8f",
-    "completed": "#adb2c7"
+    "overdue": "#ff0000",
+    "urgent": "#fff700",
+    "active": "#5ab569",
+    "completed": "#49b7df"
   },
+  "topicColors": {
+    "Trust in Media": "#ae604c"
+  },
+  "hasSeenWelcome": true,
   "courseColors": [
     "#4cc9f0",
     "#f72585",
@@ -23,7 +27,6 @@
     "#4361ee",
     "#4caf50"
   ],
-  "hasSeenWelcome": true,
   "allowNoDueDate": false,
   "showCompletedByDefault": false,
   "defaultSort": "due-date",

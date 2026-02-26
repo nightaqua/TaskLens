@@ -21,7 +21,7 @@ export interface SemesterSettings {
         completed: string;
     };
 
-    courseColors: string[];
+    topicColors: Record<string, string>;
 
     hasSeenWelcome: boolean;
 }
@@ -45,8 +45,7 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
         completed: '#457b9d'
     },
 
-    // Default palette for courses
-    courseColors: ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'],
+    topicColors: {},
 
     hasSeenWelcome: false
 };
