@@ -19,6 +19,7 @@ test-vault/
 # --- System Files ---
 .DS_Store
 Thumbs.db
+data.json
 *.log
 
 # --- IDEs ---

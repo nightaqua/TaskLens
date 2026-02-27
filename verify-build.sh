@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Build Verification Script for Semester Dashboard Plugin (PATH + off-PATH support)
+# Build Verification Script for TaskLens Plugin (PATH + off-PATH support)
 
-echo "🔍 Semester Dashboard - Build Verification"
+echo "🔍 TaskLens - Build Verification"
 echo "=========================================="
 echo ""
 
@@ -90,11 +90,11 @@ if [ ! -f "manifest.json" ]; then
 fi
 echo "✅ manifest.json found"
 
-if [ ! -f "main.ts" ]; then
-  echo "❌ main.ts not found!"
+if [ ! -f "src/main.ts" ]; then
+  echo "❌ src/main.ts not found!"
   exit 1
 fi
-echo "✅ main.ts found"
+echo "✅ src/main.ts found"
 echo ""
 
 # Install dependencies if needed
@@ -150,15 +150,13 @@ echo "✅ All checks passed!"
 echo "✅ =========================================="
 echo ""
 echo "📋 Next steps:"
-echo "1. Copy the plugin folder to: YourVault/.obsidian/plugins/semester-dashboard/"
-echo "2. Enable 'Semester Dashboard' in Obsidian settings"
-echo "3. Use Ctrl+P → 'Open Semester Dashboard'"
+echo "1. Copy the plugin folder to: YourVault/.obsidian/plugins/tasklens/"
+echo "2. Enable 'TaskLens' in Obsidian settings"
+echo "3. Click the TaskLens icon in your ribbon to open the Dashboard!"
 echo ""
 echo "📚 Documentation:"
-echo "- README.md - User guide and features"
-echo "- QUICKSTART.md - Quick setup guide"
-echo "- ARCHITECTURE.md - Technical details"
-echo "- TROUBLESHOOTING.md - Common issues"
+echo "- docs/01-Introduction.md - Getting Started"
+echo "- docs/05-Troubleshooting.md - Common issues"
 echo ""
 echo "Press Enter to exit..."
 read -r

@@ -19,6 +19,7 @@
     "Trust in Media": "#ae604c"
   },
   "hasSeenWelcome": true,
+  "hasClickedRibbonIcon": true,
   "courseColors": [
     "#4cc9f0",
     "#f72585",

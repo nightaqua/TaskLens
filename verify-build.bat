@@ -50,8 +50,9 @@ echo ✓ package.json found
 if not exist manifest.json goto :fail_manifest
 echo ✓ manifest.json found
 
-if not exist main.ts goto :fail_main_ts
-echo ✓ main.ts found
+
+if not exist src\main.ts goto :fail_main_ts
+echo ✓ src\main.ts found
 echo.
 
 REM ========================================
@@ -107,15 +108,14 @@ echo Build completed successfully!
 echo ========================================
 echo.
 echo Next steps:
-echo 1. Copy this folder to: YourVault\.obsidian\plugins\semester-dashboard\
+echo 1. Copy this folder to: YourVault\.obsidian\plugins\tasklens\
 echo 2. Open Obsidian Settings - Community Plugins
-echo 3. Reload plugins and enable "Semester Dashboard"
-echo 4. Use Ctrl+P and type "Open Semester Dashboard"
+echo 3. Reload plugins and enable "TaskLens"
+echo 4. Click the TaskLens icon in your ribbon to open the Dashboard!
 echo.
 echo Documentation:
-echo - README.md - User guide
-echo - QUICKSTART.md - Setup guide
-echo - TROUBLESHOOTING.md - Common issues
+echo - docs\01-Introduction.md - Getting Started
+echo - docs\05-Troubleshooting.md - Common issues
 echo.
 goto :end_success
 
@@ -153,8 +153,9 @@ goto :end_fail
 echo ERROR: manifest.json not found!
 goto :end_fail
 
+
 :fail_main_ts
-echo ERROR: main.ts not found!
+echo ERROR: src\main.ts not found!
 goto :end_fail
 
 :fail_install

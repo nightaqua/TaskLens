@@ -2,7 +2,7 @@
    1. DASHBOARD LAYOUT & STRUCTURE
    ========================================= */
 
-.semester-dashboard-view {
+.tasklens-dashboard-view {
     padding: 16px !important;
     height: 100%;
     width: 100%;
@@ -637,7 +637,7 @@
    5. SETTINGS UI & HIGHLIGHTS
    ========================================= */
 
-.semester-dashboard-settings .setting-item {
+.tasklens-settings .setting-item {
     border: 1px solid var(--background-modifier-border);
     background-color: var(--background-secondary);
     border-radius: 8px;
@@ -645,18 +645,18 @@
     margin-bottom: 12px;
 }
 
-.semester-dashboard-settings details summary {
+.tasklens-settings details summary {
     margin-bottom: 16px;
     font-weight: 600;
     cursor: pointer;
     padding-left: 4px;
 }
 
-.semester-dashboard-settings details {
+.tasklens-settings details {
     margin-left: 12px;
 }
 
-.semester-dashboard-settings details[open] summary ~ .setting-item:first-of-type {
+.tasklens-settings details[open] summary ~ .setting-item:first-of-type {
     margin-top: 12px;
 }
 
@@ -732,38 +732,38 @@
 }
 
 /* Chromeless Logic */
-.workspace-leaf-content.semester-chromeless .workspace-leaf-header,
-.workspace-leaf-content.semester-chromeless .workspace-tab-header-container,
-.workspace-leaf-content.semester-chromeless .workspace-tab-header,
-.workspace-leaf-content.semester-chromeless .workspace-tab-header-inner,
-.workspace-leaf-content.semester-chromeless .view-header {
+.workspace-leaf-content.tasklens-chromeless .workspace-leaf-header,
+.workspace-leaf-content.tasklens-chromeless .workspace-tab-header-container,
+.workspace-leaf-content.tasklens-chromeless .workspace-tab-header,
+.workspace-leaf-content.tasklens-chromeless .workspace-tab-header-inner,
+.workspace-leaf-content.tasklens-chromeless .view-header {
     display: none !important;
 }
 
-.workspace-leaf-content.semester-chromeless {
+.workspace-leaf-content.tasklens-chromeless {
     padding-top: 0 !important;
     margin-top: 0 !important;
     border: none !important;
     box-shadow: none !important;
 }
 
-.workspace-leaf-content.semester-chromeless .view-content {
+.workspace-leaf-content.tasklens-chromeless .view-content {
     height: 100% !important;
     margin: 0 !important;
     background-color: var(--background-primary);
 }
 
-.workspace-tabs.semester-hide-tabs .workspace-tab-header-container { display: none !important; }
-.workspace-tabs.semester-hide-tabs .workspace-tab-header-container-inner { padding: 0 !important; margin: 0 !important; }
-.workspace-tabs.semester-hide-tabs .workspace-leaf { height: 100% !important; }
+.workspace-tabs.tasklens-hide-tabs .workspace-tab-header-container { display: none !important; }
+.workspace-tabs.tasklens-hide-tabs .workspace-tab-header-container-inner { padding: 0 !important; margin: 0 !important; }
+.workspace-tabs.tasklens-hide-tabs .workspace-leaf { height: 100% !important; }
 
 /* --- Adaptive Padding Fixes --- */
-.semester-dashboard-view {
+.tasklens-dashboard-view {
     padding: 12px !important; /* Slightly tighter outer padding */
 }
 
 /* Remove bottom margin from whichever widget is currently last in the view */
-.semester-dashboard-view > *:last-child {
+.tasklens-dashboard-view > *:last-child {
     margin-bottom: 0 !important;
 }
 
