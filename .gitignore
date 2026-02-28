@@ -17,10 +17,11 @@ package-lock.json
 test-vault/
 
 # --- System Files ---
-.DS_Store
+*.DS_Store
 Thumbs.db
 data.json
 *.log
+
 
 # --- IDEs ---
 .idea/
@@ -29,6 +30,9 @@ data.json
 .idea
 *.swp
 *.swo
+
+# Private maintainer notes
+00-ForMe.md
 
 # --- Testing ---
 coverage/

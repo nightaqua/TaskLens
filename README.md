@@ -1,6 +1,6 @@
 # TaskLens for Obsidian
 
-TaskLens is a native , widget-based dashboard that turns Obsidian into a powerful task command center. Visualize deadlines, manage tasks, and track project progress without leaving your vault or changing how you write.
+TaskLens is a native, widget-based dashboard that turns Obsidian into a powerful task command center. Visualize deadlines, manage tasks, and track project progress without leaving your vault or changing how you write.
 
 ![TaskLens Dark Preview](docs/assets/Layout3.png)
 
@@ -11,8 +11,6 @@ TaskLens is a native , widget-based dashboard that turns Obsidian into a powerfu
 - **Dynamic Topic Colors:** Assign unique colors to different projects or folders. TaskLens automatically color-codes your entire dashboard based on your custom palette
 - **Focus Mode:** Instantly hide all TaskLens widgets and collapse your sidebars to focus purely on writing. Click again to restore your exact window layout perfectly
 - **Quick Add:** A unified ribbon menu allows you to inject a new task directly at your current text cursor, or append it to any specific file in your vault
-
-![TaskLens Settings Preview](docs/assets/Settings.png)
 
 ## Task Format
 
@@ -36,19 +34,34 @@ TaskLens operates entirely from a single, unified Ribbon Icon (the magnifying gl
 Create your own version of the TaskLens dashboard by each widget to your liking.
 
 ## Gallery
-[video_example.mp4](docs/assets/video_example.mp4)
+
 <details> 
     <summary> 📸 Open Gallery / See White Theme </summary>
     <br>
-        <p align="center">
+ <p align="center">
   <img src="docs/assets/Layout1.png"/><br>
   <em>Layout Variant</em> </p>
  <br>
     <p align="center">
     <img src="docs/assets/Layout2.png"/><br>
-    <em>Alternative Layout Variation</em>
+    <em>Alternative Layout Variation</em> </p>
+ <br>
+    <p align="center">
+    <img src="docs/assets/Settings.png"><br>
+    <em>TaskLens Settings Preview</em>
 </p>
 </details>
+
+![TaskLens Settings Preview](docs/assets/Settings.png)
+
+## *Demo Video*
+<p align="center">
+  <a href="https://youtu.be/WHJTi8GESqQ">
+    <img src="https://img.youtube.com/vi/WHJTi8GESqQ/maxresdefault.jpg"
+         alt="Watch the demo video"
+         width="600">
+  </a>
+</p>
 
 
 ## Installation
@@ -66,4 +79,10 @@ Want to know more? Check out [Contributing](docs/06-Contributing.md) for more in
 
 If you enjoy TaskLens and it helps you stay organized, consider supporting its development!
 
-[<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" width="200" alt="Buy Me A Coffee">](https://buymeacoffee.com/joblessdev)
+<p align="center">
+  <a href="https://buymeacoffee.com/">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+         width="200" 
+         alt="Buy Me A Coffee">
+  </a>
+</p>
