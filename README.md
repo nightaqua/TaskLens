@@ -52,8 +52,6 @@ Create your own version of the TaskLens dashboard by each widget to your liking.
 </p>
 </details>
 
-![TaskLens Settings Preview](docs/assets/Settings.png)
-
 ## *Demo Video*
 <p align="center">
   <a href="https://youtu.be/WHJTi8GESqQ">
