@@ -61,7 +61,7 @@ Create your own version of the TaskLens dashboard by each widget to your liking.
   </a>
 </p>
 
-
+<iframe width="600" src="https://www.youtube.com/embed/WHJTi8GESqQ" title="TaskLens Short Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 ## Installation
 
 ### Manual Installation
