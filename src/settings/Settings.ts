@@ -23,11 +23,10 @@ export interface SemesterSettings {
     topicColors: Record<string, string>;
 
     hasSeenWelcome: boolean;
-    hasClickedRibbonIcon: boolean; 
+    hasClickedRibbonIcon: boolean;
 }
 
 export const DEFAULT_SETTINGS: SemesterSettings = {
-    // Scanning Defaults
     scanFolders: [],
     scanRecursively: true,
     courseDetection: 'per-file',
@@ -35,7 +34,6 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
     startDateKey: 'start',
     dueDateKey: 'due',
 
-    // Visual Defaults
     colorScheme: 'inherit',
     colorMode: 'status',
     colors: {
@@ -48,5 +46,15 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
     topicColors: {},
 
     hasSeenWelcome: false,
-    hasClickedRibbonIcon: false 
+    hasClickedRibbonIcon: false
 };
+
+export function getTopicColor(topic: string, settings: SemesterSettings): string {
+    if (settings?.topicColors && settings.topicColors[topic]) {
+        return settings.topicColors[topic];
+    }
+    const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
+    let hash = 0;
+    for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
+    return defaultPalette[Math.abs(hash) % defaultPalette.length];
+}

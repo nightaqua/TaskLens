@@ -16,7 +16,7 @@
 }
 
 /* --- The Slide-Out Handle --- */
-.dashboard-sidebar-handle {
+.tasklens-dashboard-view .dashboard-sidebar-handle {
     position: absolute;
     left: 0;
     top: 10px;
@@ -35,17 +35,17 @@
     color: var(--text-on-accent);
 }
 
-.dashboard-sidebar-handle:hover {
+.tasklens-dashboard-view .dashboard-sidebar-handle:hover {
     transform: translateX(0);
     opacity: 1;
     background-color: var(--interactive-accent-hover);
     box-shadow: 2px 2px 12px rgba(0,0,0,0.4);
 }
 
-.dashboard-sidebar-handle.is-hidden { display: none; }
+.tasklens-dashboard-view .dashboard-sidebar-handle.is-hidden { display: none; }
 
 /* --- Header Styles --- */
-.dashboard-header {
+.tasklens-dashboard-view .dashboard-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -56,9 +56,9 @@
     transition: all 0.3s ease;
 }
 
-.dashboard-header.is-collapsed { display: none !important; }
+.tasklens-dashboard-view .dashboard-header.is-collapsed { display: none !important; }
 
-.dashboard-title-wrapper {
+.tasklens-dashboard-view .dashboard-title-wrapper {
     flex-grow: 1;
     display: flex;
     justify-content: center;
@@ -70,7 +70,7 @@
     min-width: 0;
 }
 
-.dashboard-title-wrapper h2 {
+.tasklens-dashboard-view .dashboard-title-wrapper h2 {
     margin: 0;
     font-size: 1.5em;
     line-height: 1.2;
@@ -80,7 +80,7 @@
     max-width: 100%;
 }
 
-.dashboard-title-input {
+.tasklens-dashboard-view .dashboard-title-input {
     font-size: 1.4em;
     font-weight: 600;
     background: var(--background-primary);
@@ -94,21 +94,21 @@
     box-sizing: border-box;
 }
 
-.edit-title-icon {
+.tasklens-dashboard-view .edit-title-icon {
     opacity: 0;
     color: var(--text-muted);
     transition: opacity 0.2s;
 }
 
-.dashboard-title-wrapper:hover .edit-title-icon { opacity: 1; }
+.tasklens-dashboard-view .dashboard-title-wrapper:hover .edit-title-icon { opacity: 1; }
 
-.header-actions-left, .header-actions-right {
+.tasklens-dashboard-view .header-actions-left, .tasklens-dashboard-view .header-actions-right {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
-.header-icon-btn {
+.tasklens-dashboard-view .header-icon-btn {
     background: transparent;
     box-shadow: none;
     border: none;
@@ -122,14 +122,14 @@
     justify-content: center;
 }
 
-.header-icon-btn:hover {
+.tasklens-dashboard-view .header-icon-btn:hover {
     opacity: 1;
     color: var(--text-normal);
     background-color: var(--background-modifier-hover);
     border-radius: 6px;
 }
 
-.dashboard-refresh-btn.is-rotating svg { animation: spin 1s linear infinite; }
+.tasklens-dashboard-view .dashboard-refresh-btn.is-rotating svg { animation: spin 1s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
 
@@ -137,7 +137,7 @@
    2. CONTROLS & STATS
    ========================================= */
 
-.dashboard-controls {
+.tasklens-dashboard-view .dashboard-controls {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
@@ -154,7 +154,7 @@
     border: 1px solid var(--background-modifier-border-hover);
 }
 
-.dashboard-controls.is-hidden {
+.tasklens-dashboard-view .dashboard-controls.is-hidden {
     max-height: 0;
     opacity: 0;
     padding: 0;
@@ -163,7 +163,7 @@
     pointer-events: none;
 }
 
-.control-group {
+.tasklens-dashboard-view .control-group {
     display: flex;
     align-items: center;
     flex-wrap: wrap; /* NEW: Allows inner buttons to wrap to a new line */
@@ -172,13 +172,13 @@
     min-width: 0; /* NEW: Prevents rigid elements from bursting the container */
 }
 
-.control-group label {
+.tasklens-dashboard-view .control-group label {
     font-weight: 500;
     color: var(--text-muted);
     font-size: 0.9em;
 }
 
-.control-group select {
+.tasklens-dashboard-view .control-group select {
     background-color: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
@@ -189,7 +189,7 @@
     white-space: nowrap;
 }
 
-.view-toggle-btn {
+.tasklens-dashboard-view .view-toggle-btn {
     background: transparent;
     border: 1px solid var(--background-modifier-border);
     padding: 4px 12px;
@@ -200,12 +200,12 @@
     transition: all 0.2s;
 }
 
-.view-toggle-btn:hover {
+.tasklens-dashboard-view .view-toggle-btn:hover {
     color: var(--text-normal);
     border-color: var(--text-muted);
 }
 
-.view-toggle-btn.is-active {
+.tasklens-dashboard-view .view-toggle-btn.is-active {
     background-color: var(--interactive-accent);
     color: var(--text-on-accent);
     border-color: var(--interactive-accent);
@@ -213,14 +213,14 @@
 }
 
 /* --- Statistics Cards --- */
-.dashboard-stats {
+.tasklens-dashboard-view .dashboard-stats {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 24px;
 }
 
-.stat-card {
+.tasklens-dashboard-view .stat-card {
     background-color: var(--background-secondary);
     padding: 12px;
     border-radius: 8px;
@@ -231,30 +231,30 @@
     flex: 1 1 120px;
 }
 
-.stat-card.stat-urgent { border-left: 4px solid var(--color-orange); }
-.stat-card.stat-overdue { border-left: 4px solid var(--color-red); }
-.stat-card.stat-completed { border-left: 4px solid var(--color-blue); }
-.stat-card.stat-active { border-left: 4px solid var(--color-green); }
-.stat-card.stat-total { border-left: 4px solid var(--color-purple); }
+.tasklens-dashboard-view .stat-card.stat-urgent { border-left: 4px solid var(--color-orange); }
+.tasklens-dashboard-view .stat-card.stat-overdue { border-left: 4px solid var(--color-red); }
+.tasklens-dashboard-view .stat-card.stat-completed { border-left: 4px solid var(--color-blue); }
+.tasklens-dashboard-view .stat-card.stat-active { border-left: 4px solid var(--color-green); }
+.tasklens-dashboard-view .stat-card.stat-total { border-left: 4px solid var(--color-purple); }
 
-.stat-card.is-clickable {
+.tasklens-dashboard-view .stat-card.is-clickable {
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.stat-card.is-clickable:hover {
+.tasklens-dashboard-view .stat-card.is-clickable:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     background-color: var(--background-modifier-hover);
 }
 
-.stat-value {
+.tasklens-dashboard-view .stat-value {
     font-size: 1.5em;
     font-weight: bold;
     color: var(--text-normal);
 }
 
-.stat-label {
+.tasklens-dashboard-view .stat-label {
     font-size: 0.8em;
     color: var(--text-muted);
     margin-top: 4px;
@@ -266,7 +266,7 @@
    ========================================= */
 
 /* The Container Query setup */
-.dashboard-task-list {
+.tasklens-dashboard-view .dashboard-task-list {
     container-type: inline-size;
     container-name: tasklist;
     min-height: 150px;
@@ -280,7 +280,7 @@
     transition: all 0.2s ease;
 }
 
-.task-item {
+.tasklens-dashboard-view .task-item {
     display: flex;
     align-items: flex-start;
     padding: 12px;
@@ -291,19 +291,19 @@
     transition: transform 0.1s ease, background-color 0.1s ease;
 }
 
-.task-item:hover {
+.tasklens-dashboard-view .task-item:hover {
     transform: translateX(2px);
     background-color: var(--background-secondary-alt);
 }
 
 /* Status Colors */
-.task-item.status-overdue { border-left-color: var(--color-red); }
-.task-item.status-urgent { border-left-color: var(--color-orange); }
-.task-item.status-completed { border-left-color: var(--color-blue); opacity: 0.7; }
-.task-item.status-active { border-left-color: var(--color-green); }
+.tasklens-dashboard-view .task-item.status-overdue { border-left-color: var(--color-red); }
+.tasklens-dashboard-view .task-item.status-urgent { border-left-color: var(--color-orange); }
+.tasklens-dashboard-view .task-item.status-completed { border-left-color: var(--color-blue); opacity: 0.7; }
+.tasklens-dashboard-view .task-item.status-active { border-left-color: var(--color-green); }
 
 /* Checkbox (Fixed alignment & shrinking) */
-.task-checkbox {
+.tasklens-dashboard-view .task-checkbox {
     margin-right: 12px;
     margin-top: 2.5px !important; /* Perfect baseline alignment */
     cursor: pointer;
@@ -311,19 +311,19 @@
 }
 
 /* Task Text & Layout */
-.task-content {
+.tasklens-dashboard-view .task-content {
     flex: 1;
     min-width: 0; /* CRITICAL: Stops titles from bursting horizontally */
 }
 
-.task-view-mode {
+.tasklens-dashboard-view .task-view-mode {
     display: flex;
     flex-direction: column; /* Stack title above meta naturally */
     align-items: flex-start;
     width: 100%;
 }
 
-.task-title {
+.tasklens-dashboard-view .task-title {
     font-size: 1.05em;
     font-weight: 500;
     margin-bottom: 6px;
@@ -334,7 +334,7 @@
     width: 100%;
 }
 
-.task-meta {
+.tasklens-dashboard-view .task-meta {
     display: flex;
     flex-wrap: wrap; /* Allows dates to drop to a new line if screen is too narrow */
     gap: 8px;
@@ -345,7 +345,7 @@
 }
 
 /* Badges (Course name truncation & date protection) */
-.task-course, .task-date {
+.tasklens-dashboard-view .task-course, .tasklens-dashboard-view .task-date {
     background-color: var(--background-primary);
     padding: 2px 8px;
     border-radius: 4px;
@@ -355,7 +355,7 @@
     white-space: nowrap;
 }
 
-.task-course {
+.tasklens-dashboard-view .task-course {
     flex-shrink: 1; /* Allow course name to squish */
     min-width: 0;
     overflow: hidden;
@@ -364,12 +364,12 @@
     display: inline-block; /* Helps with ellipsis */
 }
 
-.task-date {
+.tasklens-dashboard-view .task-date {
     flex-shrink: 0; /* Protect date from squishing */
 }
 
 /* Action Buttons */
-.task-actions {
+.tasklens-dashboard-view .task-actions {
     display: flex;
     gap: 4px;
     opacity: 0;
@@ -380,11 +380,11 @@
 }
 
 /* Ensure the hover still works when they are nested inside content */
-.task-item:hover .task-actions { 
+.tasklens-dashboard-view .task-item:hover .task-actions { 
     opacity: 1; 
 }
 
-.task-action-btn {
+.tasklens-dashboard-view .task-action-btn {
     background: transparent;
     border: none;
     color: var(--text-muted);
@@ -396,26 +396,26 @@
     justify-content: center;
 }
 
-.task-action-btn:hover {
+.tasklens-dashboard-view .task-action-btn:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
 }
 
-.task-action-btn.btn-danger:hover {
+.tasklens-dashboard-view .task-action-btn.btn-danger:hover {
     color: var(--text-error);
     background-color: rgba(255, 0, 0, 0.1);
 }
 
 /* --- Container Query (Borderless Mobile/Narrow View) --- */
 @container tasklist (max-width: 450px) {
-    .dashboard-task-list {
+    .tasklens-dashboard-view .dashboard-task-list {
         border: none !important;
         padding: 0 !important;
         background-color: transparent !important;
         gap: 0 !important;
     }
 
-    .task-item {
+    .tasklens-dashboard-view .task-item {
         background-color: transparent !important;
         border-radius: 0 !important;
         border-bottom: 1px solid var(--background-modifier-border) !important;
@@ -423,11 +423,11 @@
         margin: 0 !important;
     }
 
-    .task-item:last-child {
+    .tasklens-dashboard-view .task-item:last-child {
         border-bottom: none !important;
     }
 
-    .task-item:hover {
+    .tasklens-dashboard-view .task-item:hover {
         background-color: var(--background-secondary) !important;
         transform: none !important; /* Disable shift effect */
     }
@@ -438,11 +438,11 @@
    4. TIMELINE / GANTT VIEW
    ========================================= */
 
-.dashboard-timeline-view {
+.tasklens-dashboard-view .dashboard-timeline-view {
     margin-bottom: 24px;
 }
 
-.timeline-controls {
+.tasklens-dashboard-view .timeline-controls {
     display: flex;
     justify-content: space-between;
     margin-bottom: 10px;
@@ -452,12 +452,12 @@
     color: var(--text-muted);
 }
 
-.timeline-wrapper {
+.tasklens-dashboard-view .timeline-wrapper {
     position: relative;
     width: 100%;
 }
 
-.timeline-container {
+.tasklens-dashboard-view .timeline-container {
     overflow-x: auto;
     width: 100%;
     border: 1px solid var(--background-modifier-border);
@@ -471,11 +471,11 @@
     position: relative;
 }
 
-.timeline-container.is-dragging { cursor: grabbing; }
+.tasklens-dashboard-view .timeline-container.is-dragging { cursor: grabbing; }
 
-.timeline-scroll-content { min-height: 100%; }
+.tasklens-dashboard-view .timeline-scroll-content { min-height: 100%; }
 
-.timeline-nav-overlay {
+.tasklens-dashboard-view .timeline-nav-overlay {
     position: absolute;
     top: 0;
     bottom: 10px;
@@ -489,20 +489,20 @@
     background: transparent;
 }
 
-.timeline-nav-overlay:hover { background: rgba(150, 150, 150, 0.1) !important; }
-.timeline-nav-overlay.nav-left { left: 0; }
-.timeline-nav-overlay.nav-right { right: 0; }
+.tasklens-dashboard-view .timeline-nav-overlay:hover { background: rgba(150, 150, 150, 0.1) !important; }
+.tasklens-dashboard-view .timeline-nav-overlay.nav-left { left: 0; }
+.tasklens-dashboard-view .timeline-nav-overlay.nav-right { right: 0; }
 
-.timeline-wrapper:hover .timeline-nav-overlay { opacity: 1; }
+.tasklens-dashboard-view .timeline-wrapper:hover .timeline-nav-overlay { opacity: 1; }
 
-.nav-arrow {
+.tasklens-dashboard-view .nav-arrow {
     font-size: 2em;
     font-weight: bold;
     color: var(--text-muted);
     user-select: none;
 }
 
-.timeline-month-row {
+.tasklens-dashboard-view .timeline-month-row {
     position: relative;
     height: 24px;
     background-color: var(--background-secondary-alt);
@@ -510,7 +510,7 @@
     width: 100%;
 }
 
-.timeline-month-cell {
+.tasklens-dashboard-view .timeline-month-cell {
     position: absolute;
     top: 0;
     height: 100%;
@@ -523,12 +523,12 @@
     white-space: nowrap;
 }
 
-.timeline-grid {
+.tasklens-dashboard-view .timeline-grid {
     display: grid;
     min-width: 100%;
 }
 
-.timeline-header-cell {
+.tasklens-dashboard-view .timeline-header-cell {
     padding: 8px 4px;
     font-size: 0.8em;
     text-align: center;
@@ -541,45 +541,45 @@
     white-space: nowrap;
 }
 
-.timeline-header-cell.is-today {
+.tasklens-dashboard-view .timeline-header-cell.is-today {
     background-color: var(--background-modifier-hover);
     border-bottom: 2px solid var(--color-red);
 }
 
-.timeline-header-cell.is-month-start {
+.tasklens-dashboard-view .timeline-header-cell.is-month-start {
     border-left: 2px solid var(--interactive-accent);
 }
 
-.timeline-bg-cell.is-month-start-bg {
+.tasklens-dashboard-view .timeline-bg-cell.is-month-start-bg {
     border-left: 2px solid var(--interactive-accent);
     opacity: 0.6;
 }
 
-.timeline-day-name {
+.tasklens-dashboard-view .timeline-day-name {
     font-size: 0.7em;
     color: var(--text-muted);
     display: block;
 }
 
 /* Solid Grid Lines */
-.timeline-bg-cell {
+.tasklens-dashboard-view .timeline-bg-cell {
     border-right: 1px solid var(--background-modifier-border);
     background-color: rgba(128, 128, 128, 0.05);
     pointer-events: none;
     z-index: 1;
 }
-.timeline-bg-cell.is-today-bg {
+.tasklens-dashboard-view .timeline-bg-cell.is-today-bg {
     background-color: rgba(150, 150, 150, 0.1);
 }
 
-.timeline-row-bg {
+.tasklens-dashboard-view .timeline-row-bg {
     border-bottom: 1px solid var(--background-modifier-border);
     z-index: 0;
     pointer-events: none;
 }
 
 /* Timeline Task Bars */
-.timeline-task-bar {
+.tasklens-dashboard-view .timeline-task-bar {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.85em;
@@ -590,22 +590,22 @@
     margin: 2px 4px;
     opacity: 0.9;
     z-index: 5;
-    color: #fff;
+    color: var(--text-on-accent);
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     transition: transform 0.1s, filter 0.1s;
 }
 
-.timeline-task-bar:hover {
+.tasklens-dashboard-view .timeline-task-bar:hover {
     transform: scale(1.02);
     filter: brightness(1.1);
 }
 
-.timeline-task-bar.status-overdue { background-color: var(--color-red); }
-.timeline-task-bar.status-urgent { background-color: var(--color-orange); }
-.timeline-task-bar.status-completed { background-color: var(--color-blue); opacity: 0.6; text-decoration: line-through; }
-.timeline-task-bar.status-active { background-color: var(--color-green); }
+.tasklens-dashboard-view .timeline-task-bar.status-overdue { background-color: var(--color-red); }
+.tasklens-dashboard-view .timeline-task-bar.status-urgent { background-color: var(--color-orange); }
+.tasklens-dashboard-view .timeline-task-bar.status-completed { background-color: var(--color-blue); opacity: 0.6; text-decoration: line-through; }
+.tasklens-dashboard-view .timeline-task-bar.status-active { background-color: var(--color-green); }
 
-.timeline-today-marker {
+.tasklens-dashboard-view .timeline-today-marker {
     background-color: var(--color-red);
     width: 2px;
     height: 100%;
@@ -615,8 +615,8 @@
     justify-self: center;
 }
 
-/* Tooltip */
-.dashboard-tooltip {
+/* Tooltip !To be reviewed. Idk if scoping this tooltip was a good idea, check if anything broke. */
+.tasklens-dashboard-view .dashboard-tooltip {
     position: fixed;
     z-index: 1000;
     background-color: var(--background-primary);
@@ -629,8 +629,8 @@
     min-width: 150px;
 }
 
-.tooltip-title { font-weight: 600; margin-bottom: 4px; font-size: 0.9em; }
-.tooltip-meta, .tooltip-date { font-size: 0.8em; color: var(--text-muted); }
+.tasklens-dashboard-view .tooltip-title { font-weight: 600; margin-bottom: 4px; font-size: 0.9em; }
+.tasklens-dashboard-view .tooltip-meta, .tasklens-dashboard-view .tooltip-date { font-size: 0.8em; color: var(--text-muted); }
 
 
 /* =========================================
@@ -661,25 +661,25 @@
 }
 
 /* Scan Paths Custom Alignment */
-.scan-paths-setting {
+.tasklens-settings .scan-paths-setting {
     align-items: flex-start !important;
 }
 
-.scan-paths-setting .setting-item-info {
+.tasklens-settings .scan-paths-setting .setting-item-info {
     flex: 1 1 50%;
     max-width: 50%;
     white-space: pre-wrap;
     line-height: 1.4;
 }
 
-.scan-paths-setting .setting-item-control {
+.tasklens-settings .scan-paths-setting .setting-item-control {
     flex: 0 0 50%;
     width: 50%;
     justify-content: flex-end;
     padding-right: 16px;
 }
 
-.scan-paths-setting textarea {
+.tasklens-settings .scan-paths-setting textarea {
     width: 100%;
     resize: none !important;
     min-height: 80px;
@@ -709,15 +709,15 @@
    6. CHROMELESS / EDIT MODES / MISC
    ========================================= */
 
-.task-edit-mode { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: center; }
-.task-edit-input { flex-grow: 1; background: var(--background-primary); border: 1px solid var(--background-modifier-border); padding: 4px 8px; border-radius: 4px; }
-.task-edit-date { background: var(--background-primary); border: 1px solid var(--background-modifier-border); padding: 4px 8px; border-radius: 4px; color: var(--text-muted); }
-.task-save-btn, .task-cancel-btn { padding: 4px 12px; border-radius: 4px; cursor: pointer; border: 1px solid var(--background-modifier-border); background-color: var(--background-secondary); }
-.task-save-btn { background-color: var(--interactive-accent); color: var(--text-on-accent); border: none; }
-.task-save-btn:hover { opacity: 0.9; }
+.tasklens-dashboard-view .task-edit-mode { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: center; }
+.tasklens-dashboard-view .task-edit-input { flex-grow: 1; background: var(--background-primary); border: 1px solid var(--background-modifier-border); padding: 4px 8px; border-radius: 4px; }
+.tasklens-dashboard-view .task-edit-date { background: var(--background-primary); border: 1px solid var(--background-modifier-border); padding: 4px 8px; border-radius: 4px; color: var(--text-muted); }
+.tasklens-dashboard-view .task-save-btn, .tasklens-dashboard-view .task-cancel-btn { padding: 4px 12px; border-radius: 4px; cursor: pointer; border: 1px solid var(--background-modifier-border); background-color: var(--background-secondary); }
+.tasklens-dashboard-view .task-save-btn { background-color: var(--interactive-accent); color: var(--text-on-accent); border: none; }
+.tasklens-dashboard-view .task-save-btn:hover { opacity: 0.9; }
 
 /* Empty States */
-.dashboard-empty-state {
+.tasklens-dashboard-view .dashboard-empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -768,9 +768,9 @@
 }
 
 /* Slightly tighter default margins for widgets */
-.dashboard-task-list, 
-.dashboard-timeline-view, 
-.dashboard-stats {
+.tasklens-dashboard-view .dashboard-task-list, 
+.tasklens-dashboard-view .dashboard-timeline-view, 
+.tasklens-dashboard-view .dashboard-stats {
     margin-bottom: 16px; 
 }
 

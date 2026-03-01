@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
+import { setupViewDOM, cleanupViewDOM } from './DashboardView';
 
 export const VIEW_TYPE_TIMELINE = 'tasklens-timeline-view';
 
@@ -10,9 +11,9 @@ export class TimelineView extends ItemView {
     private tabContainer: HTMLElement | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
+
     constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
         super(leaf);
-        // Subscribe to shared updates
         this.plugin.taskManager.on('tasks-updated', () => this.render());
     }
 
@@ -20,28 +21,26 @@ export class TimelineView extends ItemView {
     getDisplayText() { return 'Timeline'; }
     getIcon() { return 'calendar-range'; }
 
-    async setState(state: any, result: ViewStateResult): Promise<void> {
-        if (state?.headerState) {
-            this.headerState = state.headerState;
+    async setState(state: unknown, result: ViewStateResult): Promise<void> {
+        const parsedState = state as any;
+        if (parsedState?.headerState) {
+            this.headerState = parsedState.headerState;
         }
         await super.setState(state, result);
         this.render();
     }
 
-    getState(): any {
+    getState(): Record<string, unknown> {
         if (this.headerComponent) {
             this.headerState = this.headerComponent.getState();
         }
-        return { headerState: this.headerState };
+        return { headerState: this.headerState as unknown };
     }
 
     async onOpen() {
-        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
-        if (this.leafRootEl) this.leafRootEl.classList.add('tasklens-chromeless');
-
-        // Find and flag the parent tab container to hide its header strip
-        this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
-        if (this.tabContainer) this.tabContainer.classList.add('tasklens-hide-tabs');
+        const dom = setupViewDOM(this.containerEl, true);
+        this.leafRootEl = dom.leafRootEl;
+        this.tabContainer = dom.tabContainer;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
@@ -52,8 +51,7 @@ export class TimelineView extends ItemView {
     }
 
     async onClose(): Promise<void> {
-        if (this.tabContainer) this.tabContainer.classList.remove('tasklens-hide-tabs');
-        if (this.leafRootEl) this.leafRootEl.classList.remove('tasklens-chromeless');
+        cleanupViewDOM(this.leafRootEl, this.tabContainer);
     }
 
     render() {

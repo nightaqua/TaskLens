@@ -48,11 +48,20 @@ export class TaskParser {
                 const normalizedFolder = folder.replace(/^\/|\/$/g, '');
                 const filePath = file.path;
 
-                if (this.settings.scanRecursively) {
-                    return filePath.startsWith(normalizedFolder);
+                // 1. Direct File Match (e.g. user typed "Projects/Todo.md" or "Todo")
+                if (filePath === normalizedFolder || filePath === `${normalizedFolder}.md`) {
+                    return true;
                 }
-                const fileFolder = file.parent?.path || '';
-                return fileFolder === normalizedFolder;
+
+                // 2. Folder Match
+                if (this.settings.scanRecursively) {
+                    // The trailing slash prevents "Math" from matching a folder named "Maths/"
+                    return filePath.startsWith(normalizedFolder + '/');
+                } else {
+                    // Match ONLY files directly inside this specific folder
+                    const fileFolder = file.parent?.path === '/' ? '' : (file.parent?.path || '');
+                    return fileFolder === normalizedFolder;
+                }
             });
         });
     }

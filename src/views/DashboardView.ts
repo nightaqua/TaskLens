@@ -1,7 +1,7 @@
-import { ItemView, WorkspaceLeaf, MarkdownView, setIcon, ViewStateResult } from 'obsidian';
-import { Task, TaskStatus } from '../models/Task';
+import { ItemView, WorkspaceLeaf, setIcon, ViewStateResult } from 'obsidian';
+import { TaskStatus } from '../models/Task';
 import { TaskManager } from '../services/TaskManager';
-import TaskLensPlugin from '../main';
+import TaskLensPlugin, { RefreshableView } from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { TaskListComponent } from './TaskListComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
@@ -9,21 +9,33 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 
 export const VIEW_TYPE_DASHBOARD = 'tasklens-dashboard-view';
 
-export class DashboardView extends ItemView {
+export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean) {
+    const leafRootEl = containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
+    if (leafRootEl) leafRootEl.classList.add('tasklens-chromeless');
+    const tabContainer = containerEl.closest('.workspace-tabs') as HTMLElement | null;
+    if (tabContainer && isLocked) tabContainer.classList.add('tasklens-hide-tabs');
+    return { leafRootEl, tabContainer };
+}
+
+export function cleanupViewDOM(leafRootEl: HTMLElement | null, tabContainer: HTMLElement | null) {
+    if (tabContainer) tabContainer.classList.remove('tasklens-hide-tabs');
+    if (leafRootEl) leafRootEl.classList.remove('tasklens-chromeless');
+}
+
+export class DashboardView extends ItemView implements RefreshableView {
     private leafRootEl: HTMLElement | null = null;
     private tabContainer: HTMLElement | null = null;
     private taskManager: TaskManager;
-    private timelineComponent: TimelineComponent | null = null; // Ref to access scrollToToday
+    private timelineComponent: TimelineComponent | null = null;
 
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
-    // UI State
     private showControls: boolean = true;
     private showTimeline: boolean = true;
     private showList: boolean = true;
     private showStats: boolean = true;
-    private timelineDaysToShow: number = 10; 
+    private timelineDaysToShow: number = 10;
     private renderTimer: NodeJS.Timeout | null = null;
     private lastTimelineScroll: number | null = null;
     private forceScrollToToday: boolean = false;
@@ -55,7 +67,9 @@ export class DashboardView extends ItemView {
 
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
-                if (file.path.endsWith('.md')) this.taskManager.refreshFileTask(file.path);
+                if (file.path.endsWith('.md')) {
+                    void this.taskManager.refreshFileTask(file.path);
+                }
             })
         );
 
@@ -63,28 +77,28 @@ export class DashboardView extends ItemView {
     }
 
     getViewType(): string { return VIEW_TYPE_DASHBOARD; }
-    getDisplayText(): string { return 'TaskLens Dashboard'; }
+    getDisplayText(): string { return 'TaskLens dashboard'; }
     getIcon(): string { return 'layout-dashboard'; }
 
-    // --- Persistence Logic ---
-    async setState(state: any, result: ViewStateResult): Promise<void> {
+    async setState(state: unknown, result: ViewStateResult): Promise<void> {
         if (state) {
-            this.showControls = state.showControls ?? this.showControls;
-            this.showTimeline = state.showTimeline ?? this.showTimeline;
-            this.showList = state.showList ?? this.showList;
-            this.showStats = state.showStats ?? this.showStats;
-            this.timelineDaysToShow = state.zoomLevel ?? 10;
+            const parsedState = state as any;
+            this.showControls = parsedState.showControls ?? this.showControls;
+            this.showTimeline = parsedState.showTimeline ?? this.showTimeline;
+            this.showList = parsedState.showList ?? this.showList;
+            this.showStats = parsedState.showStats ?? this.showStats;
+            this.timelineDaysToShow = parsedState.zoomLevel ?? 10;
 
-            if (state.statusFilter) this.taskManager.setStatusFilter(state.statusFilter);
-            if (state.courseFilter) this.taskManager.setCourseFilter(state.courseFilter);
-            if (state.headerState) this.headerState = state.headerState;
+            if (parsedState.statusFilter) this.taskManager.setStatusFilter(parsedState.statusFilter);
+            if (parsedState.courseFilter) this.taskManager.setCourseFilter(parsedState.courseFilter);
+            if (parsedState.headerState) this.headerState = parsedState.headerState;
         }
 
         await super.setState(state, result);
         this.render();
     }
 
-    getState(): any {
+    getState(): Record<string, unknown> {
         const filters = this.taskManager.getCurrentFilters();
         if (this.headerComponent) {
             this.headerState = this.headerComponent.getState();
@@ -97,24 +111,14 @@ export class DashboardView extends ItemView {
             zoomLevel: this.timelineDaysToShow,
             statusFilter: filters.status,
             courseFilter: filters.course,
-            headerState: this.headerState
+            headerState: this.headerState as unknown
         };
     }
-    // -------------------------
 
     async onOpen(): Promise<void> {
-        // 1) The "Parent Trick": add class to the leaf wrapper (sibling of .view-header)
-        const parent = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
-        if (parent) parent.classList.add('tasklens-chromeless');
-
-        // 1b) Find the parent Tab Container (The "Window") and add our hider class
-        this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
-        if (this.plugin.isLayoutLocked && this.tabContainer) {
-            this.tabContainer.classList.add('tasklens-hide-tabs');
-        }
-
-        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
-        if (this.leafRootEl) this.leafRootEl.classList.add('tasklens-chromeless');
+        const dom = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+        this.leafRootEl = dom.leafRootEl;
+        this.tabContainer = dom.tabContainer;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
@@ -122,8 +126,7 @@ export class DashboardView extends ItemView {
         this.applyColorTheme();
         await this.taskManager.loadTasks();
         this.render();
-        
-        // 2. Add a slight delay to ensure the DOM is ready on Obsidian launch
+
         setTimeout(() => {
             if (this.timelineComponent) {
                 this.timelineComponent.scrollToToday();
@@ -131,11 +134,9 @@ export class DashboardView extends ItemView {
         }, 250);
     }
 
-    // 3. Remove class on close
-    async onClose(): Promise<void> {
-        // Cleanup: remove hider classes so normal notes show tabs again
-        if (this.tabContainer) this.tabContainer.classList.remove('tasklens-hide-tabs');
-        if (this.leafRootEl) this.leafRootEl.classList.remove('tasklens-chromeless');
+    onClose(): Promise<void> {
+        cleanupViewDOM(this.leafRootEl, this.tabContainer);
+        return Promise.resolve();
     }
 
     public render(): void {
@@ -144,7 +145,7 @@ export class DashboardView extends ItemView {
         this.headerComponent = new HeaderComponent(
             this.contentEl,
             this.headerState,
-            'TaskLens Dashboard',
+            'TaskLens dashboard',
             {
                 onStateChange: () => {
                     if (this.headerComponent) {
@@ -174,10 +175,9 @@ export class DashboardView extends ItemView {
             },
             {
                 highlightAddButton: !this.plugin.settings.hasSeenWelcome,
-                onHighlightDismiss: async () => {
+                onHighlightDismiss: () => {
                     this.plugin.settings.hasSeenWelcome = true;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshViews();
+                    void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
                 }
             }
         );
@@ -199,19 +199,15 @@ export class DashboardView extends ItemView {
         const controls = this.contentEl.createDiv('dashboard-controls');
 
         const filtersDiv = controls.createDiv('filters-wrapper');
-        filtersDiv.style.display = 'flex';
-        filtersDiv.style.gap = '12px';
-        filtersDiv.style.flexWrap = 'wrap';
+        filtersDiv.setCssProps({ display: 'flex', gap: '12px', 'flex-wrap': 'wrap' });
 
-        // Status Filter
         const statusGroup = filtersDiv.createDiv('control-group');
         statusGroup.createEl('label', { text: 'Show:' });
         const statusSelect = statusGroup.createEl('select');
 
-        // UPDATED options (removed Urgent dropdown option)
         const statusOptions = [
-            { value: TaskStatus.Open, label: 'Active' }, // Green
-            { value: TaskStatus.All, label: 'All Tasks' },
+            { value: TaskStatus.Open, label: 'Active' },
+            { value: TaskStatus.All, label: 'All tasks' },
             { value: TaskStatus.Completed, label: 'Completed' },
         ];
 
@@ -224,11 +220,10 @@ export class DashboardView extends ItemView {
             this.taskManager.setStatusFilter(statusSelect.value as TaskStatus);
         });
 
-        // Topic Filter
         const courseGroup = filtersDiv.createDiv('control-group');
         courseGroup.createEl('label', { text: 'Topic:' });
         const courseSelect = courseGroup.createEl('select');
-        courseSelect.createEl('option', { value: '', text: 'All Topics' });
+        courseSelect.createEl('option', { value: '', text: 'All topics' });
 
         this.taskManager.getCourseNames().forEach(course => {
             const option = courseSelect.createEl('option', { value: course, text: course });
@@ -239,11 +234,8 @@ export class DashboardView extends ItemView {
         });
 
         const actionsDiv = controls.createDiv('actions-wrapper');
-        actionsDiv.style.display = 'flex';
-        actionsDiv.style.gap = '12px';
-        actionsDiv.style.alignItems = 'center';
+        actionsDiv.setCssProps({ display: 'flex', gap: '12px', 'align-items': 'center' });
 
-        // Render buttons directly (no view group wrapper)
         const toggleTimeline = actionsDiv.createEl('button', {
             cls: `view-toggle-btn ${this.showTimeline ? 'is-active' : ''}`,
             text: 'Timeline'
@@ -312,16 +304,18 @@ export class DashboardView extends ItemView {
 
     public applyColorTheme(): void {
         const cols = this.plugin.settings.colors;
-        this.contentEl.style.setProperty('--color-red', cols.overdue);
-        this.contentEl.style.setProperty('--color-orange', cols.urgent);
-        this.contentEl.style.setProperty('--color-green', cols.active);
-        this.contentEl.style.setProperty('--color-blue', cols.completed);
-        this.contentEl.style.setProperty('--color-purple', '#7209b7'); // Keep fixed or add setting later
+        this.contentEl.setCssProps({
+            '--color-red': cols.overdue,
+            '--color-orange': cols.urgent,
+            '--color-green': cols.active,
+            '--color-blue': cols.completed,
+            '--color-purple': '#7209b7'
+        });
     }
 
     public refreshFromSettings() {
         this.applyColorTheme();
-        this.render(); // This forces TaskListComponent to request the new palette colors!
+        this.render();
     }
 
     private renderTimeline(): void {
@@ -329,7 +323,6 @@ export class DashboardView extends ItemView {
 
         const controls = container.createDiv('timeline-controls');
 
-        // Left: Zoom
         const zoomControls = controls.createDiv('zoom-controls');
         zoomControls.createSpan({ text: 'Zoom: ' });
         const zoomOut = zoomControls.createEl('button', { text: '-', cls: 'view-toggle-btn' });
@@ -344,7 +337,6 @@ export class DashboardView extends ItemView {
             this.render();
         });
 
-        // Right: Navigation (NEW arrows)
         const navControls = controls.createDiv('nav-controls');
         const scrollLeft = navControls.createEl('button', { cls: 'view-toggle-btn' });
         setIcon(scrollLeft, 'chevron-left');
@@ -353,29 +345,15 @@ export class DashboardView extends ItemView {
         setIcon(scrollRight, 'chevron-right');
 
         this.timelineComponent = new TimelineComponent(
-            container, 
-            this.app, 
-            this.taskManager.getFilteredTasks(), 
+            container,
+            this.app,
+            this.taskManager.getFilteredTasks(),
             this.timelineDaysToShow,
             this.plugin.settings
         );
         this.timelineComponent.render();
 
-        // Attach listeners
         scrollLeft.addEventListener('click', () => this.timelineComponent?.scroll('left'));
         scrollRight.addEventListener('click', () => this.timelineComponent?.scroll('right'));
-    }
-
-    private async openTaskInEditor(task: Task) {
-        const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file) {
-            const leaf = this.app.workspace.getLeaf(false);
-            await leaf.openFile(file as any);
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view) {
-                view.editor.setCursor({ line: task.lineNumber, ch: 0 });
-                view.editor.scrollIntoView({ from: {line: task.lineNumber, ch: 0}, to: {line: task.lineNumber, ch: 0} }, true);
-            }
-        }
     }
 }

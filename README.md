@@ -77,7 +77,7 @@ Want to know more? Check out [Contributing](docs/06-Contributing.md) for more in
 If you enjoy TaskLens and it helps you stay organized, consider supporting its development!
 
 <p align="center">
-  <a href="https://buymeacoffee.com/">
+  <a href="https://buymeacoffee.com/JoblessDev">
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
          width="200" 
          alt="Buy Me A Coffee">

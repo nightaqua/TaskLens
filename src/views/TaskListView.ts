@@ -3,7 +3,8 @@ import TaskLensPlugin from '../main';
 import { TaskListComponent } from './TaskListComponent';
 import { Task } from '../models/Task';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
-import { QuickAddModal } from '../modals/QuickAddModal'; // <--- Ensure this import exists
+import { QuickAddModal } from '../modals/QuickAddModal';
+import { setupViewDOM, cleanupViewDOM } from './DashboardView';
 
 export const VIEW_TYPE_LIST = 'tasklens-list-view';
 
@@ -25,42 +26,42 @@ export class TaskListView extends ItemView {
     }
 
     getViewType() { return VIEW_TYPE_LIST; }
-    getDisplayText() { return 'Task List'; }
+    getDisplayText() { return 'Task list'; }
     getIcon() { return 'list-todo'; }
 
-    async setState(state: any, result: ViewStateResult): Promise<void> {
-        if (state?.headerState) {
-            this.headerState = state.headerState;
+    async setState(state: unknown, result: ViewStateResult): Promise<void> {
+        const parsedState = state as any;
+        if (parsedState?.headerState) {
+            this.headerState = parsedState.headerState;
         }
         await super.setState(state, result);
         this.render();
     }
 
-    getState(): any {
+    getState(): Record<string, unknown> {
         if (this.headerComponent) {
             this.headerState = this.headerComponent.getState();
         }
-        return { headerState: this.headerState };
+        return { headerState: this.headerState as unknown };
     }
 
-    async onOpen() {
-        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
-        if (this.leafRootEl) this.leafRootEl.classList.add('tasklens-chromeless');
-
-        this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
-        if (this.tabContainer) this.tabContainer.classList.add('tasklens-hide-tabs');
+    onOpen(): Promise<void> {
+        const dom = setupViewDOM(this.containerEl, true); // Always true for single views
+        this.leafRootEl = dom.leafRootEl;
+        this.tabContainer = dom.tabContainer;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
         this.contentEl.addClass('is-single-view');
         this.isOpen = true;
         this.render();
+        return Promise.resolve();
     }
 
-    async onClose(): Promise<void> {
+    onClose(): Promise<void> {
         this.isOpen = false;
-        if (this.tabContainer) this.tabContainer.classList.remove('tasklens-hide-tabs');
-        if (this.leafRootEl) this.leafRootEl.classList.remove('tasklens-chromeless');
+        cleanupViewDOM(this.leafRootEl, this.tabContainer);
+        return Promise.resolve();
     }
 
     render() {
@@ -71,7 +72,7 @@ export class TaskListView extends ItemView {
         this.headerComponent = new HeaderComponent(
             this.contentEl,
             this.headerState,
-            'My Tasks',
+            'My tasks',
             {
                 onStateChange: () => {
                     if (this.headerComponent) {
@@ -83,17 +84,15 @@ export class TaskListView extends ItemView {
                 onRefresh: async () => {
                     await this.plugin.taskManager.loadTasks();
                 },
-                // <--- Pass the callback to open the modal
                 onAdd: () => {
                     new QuickAddModal(this.app, this.plugin.taskManager).open();
                 }
             },
             {
                 highlightAddButton: !this.plugin.settings.hasSeenWelcome,
-                onHighlightDismiss: async () => {
+                onHighlightDismiss: () => {
                     this.plugin.settings.hasSeenWelcome = true;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshViews();
+                    void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
                 }
             }
         );
