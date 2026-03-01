@@ -1,10 +1,10 @@
 {
-    "id": "tasklens",
-    "name": "TaskLens",
-    "version": "1.1.0",
-    "minAppVersion": "0.15.0",
-    "description": "Your personal command center. Widget-based dashboard for task and timelines visualization and goal tracking.",
-    "author": "nightaqua",
-    "authorUrl": "https://buymeacoffee.com/joblessdev",
-    "isDesktopOnly": false
+	"id": "tasklens",
+	"name": "TaskLens",
+	"version": "1.1.1",
+	"minAppVersion": "0.15.0",
+	"description": "Your personal command center. Widget-based dashboard for task and timelines visualization and goal tracking.",
+	"author": "nightaqua",
+	"authorUrl": "https://buymeacoffee.com/joblessdev",
+	"isDesktopOnly": false
 }
