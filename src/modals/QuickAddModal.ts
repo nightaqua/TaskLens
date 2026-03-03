@@ -17,10 +17,10 @@ export class QuickAddModal extends Modal {
         // 1. Task Title
         new Setting(contentEl)
             .setName('Task')
-            .addText(text => text
+            .addText(text => { text
                 .setPlaceholder('Read Chapter 4...')
                 .onChange(value => this.title = value)
-                .inputEl.focus());
+                .inputEl.focus(); });
 
         // 2. Destination Selection (Cursor + All Files)
         new Setting(contentEl)
@@ -66,26 +66,26 @@ export class QuickAddModal extends Modal {
             .addButton(btn => btn
                 .setButtonText('Add Task')
                 .setCta()
-                .onClick(async () => {
+                .onClick(() => {
                     if (!this.title || !this.selectedFile) return;
 
                     if (this.selectedFile === '__CURSOR__') {
                         // Logic to insert directly into the text editor
                         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                        if (view && view.editor) {
-                            const dateStr = this.date ? ` [due:: ${this.date}]` : '';
-                            const taskLine = `- [ ] ${this.title}${dateStr}\n`;
+                        const dateStr = this.date ? ` [due:: ${this.date}]` : '';
+                        const taskLine = `- [ ] ${this.title}${dateStr}\n`;
+                        if (view?.editor) {
                             view.editor.replaceSelection(taskLine);
 
                             // Tell task manager to rescan this specific file immediately
                             if (view.file) {
-                                await this.taskManager.refreshFileTask(view.file.path);
+                                void this.taskManager.refreshFileTask(view.file.path);
                             }
                         }
                     } else {
                         // Standard append to end of file logic
                         const dateObj = this.date ? new Date(this.date) : null;
-                        await this.taskManager.addTask(this.title, dateObj, this.selectedFile);
+                        void this.taskManager.addTask(this.title, dateObj, this.selectedFile);
                     }
 
                     this.close();

@@ -97,10 +97,10 @@ export class SettingsTab extends PluginSettingTab {
             colorPickersContainer.empty();
 
             if (this.plugin.settings.colorMode === 'status') {
-                new Setting(colorPickersContainer).setName('Overdue color').addColorPicker(c => c.setValue(this.plugin.settings.colors.overdue).onChange(v => { this.plugin.settings.colors.overdue = v; void this.plugin.saveSettings().then(() => this.plugin.refreshViews()); }));
-                new Setting(colorPickersContainer).setName('Urgent color').addColorPicker(c => c.setValue(this.plugin.settings.colors.urgent).onChange(v => { this.plugin.settings.colors.urgent = v; void this.plugin.saveSettings().then(() => this.plugin.refreshViews()); }));
-                new Setting(colorPickersContainer).setName('Active color').addColorPicker(c => c.setValue(this.plugin.settings.colors.active).onChange(v => { this.plugin.settings.colors.active = v; void this.plugin.saveSettings().then(() => this.plugin.refreshViews()); }));
-                new Setting(colorPickersContainer).setName('Completed color').addColorPicker(c => c.setValue(this.plugin.settings.colors.completed).onChange(v => { this.plugin.settings.colors.completed = v; void this.plugin.saveSettings().then(() => this.plugin.refreshViews()); }));
+                new Setting(colorPickersContainer).setName('Overdue color').addColorPicker(c => c.setValue(this.plugin.settings.colors.overdue).onChange(v => { this.plugin.settings.colors.overdue = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
+                new Setting(colorPickersContainer).setName('Urgent color').addColorPicker(c => c.setValue(this.plugin.settings.colors.urgent).onChange(v => { this.plugin.settings.colors.urgent = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
+                new Setting(colorPickersContainer).setName('Active color').addColorPicker(c => c.setValue(this.plugin.settings.colors.active).onChange(v => { this.plugin.settings.colors.active = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
+                new Setting(colorPickersContainer).setName('Completed color').addColorPicker(c => c.setValue(this.plugin.settings.colors.completed).onChange(v => { this.plugin.settings.colors.completed = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
             } else {
                 const helperText = colorPickersContainer.createEl('p', {
                     text: 'Assign a custom color to each of your active topics.',
@@ -124,7 +124,7 @@ export class SettingsTab extends PluginSettingTab {
                         .setName(`${topic} color`)
                         .addColorPicker(c => c.setValue(savedColor).onChange(v => {
                             this.plugin.settings.topicColors[topic] = v;
-                            void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+                            void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
                         }));
                 });
             }

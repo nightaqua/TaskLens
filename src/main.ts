@@ -32,6 +32,11 @@ export default class TaskLensPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
 
+        // If they closed Obsidian while in Focus Mode, keep the state active
+        if (this.settings.savedFocusLayout) {
+            this.isFocusMode = true;
+        }
+
         const parser = new TaskParser(this.app, this.settings);
         this.taskManager = new TaskManager(parser, this.app);
 
@@ -53,7 +58,7 @@ export default class TaskLensPlugin extends Plugin {
 
             menu.addItem((item) =>
                 item
-                    .setTitle('Open dashboard')
+                    .setTitle('Add Widget')
                     .setIcon('layout-dashboard')
                     .onClick(() => { void this.activateView(VIEW_TYPE_DASHBOARD); })
             );
@@ -62,21 +67,21 @@ export default class TaskLensPlugin extends Plugin {
                 item
                     .setTitle('Quick add task')
                     .setIcon('plus-circle')
-                    .onClick(() => new QuickAddModal(this.app, this.taskManager).open())
+                    .onClick(() => { new QuickAddModal(this.app, this.taskManager).open(); })
             );
 
             menu.addSeparator();
 
             menu.addItem((item) =>
                 item
-                    .setTitle(this.isLayoutLocked ? 'Unlock layout' : 'Lock layout')
+                    .setTitle(this.isLayoutLocked ? 'Unlock Layout' : 'Lock Layout')
                     .setIcon(this.isLayoutLocked ? 'unlock' : 'lock')
-                    .onClick(() => this.toggleLayoutMode())
+                    .onClick(() => { this.toggleLayoutMode(); })
             );
 
             menu.addItem((item) =>
                 item
-                    .setTitle(this.isFocusMode ? 'Exit focus mode' : 'Enter focus mode')
+                    .setTitle(this.isFocusMode ? 'Exit Focus Mode' : 'Enter Focus Mode')
                     .setIcon(this.isFocusMode ? 'eye' : 'eye-off')
                     .onClick(() => { void this.toggleFocusMode(); })
             );
@@ -114,7 +119,7 @@ export default class TaskLensPlugin extends Plugin {
 
         this.addCommand({
             id: 'quick-add-task',
-            name: 'Quick add task',
+            name: 'Quick Add Task',
             callback: () => {
                 new QuickAddModal(this.app, this.taskManager).open();
             }
@@ -123,7 +128,7 @@ export default class TaskLensPlugin extends Plugin {
         this.addCommand({
             id: 'refresh-dashboard-styles',
             name: 'Reload dashboard colors/styles',
-            callback: () => this.refreshViews()
+            callback: () => { this.refreshViews(); }
         });
 
         if (!this.settings.hasSeenWelcome) {
@@ -161,38 +166,40 @@ export default class TaskLensPlugin extends Plugin {
         const workspace = this.app.workspace as unknown as { leftSplit: { collapse: () => void }, rightSplit: { collapse: () => void }, setLayout: (layout: unknown) => Promise<void> };
 
         if (!this.isFocusMode) {
-            this.savedLayout = this.app.workspace.getLayout();
+            // Save current layout to permanent settings
+            this.settings.savedFocusLayout = this.app.workspace.getLayout();
             this.isFocusMode = true;
+            await this.saveSettings(); // Force save to data.json
 
-            if (workspace.leftSplit && typeof workspace.leftSplit.collapse === 'function') {
-                workspace.leftSplit.collapse();
-            }
-            if (workspace.rightSplit && typeof workspace.rightSplit.collapse === 'function') {
-                workspace.rightSplit.collapse();
-            }
+            // Collapse Sidebars
+            if (typeof workspace.leftSplit.collapse === 'function') workspace.leftSplit.collapse();
+            if (typeof workspace.rightSplit.collapse === 'function') workspace.rightSplit.collapse();
 
+            // Close all TaskLens widgets natively
             const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
             let closedCount = 0;
-
             viewTypes.forEach(type => {
-                this.app.workspace.getLeavesOfType(type).forEach(leaf => {
-                    leaf.detach();
-                    closedCount++;
-                });
+                const leaves = this.app.workspace.getLeavesOfType(type);
+                if (leaves.length > 0) {
+                    closedCount += leaves.length;
+                    this.app.workspace.detachLeavesOfType(type);
+                }
             });
 
-            if (closedCount > 0) {
-                new Notice('Focus mode enabled');
-            } else {
+            if (closedCount > 0) new Notice('Focus mode enabled');
+            else {
                 this.isFocusMode = false;
-                this.savedLayout = null;
+                this.settings.savedFocusLayout = null;
+                await this.saveSettings();
                 new Notice('No TaskLenses were open');
             }
         } else {
             this.isFocusMode = false;
-            if (this.savedLayout) {
-                await workspace.setLayout(this.savedLayout);
-                this.savedLayout = null;
+            // Restore original layout from permanent settings
+            if (this.settings.savedFocusLayout) {
+                await workspace.setLayout(this.settings.savedFocusLayout);
+                this.settings.savedFocusLayout = null;
+                await this.saveSettings(); // Clear the saved layout
                 new Notice('Focus mode disabled');
             }
         }
@@ -200,7 +207,7 @@ export default class TaskLensPlugin extends Plugin {
 
     async activateView(viewType: string) {
         let leaf = this.app.workspace.getLeaf(false);
-        if (leaf && leaf.view.getViewType() !== 'empty') {
+        if (leaf.view.getViewType() !== 'empty') {
             leaf = this.app.workspace.getLeaf('split');
         }
 
@@ -214,12 +221,15 @@ export default class TaskLensPlugin extends Plugin {
             new Notice('Layout auto-unlocked for placement 🔓');
         } else {
             const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
-            if (tabContainer) tabContainer.classList.remove('tasklens-hide-tabs');
+            if (tabContainer instanceof HTMLElement) {
+                tabContainer.classList.remove('tasklens-hide-tabs');
+            }
         }
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        const data = (await this.loadData()) as Partial<SemesterSettings> | null;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {});
     }
 
     async saveSettings() {

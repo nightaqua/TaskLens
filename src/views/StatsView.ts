@@ -7,14 +7,14 @@ import { setupViewDOM, cleanupViewDOM } from './DashboardView';
 export const VIEW_TYPE_STATS = 'tasklens-stats-view';
 
 export class StatsView extends ItemView {
-    private leafRootEl: HTMLElement | null = null;
-    private tabContainer: HTMLElement | null = null;
+    private leafRootEl: Element | null = null;
+    private tabContainer: Element | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
     constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
         super(leaf);
-        this.plugin.taskManager.on('tasks-updated', () => this.render());
+        this.plugin.taskManager.on('tasks-updated', () => { this.render(); });
     }
 
     getViewType() { return VIEW_TYPE_STATS; }
@@ -22,9 +22,10 @@ export class StatsView extends ItemView {
     getIcon() { return 'bar-chart-3'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
-        const parsedState = state as any;
-        if (parsedState?.headerState) {
-            this.headerState = parsedState.headerState;
+        // Change "as any" to "as Record<string, unknown>"
+        const parsedState = state as Record<string, unknown>;
+        if (parsedState.headerState) {
+            this.headerState = parsedState.headerState as HeaderState;
         }
         await super.setState(state, result);
         this.render();
@@ -37,7 +38,7 @@ export class StatsView extends ItemView {
         return { headerState: this.headerState as unknown };
     }
 
-    async onOpen() {
+    onOpen(): Promise<void> {
         const dom = setupViewDOM(this.containerEl, true);
         this.leafRootEl = dom.leafRootEl;
         this.tabContainer = dom.tabContainer;
@@ -45,10 +46,14 @@ export class StatsView extends ItemView {
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
         this.render();
+
+        return Promise.resolve();
     }
 
-    async onClose(): Promise<void> {
+    onClose(): Promise<void> {
         cleanupViewDOM(this.leafRootEl, this.tabContainer);
+
+        return Promise.resolve();
     }
 
     render() {
@@ -66,8 +71,8 @@ export class StatsView extends ItemView {
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
-                onRefresh: async () => {
-                    await this.plugin.taskManager.loadTasks();
+                onRefresh: () => {
+                    void this.plugin.taskManager.loadTasks();
                 }
             }
         );

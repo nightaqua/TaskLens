@@ -33,7 +33,7 @@ export class WelcomeModal extends Modal {
                 .setValue(this.plugin.settings.hasSeenWelcome)
                 .onChange(value => {
                     this.plugin.settings.hasSeenWelcome = value;
-                    void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+                    void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
                 })
             );
 

@@ -83,7 +83,7 @@ export class TaskParser {
                 const { title, startDate, dueDate } = this.parseTaskMetadata(taskText);
 
                 const task: Task = {
-                    id: `${file.path}:${i}`,
+                    id: `${file.path}:${String(i)}`,
                     title,
                     completed,
                     filePath: file.path,
@@ -107,8 +107,8 @@ export class TaskParser {
                 return file.parent?.name || file.basename;
             case 'frontmatter':
                 if (cache?.frontmatter) {
-                    const val = cache.frontmatter[this.settings.courseFrontmatterKey];
-                    if (val) return String(val);
+                    const val = cache.frontmatter[this.settings.courseFrontmatterKey] as string | undefined;
+                    if (val) return val;
                 }
                 return file.basename;
             default:

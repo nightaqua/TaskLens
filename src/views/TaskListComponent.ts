@@ -33,7 +33,7 @@ export class TaskListComponent {
     private renderTaskItem(container: HTMLElement, task: Task) {
         const taskEl = container.createDiv({ cls: ['task-item'] });
 
-        if (this.settings?.colorMode === 'course' && task.fileName) {
+        if (this.settings.colorMode === 'course' && task.fileName) {
             // --- USES SHARED HELPER ---
             taskEl.setCssProps({ 'border-left-color': getTopicColor(task.fileName, this.settings) });
         } else {
@@ -46,7 +46,7 @@ export class TaskListComponent {
 
         const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
         checkbox.checked = task.completed;
-        checkbox.addEventListener('change', () => this.callbacks.onToggle(task));
+        checkbox.addEventListener('change', () => { this.callbacks.onToggle(task); });
 
         const content = taskEl.createDiv('task-content');
 
@@ -71,9 +71,10 @@ export class TaskListComponent {
 
     private async openTaskInEditor(task: Task) {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file) {
+        // Use instanceof instead of casting with "as"
+        if (file instanceof TFile) {
             const leaf = this.app.workspace.getLeaf(false);
-            await leaf.openFile(file as TFile);
+            await leaf.openFile(file); // Removed the 'as TFile' here!
             const view = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (view) {
                 view.editor.setCursor({ line: task.lineNumber, ch: 0 });

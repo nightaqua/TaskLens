@@ -80,7 +80,7 @@ export class HeaderComponent {
         if (this.onSettings) {
             const settingsBtn = leftGroup.createEl('button', { cls: 'header-icon-btn' });
             setIcon(settingsBtn, 'settings');
-            settingsBtn.addEventListener('click', () => this.onSettings!());
+            settingsBtn.addEventListener('click', () => { this.onSettings?.(); });
         }
 
         const titleWrapper = this.headerEl.createDiv('dashboard-title-wrapper');
@@ -106,7 +106,7 @@ export class HeaderComponent {
                     addBtn.removeClass('feature-highlight');
                     if (this.onHighlightDismiss) this.onHighlightDismiss();
                 }
-                this.onAdd!();
+                this.onAdd?.();
             });
         }
 
@@ -116,7 +116,7 @@ export class HeaderComponent {
         refreshBtn.addEventListener('click', () => {
             refreshBtn.addClass('is-rotating');
             this.onRefresh();
-            setTimeout(() => refreshBtn.removeClass('is-rotating'), 1000);
+            setTimeout(() => { refreshBtn.removeClass('is-rotating'); }, 1000);
         });
 
         const hideBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
@@ -159,7 +159,7 @@ export class HeaderComponent {
                 save();
             }
         });
-        input.addEventListener('keypress', (e) => e.stopPropagation());
+        input.addEventListener('keypress', (e) => { e.stopPropagation(); });
     }
 
     private updateVisibility(): void {
@@ -179,3 +179,5 @@ export class HeaderComponent {
         };
     }
 }
+
+/* #TODO change dashboard to widget */

@@ -10,14 +10,14 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 export const VIEW_TYPE_DASHBOARD = 'tasklens-dashboard-view';
 
 export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean) {
-    const leafRootEl = containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
+    const leafRootEl = containerEl.closest('.workspace-leaf-content');
     if (leafRootEl) leafRootEl.classList.add('tasklens-chromeless');
-    const tabContainer = containerEl.closest('.workspace-tabs') as HTMLElement | null;
+    const tabContainer = containerEl.closest('.workspace-tabs');
     if (tabContainer && isLocked) tabContainer.classList.add('tasklens-hide-tabs');
     return { leafRootEl, tabContainer };
 }
 
-export function cleanupViewDOM(leafRootEl: HTMLElement | null, tabContainer: HTMLElement | null) {
+export function cleanupViewDOM(leafRootEl: Element | null, tabContainer: Element | null) {
     if (tabContainer) tabContainer.classList.remove('tasklens-hide-tabs');
     if (leafRootEl) leafRootEl.classList.remove('tasklens-chromeless');
 }
@@ -81,61 +81,67 @@ export class DashboardView extends ItemView implements RefreshableView {
     getIcon(): string { return 'layout-dashboard'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
-        if (state) {
-            const parsedState = state as any;
-            this.showControls = parsedState.showControls ?? this.showControls;
-            this.showTimeline = parsedState.showTimeline ?? this.showTimeline;
-            this.showList = parsedState.showList ?? this.showList;
-            this.showStats = parsedState.showStats ?? this.showStats;
-            this.timelineDaysToShow = parsedState.zoomLevel ?? 10;
+        if (state && Object.keys(state as Record<string, unknown>).length > 0) {
+            const parsedState = state as Record<string, unknown>;
+            // Safe fallback: If undefined (new leaf), keep it true!
+            this.showControls = parsedState.showControls !== undefined ? parsedState.showControls as boolean : true;
+            this.showTimeline = parsedState.showTimeline !== undefined ? parsedState.showTimeline as boolean : true;
+            this.showList = parsedState.showList !== undefined ? parsedState.showList as boolean : true;
+            this.showStats = parsedState.showStats !== undefined ? parsedState.showStats as boolean : true;
+            this.timelineDaysToShow = parsedState.zoomLevel !== undefined ? parsedState.zoomLevel as number : 10;
 
-            if (parsedState.statusFilter) this.taskManager.setStatusFilter(parsedState.statusFilter);
-            if (parsedState.courseFilter) this.taskManager.setCourseFilter(parsedState.courseFilter);
-            if (parsedState.headerState) this.headerState = parsedState.headerState;
+            if (parsedState.statusFilter) this.taskManager.setStatusFilter(parsedState.statusFilter as TaskStatus);
+            if (parsedState.courseFilter) this.taskManager.setCourseFilter(parsedState.courseFilter as string);
+            if (parsedState.headerState) this.headerState = parsedState.headerState as HeaderState;
+        } else {
+            // Completely fresh widget - set defaults
+            this.showControls = true;
+            this.showTimeline = true;
+            this.showList = true;
+            this.showStats = true;
         }
 
         await super.setState(state, result);
         this.render();
+
+        // Ensure timeline scrolls to today on restore
+        setTimeout(() => {
+            if (this.timelineComponent) this.timelineComponent.scrollToToday();
+        }, 300);
     }
 
-    getState(): Record<string, unknown> {
-        const filters = this.taskManager.getCurrentFilters();
-        if (this.headerComponent) {
-            this.headerState = this.headerComponent.getState();
+    onOpen(): Promise<void> {
+        const parent = this.containerEl.closest('.workspace-leaf-content');
+        if (parent) parent.classList.add('tasklens-chromeless');
+
+        this.tabContainer = this.containerEl.closest('.workspace-tabs');
+        if (this.plugin.isLayoutLocked && this.tabContainer) {
+            this.tabContainer.classList.add('tasklens-hide-tabs');
         }
-        return {
-            showControls: this.showControls,
-            showTimeline: this.showTimeline,
-            showList: this.showList,
-            showStats: this.showStats,
-            zoomLevel: this.timelineDaysToShow,
-            statusFilter: filters.status,
-            courseFilter: filters.course,
-            headerState: this.headerState as unknown
-        };
-    }
 
-    async onOpen(): Promise<void> {
-        const dom = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
-        this.leafRootEl = dom.leafRootEl;
-        this.tabContainer = dom.tabContainer;
+        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content');
+        if (this.leafRootEl) this.leafRootEl.classList.add('tasklens-chromeless');
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
 
         this.applyColorTheme();
-        await this.taskManager.loadTasks();
-        this.render();
 
-        setTimeout(() => {
-            if (this.timelineComponent) {
-                this.timelineComponent.scrollToToday();
-            }
-        }, 250);
+        void this.taskManager.loadTasks().then(() => {
+            this.render();
+            setTimeout(() => {
+                if (this.timelineComponent) {
+                    this.timelineComponent.scrollToToday();
+                }
+            }, 250);
+        });
+
+        return Promise.resolve();
     }
 
     onClose(): Promise<void> {
-        cleanupViewDOM(this.leafRootEl, this.tabContainer);
+        if (this.tabContainer) this.tabContainer.classList.remove('tasklens-hide-tabs');
+        if (this.leafRootEl) this.leafRootEl.classList.remove('tasklens-chromeless');
         return Promise.resolve();
     }
 
@@ -157,9 +163,9 @@ export class DashboardView extends ItemView implements RefreshableView {
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
-                onRefresh: async () => {
+                onRefresh: () => {
                     this.forceScrollToToday = true;
-                    await this.taskManager.loadTasks();
+                    void this.taskManager.loadTasks();
                 },
                 onSettings: () => {
                     this.showControls = !this.showControls;
@@ -177,7 +183,7 @@ export class DashboardView extends ItemView implements RefreshableView {
                 highlightAddButton: !this.plugin.settings.hasSeenWelcome,
                 onHighlightDismiss: () => {
                     this.plugin.settings.hasSeenWelcome = true;
-                    void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+                    void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
                 }
             }
         );
@@ -294,9 +300,9 @@ export class DashboardView extends ItemView implements RefreshableView {
         const container = this.contentEl.createDiv();
 
         const list = new TaskListComponent(container, this.app, {
-            onToggle: (t) => this.taskManager.toggleTaskCompletion(t),
-            onEdit: async (t, newTitle, newDate) => { await this.taskManager.updateTask(t, newTitle, newDate); },
-            onDelete: async (t) => { await this.taskManager.deleteTask(t); }
+            onToggle: (t) => { void this.taskManager.toggleTaskCompletion(t); },
+            onEdit: (t, newTitle, newDate) => { void this.taskManager.updateTask(t, newTitle, newDate); },
+            onDelete: (t) => { void this.taskManager.deleteTask(t); }
         }, this.plugin.settings);
 
         list.render(this.taskManager.getFilteredTasks());
@@ -330,7 +336,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
             this.render();
         });
-        zoomControls.createSpan({ text: ` ${this.timelineDaysToShow} Days ` });
+        zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} Days ` });
         const zoomIn = zoomControls.createEl('button', { text: '+', cls: 'view-toggle-btn' });
         zoomIn.addEventListener('click', () => {
             this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);

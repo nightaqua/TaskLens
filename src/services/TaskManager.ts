@@ -153,7 +153,8 @@ export class TaskManager extends Events {
     async addTask(title: string, date: Date | null, filePath: string): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(filePath);
         if (file instanceof TFile) {
-            let content = await this.app.vault.read(file);
+            // Change "let content" to "const content"
+            const content = await this.app.vault.read(file);
             let taskLine = `\n- [ ] ${title}`;
             if (date) {
                 const dateStr = this.formatDate(date);
@@ -168,7 +169,7 @@ export class TaskManager extends Events {
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
+        return `${String(y)}-${m}-${d}`;
     }
 
     private applyFiltersAndSort(): void {

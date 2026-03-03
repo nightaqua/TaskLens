@@ -34,19 +34,16 @@ var import_obsidian = require("obsidian");
 
 // src/models/Task.ts
 function getTaskStatus(task) {
-  if (task.completed)
-    return "completed" /* Completed */;
+  if (task.completed) return "completed" /* Completed */;
   if (task.dueDate) {
-    const today = new Date();
+    const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
     const due = new Date(task.dueDate);
     due.setHours(0, 0, 0, 0);
-    if (due < today)
-      return "overdue" /* Overdue */;
+    if (due < today) return "overdue" /* Overdue */;
     const diffTime = due.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1e3 * 60 * 60 * 24));
-    if (diffDays <= 3 && diffDays >= 0)
-      return "urgent" /* Urgent */;
+    if (diffDays <= 3 && diffDays >= 0) return "urgent" /* Urgent */;
     return "upcoming_week" /* UpcomingWeek */;
   }
   return "no_date" /* NoDate */;
@@ -179,7 +176,7 @@ var TaskManager = class extends import_obsidian.Events {
   async addTask(title, date, filePath) {
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (file instanceof import_obsidian.TFile) {
-      let content = await this.app.vault.read(file);
+      const content = await this.app.vault.read(file);
       let taskLine = `
 - [ ] ${title}`;
       if (date) {
@@ -194,34 +191,27 @@ var TaskManager = class extends import_obsidian.Events {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    return `${String(y)}-${m}-${d}`;
   }
   applyFiltersAndSort() {
     this.filteredTasks = this.tasks.filter((task) => {
       if (this.currentStatusFilter !== "all" /* All */) {
         if (this.currentStatusFilter === "open" /* Open */) {
-          if (task.completed)
-            return false;
+          if (task.completed) return false;
         } else {
-          if (getTaskStatus(task) !== this.currentStatusFilter)
-            return false;
+          if (getTaskStatus(task) !== this.currentStatusFilter) return false;
         }
       }
-      if (this.currentCourseFilter && task.fileName !== this.currentCourseFilter)
-        return false;
+      if (this.currentCourseFilter && task.fileName !== this.currentCourseFilter) return false;
       return true;
     });
     this.filteredTasks.sort((a, b) => {
       const weightA = this.getStatusWeight(a);
       const weightB = this.getStatusWeight(b);
-      if (weightA !== weightB)
-        return weightA - weightB;
-      if (a.dueDate && b.dueDate)
-        return a.dueDate.getTime() - b.dueDate.getTime();
-      if (a.dueDate)
-        return -1;
-      if (b.dueDate)
-        return 1;
+      if (weightA !== weightB) return weightA - weightB;
+      if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
       return 0;
     });
   }
@@ -310,7 +300,7 @@ var TaskParser = class {
         const taskText = taskMatch[3];
         const { title, startDate, dueDate } = this.parseTaskMetadata(taskText);
         const task = {
-          id: `${file.path}:${i}`,
+          id: `${file.path}:${String(i)}`,
           title,
           completed,
           filePath: file.path,
@@ -335,8 +325,7 @@ var TaskParser = class {
       case "frontmatter":
         if (cache == null ? void 0 : cache.frontmatter) {
           const val = cache.frontmatter[this.settings.courseFrontmatterKey];
-          if (val)
-            return String(val);
+          if (val) return val;
         }
         return file.basename;
       default:
@@ -389,16 +378,16 @@ var DEFAULT_SETTINGS = {
   },
   topicColors: {},
   hasSeenWelcome: false,
-  hasClickedRibbonIcon: false
+  hasClickedRibbonIcon: false,
+  savedFocusLayout: null
 };
 function getTopicColor(topic, settings) {
-  if ((settings == null ? void 0 : settings.topicColors) && settings.topicColors[topic]) {
+  if (settings.topicColors[topic]) {
     return settings.topicColors[topic];
   }
   const defaultPalette = ["#4cc9f0", "#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4caf50"];
   let hash = 0;
-  for (let i = 0; i < topic.length; i++)
-    hash = topic.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
   return defaultPalette[Math.abs(hash) % defaultPalette.length];
 }
 
@@ -430,7 +419,9 @@ var WelcomeModal = class extends import_obsidian3.Modal {
     new import_obsidian3.Setting(contentEl).setName("Do not show this window again").setDesc("You can always reopen this from the Settings tab.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.hasSeenWelcome).onChange((value) => {
         this.plugin.settings.hasSeenWelcome = value;
-        void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+        void this.plugin.saveSettings().then(() => {
+          this.plugin.refreshViews();
+        });
       })
     );
     const btnContainer = contentEl.createDiv();
@@ -512,19 +503,27 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
       if (this.plugin.settings.colorMode === "status") {
         new import_obsidian4.Setting(colorPickersContainer).setName("Overdue color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.overdue).onChange((v) => {
           this.plugin.settings.colors.overdue = v;
-          void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
         }));
         new import_obsidian4.Setting(colorPickersContainer).setName("Urgent color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.urgent).onChange((v) => {
           this.plugin.settings.colors.urgent = v;
-          void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
         }));
         new import_obsidian4.Setting(colorPickersContainer).setName("Active color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.active).onChange((v) => {
           this.plugin.settings.colors.active = v;
-          void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
         }));
         new import_obsidian4.Setting(colorPickersContainer).setName("Completed color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.completed).onChange((v) => {
           this.plugin.settings.colors.completed = v;
-          void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
         }));
       } else {
         const helperText = colorPickersContainer.createEl("p", {
@@ -543,7 +542,9 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
           const savedColor = getTopicColor(topic, this.plugin.settings);
           new import_obsidian4.Setting(colorPickersContainer).setName(`${topic} color`).addColorPicker((c) => c.setValue(savedColor).onChange((v) => {
             this.plugin.settings.topicColors[topic] = v;
-            void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+            void this.plugin.saveSettings().then(() => {
+              this.plugin.refreshViews();
+            });
           }));
         });
       }
@@ -595,14 +596,12 @@ var TimelineComponent = class {
     this.settings = settings;
   }
   getCourseColor(courseName) {
-    var _a;
-    if (((_a = this.settings) == null ? void 0 : _a.topicColors) && this.settings.topicColors[courseName]) {
+    if (this.settings.topicColors[courseName]) {
       return this.settings.topicColors[courseName];
     }
     const defaultPalette = ["#4cc9f0", "#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4caf50"];
     let hash = 0;
-    for (let i = 0; i < courseName.length; i++)
-      hash = courseName.charCodeAt(i) + ((hash << 5) - hash);
+    for (let i = 0; i < courseName.length; i++) hash = courseName.charCodeAt(i) + ((hash << 5) - hash);
     return defaultPalette[Math.abs(hash) % defaultPalette.length];
   }
   render() {
@@ -614,8 +613,8 @@ var TimelineComponent = class {
       empty.createEl("p", { text: "No dated tasks to display." });
       return;
     }
-    const dates = validTasks.map((t) => t.dueDate);
-    dates.push(new Date());
+    const dates = validTasks.map((t) => t.dueDate).filter((d) => Boolean(d));
+    dates.push(/* @__PURE__ */ new Date());
     const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
     const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
     minDate.setDate(minDate.getDate() - 2);
@@ -631,7 +630,7 @@ var TimelineComponent = class {
     this.scrollContainer = this.container.createDiv("timeline-container");
     const scrollContent = this.scrollContainer.createDiv("timeline-scroll-content");
     const totalWidthPercent = allDays.length / this.daysToShow * 100;
-    scrollContent.style.width = `${totalWidthPercent}%`;
+    scrollContent.style.width = String(totalWidthPercent) + "%";
     const colWidthPercent = 100 / allDays.length;
     const monthHeader = scrollContent.createDiv("timeline-month-row");
     let currentMonth = -1;
@@ -644,8 +643,8 @@ var TimelineComponent = class {
           const monthName2 = allDays[monthStartIdx].toLocaleString("default", { month: "long", year: "numeric" });
           const mDiv2 = monthHeader.createDiv("timeline-month-cell");
           mDiv2.setText(monthName2);
-          mDiv2.style.width = `${span2 * colWidthPercent}%`;
-          mDiv2.style.left = `${monthStartIdx * colWidthPercent}%`;
+          mDiv2.style.width = String(span2 * colWidthPercent) + "%";
+          mDiv2.style.left = String(monthStartIdx * colWidthPercent) + "%";
         }
         currentMonth = m;
         monthStartIdx = idx;
@@ -655,73 +654,73 @@ var TimelineComponent = class {
     const monthName = allDays[monthStartIdx].toLocaleString("default", { month: "long", year: "numeric" });
     const mDiv = monthHeader.createDiv("timeline-month-cell");
     mDiv.setText(monthName);
-    mDiv.style.width = `${span * colWidthPercent}%`;
-    mDiv.style.left = `${monthStartIdx * colWidthPercent}%`;
+    mDiv.style.width = String(span * colWidthPercent) + "%";
+    mDiv.style.left = String(monthStartIdx * colWidthPercent) + "%";
     const grid = scrollContent.createDiv("timeline-grid");
-    grid.style.gridTemplateColumns = `repeat(${allDays.length}, 1fr)`;
+    grid.style.gridTemplateColumns = `repeat(${String(allDays.length)}, 1fr)`;
     allDays.forEach((day, idx) => {
       const cell = grid.createDiv("timeline-header-cell");
       cell.setText(day.getDate().toString());
       const dayName = day.toLocaleString("default", { weekday: "short" });
       cell.createDiv("timeline-day-name").setText(dayName);
-      cell.style.gridColumn = `${idx + 1}`;
+      cell.style.gridColumn = String(idx + 1);
       cell.style.gridRow = `1`;
       const bgCell = grid.createDiv("timeline-bg-cell");
-      bgCell.style.gridColumn = `${idx + 1}`;
+      bgCell.style.gridColumn = String(idx + 1);
       bgCell.style.gridRow = `2 / -1`;
       if (day.getDate() === 1) {
         cell.addClass("is-month-start");
         bgCell.addClass("is-month-start-bg");
       }
-      if (day.toDateString() === new Date().toDateString()) {
+      if (day.toDateString() === (/* @__PURE__ */ new Date()).toDateString()) {
         cell.addClass("is-today");
         bgCell.addClass("is-today-bg");
         const marker = grid.createDiv("timeline-today-marker");
-        marker.style.gridColumn = `${idx + 1}`;
+        marker.style.gridColumn = String(idx + 1);
         marker.style.gridRow = `1 / -1`;
       }
     });
     validTasks.forEach((task, rowIndex) => {
-      var _a;
       const rowBg = grid.createDiv("timeline-row-bg");
       rowBg.style.gridColumn = `1 / -1`;
-      rowBg.style.gridRow = `${rowIndex + 2}`;
+      rowBg.style.gridRow = String(rowIndex + 2);
+      if (!task.dueDate) return;
       const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
       const taskEnd = new Date(task.dueDate);
       taskStart.setHours(0, 0, 0, 0);
       taskEnd.setHours(0, 0, 0, 0);
       let startIdx = allDays.findIndex((d) => d.toDateString() === taskStart.toDateString());
       let dueIdx = allDays.findIndex((d) => d.toDateString() === taskEnd.toDateString());
-      if (startIdx === -1 && taskStart < allDays[0])
-        startIdx = 0;
-      if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1])
-        dueIdx = allDays.length - 1;
+      if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
+      if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
       if (dueIdx >= 0 && startIdx >= 0) {
         const bar = grid.createDiv("timeline-task-bar");
         bar.setText(task.title);
-        if (((_a = this.settings) == null ? void 0 : _a.colorMode) === "course" && task.fileName) {
+        if (this.settings.colorMode === "course" && task.fileName) {
           bar.style.backgroundColor = this.getCourseColor(task.fileName);
         } else {
           const status = getTaskStatus(task);
-          if (status === "overdue" /* Overdue */)
-            bar.addClass("status-overdue");
-          if (status === "urgent" /* Urgent */)
-            bar.addClass("status-urgent");
-          if (status === "completed" /* Completed */)
-            bar.addClass("status-completed");
-          if (status === "upcoming_week" /* UpcomingWeek */)
-            bar.addClass("status-active");
+          if (status === "overdue" /* Overdue */) bar.addClass("status-overdue");
+          if (status === "urgent" /* Urgent */) bar.addClass("status-urgent");
+          if (status === "completed" /* Completed */) bar.addClass("status-completed");
+          if (status === "upcoming_week" /* UpcomingWeek */) bar.addClass("status-active");
         }
         const span2 = dueIdx - startIdx + 1;
-        bar.style.gridColumnStart = `${startIdx + 1}`;
-        bar.style.gridColumnEnd = `span ${span2}`;
-        bar.style.gridRow = `${rowIndex + 2}`;
-        bar.addEventListener("mouseenter", (e) => this.showTooltip(e, task));
-        bar.addEventListener("mouseleave", () => this.hideTooltip());
-        bar.addEventListener("mousemove", (e) => this.moveTooltip(e));
+        bar.style.gridColumnStart = String(startIdx + 1);
+        bar.style.gridColumnEnd = `span ${String(span2)}`;
+        bar.style.gridRow = String(rowIndex + 2);
+        bar.addEventListener("mouseenter", (e) => {
+          this.showTooltip(e, task);
+        });
+        bar.addEventListener("mouseleave", () => {
+          this.hideTooltip();
+        });
+        bar.addEventListener("mousemove", (e) => {
+          this.moveTooltip(e);
+        });
         bar.addEventListener("click", (e) => {
           e.stopPropagation();
-          this.openTaskFile(task);
+          void this.openTaskFile(task);
         });
       }
     });
@@ -737,19 +736,17 @@ var TimelineComponent = class {
   }
   scrollToToday() {
     setTimeout(() => {
-      if (!this.scrollContainer)
-        return;
+      if (!this.scrollContainer) return;
       const todayCell = this.scrollContainer.querySelector(".timeline-header-cell.is-today");
-      if (todayCell) {
+      if (todayCell instanceof HTMLElement) {
         const scrollPos = todayCell.offsetLeft - this.scrollContainer.clientWidth / 2 + todayCell.clientWidth / 2;
-        this.scrollContainer.scrollTo({ left: scrollPos, behavior: "smooth" });
+        this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: "smooth" });
       }
-    }, 100);
+    }, 300);
   }
   // --- PUBLIC SCROLL METHOD ---
   scroll(direction) {
-    if (!this.scrollContainer)
-      return;
+    if (!this.scrollContainer) return;
     const scrollAmount = this.scrollContainer.clientWidth * 0.8;
     this.scrollContainer.scrollBy({
       left: direction === "left" ? -scrollAmount : scrollAmount,
@@ -780,8 +777,7 @@ var TimelineComponent = class {
       container.removeClass("is-dragging");
     });
     container.addEventListener("mousemove", (e) => {
-      if (!this.isDragging)
-        return;
+      if (!this.isDragging) return;
       e.preventDefault();
       const x = e.pageX - container.offsetLeft;
       const walk = (x - this.startX) * 1.5;
@@ -798,18 +794,18 @@ var TimelineComponent = class {
     if (task.dueDate) {
       this.tooltipEl.createDiv("tooltip-date").setText(`\u{1F4C5} ${task.dueDate.toDateString()}`);
     }
-    this.tooltipEl.style.display = "block";
+    this.tooltipEl.setCssProps({ display: "block" });
     this.moveTooltip(e);
   }
   moveTooltip(e) {
     if (this.tooltipEl) {
-      this.tooltipEl.style.top = `${e.clientY + 15}px`;
-      this.tooltipEl.style.left = `${e.clientX + 15}px`;
+      this.tooltipEl.style.top = String(e.clientY + 15) + "px";
+      this.tooltipEl.style.left = String(e.clientX + 15) + "px";
     }
   }
   hideTooltip() {
     if (this.tooltipEl) {
-      this.tooltipEl.style.display = "none";
+      this.tooltipEl.setCssProps({ display: "none" });
     }
   }
   async openTaskFile(task) {
@@ -848,24 +844,21 @@ var TaskListComponent = class {
     });
   }
   renderTaskItem(container, task) {
-    var _a;
     const taskEl = container.createDiv({ cls: ["task-item"] });
-    if (((_a = this.settings) == null ? void 0 : _a.colorMode) === "course" && task.fileName) {
+    if (this.settings.colorMode === "course" && task.fileName) {
       taskEl.setCssProps({ "border-left-color": getTopicColor(task.fileName, this.settings) });
     } else {
       const status = getTaskStatus(task);
-      if (status === "overdue" /* Overdue */)
-        taskEl.addClass("status-overdue");
-      if (status === "urgent" /* Urgent */)
-        taskEl.addClass("status-urgent");
-      if (status === "completed" /* Completed */)
-        taskEl.addClass("status-completed");
-      if (status === "upcoming_week" /* UpcomingWeek */)
-        taskEl.addClass("status-active");
+      if (status === "overdue" /* Overdue */) taskEl.addClass("status-overdue");
+      if (status === "urgent" /* Urgent */) taskEl.addClass("status-urgent");
+      if (status === "completed" /* Completed */) taskEl.addClass("status-completed");
+      if (status === "upcoming_week" /* UpcomingWeek */) taskEl.addClass("status-active");
     }
     const checkbox = taskEl.createEl("input", { type: "checkbox", cls: "task-checkbox" });
     checkbox.checked = task.completed;
-    checkbox.addEventListener("change", () => this.callbacks.onToggle(task));
+    checkbox.addEventListener("change", () => {
+      this.callbacks.onToggle(task);
+    });
     const content = taskEl.createDiv("task-content");
     const viewMode = content.createDiv("task-view-mode");
     const titleEl = viewMode.createDiv("task-title");
@@ -885,7 +878,7 @@ var TaskListComponent = class {
   }
   async openTaskInEditor(task) {
     const file = this.app.vault.getAbstractFileByPath(task.filePath);
-    if (file) {
+    if (file instanceof import_obsidian6.TFile) {
       const leaf = this.app.workspace.getLeaf(false);
       await leaf.openFile(file);
       const view = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView);
@@ -922,8 +915,7 @@ var HeaderComponent = class {
     this.updateVisibility();
   }
   renderSidebarHandle() {
-    if (this.sidebarHandleEl)
-      this.sidebarHandleEl.remove();
+    if (this.sidebarHandleEl) this.sidebarHandleEl.remove();
     this.sidebarHandleEl = this.container.createDiv("dashboard-sidebar-handle is-hidden");
     (0, import_obsidian7.setIcon)(this.sidebarHandleEl, "panel-left-open");
     this.sidebarHandleEl.setAttribute("aria-label", "Show Header");
@@ -934,14 +926,16 @@ var HeaderComponent = class {
     });
   }
   renderHeader() {
-    if (this.headerEl)
-      this.headerEl.remove();
+    if (this.headerEl) this.headerEl.remove();
     this.headerEl = this.container.createDiv("dashboard-header");
     const leftGroup = this.headerEl.createDiv("header-actions-left");
     if (this.onSettings) {
       const settingsBtn = leftGroup.createEl("button", { cls: "header-icon-btn" });
       (0, import_obsidian7.setIcon)(settingsBtn, "settings");
-      settingsBtn.addEventListener("click", () => this.onSettings());
+      settingsBtn.addEventListener("click", () => {
+        var _a;
+        (_a = this.onSettings) == null ? void 0 : _a.call(this);
+      });
     }
     const titleWrapper = this.headerEl.createDiv("dashboard-title-wrapper");
     titleWrapper.setAttribute("aria-label", "Click to rename");
@@ -954,18 +948,17 @@ var HeaderComponent = class {
     const rightGroup = this.headerEl.createDiv("header-actions-right");
     if (this.onAdd) {
       const addBtn = rightGroup.createEl("button", { cls: "header-icon-btn" });
-      if (this.highlightAddButton)
-        addBtn.addClass("feature-highlight");
+      if (this.highlightAddButton) addBtn.addClass("feature-highlight");
       (0, import_obsidian7.setIcon)(addBtn, "plus");
       addBtn.setAttribute("aria-label", "Quick Add Task");
       addBtn.addEventListener("click", () => {
+        var _a;
         if (this.highlightAddButton) {
           this.highlightAddButton = false;
           addBtn.removeClass("feature-highlight");
-          if (this.onHighlightDismiss)
-            this.onHighlightDismiss();
+          if (this.onHighlightDismiss) this.onHighlightDismiss();
         }
-        this.onAdd();
+        (_a = this.onAdd) == null ? void 0 : _a.call(this);
       });
     }
     const refreshBtn = rightGroup.createEl("button", { cls: "dashboard-refresh-btn header-icon-btn" });
@@ -974,7 +967,9 @@ var HeaderComponent = class {
     refreshBtn.addEventListener("click", () => {
       refreshBtn.addClass("is-rotating");
       this.onRefresh();
-      setTimeout(() => refreshBtn.removeClass("is-rotating"), 1e3);
+      setTimeout(() => {
+        refreshBtn.removeClass("is-rotating");
+      }, 1e3);
     });
     const hideBtn = rightGroup.createEl("button", { cls: "header-icon-btn" });
     (0, import_obsidian7.setIcon)(hideBtn, "panel-top-close");
@@ -996,8 +991,7 @@ var HeaderComponent = class {
     input.select();
     this.isSaving = false;
     const save = () => {
-      if (this.isSaving)
-        return;
+      if (this.isSaving) return;
       this.isSaving = true;
       const newVal = input.value.trim();
       this.title = newVal.length > 0 ? newVal : this.defaultTitle;
@@ -1011,7 +1005,9 @@ var HeaderComponent = class {
         save();
       }
     });
-    input.addEventListener("keypress", (e) => e.stopPropagation());
+    input.addEventListener("keypress", (e) => {
+      e.stopPropagation();
+    });
   }
   updateVisibility() {
     var _a, _b, _c, _d;
@@ -1044,7 +1040,9 @@ var QuickAddModal = class extends import_obsidian8.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.createEl("h2", { text: "Quick Add Task" });
-    new import_obsidian8.Setting(contentEl).setName("Task").addText((text) => text.setPlaceholder("Read Chapter 4...").onChange((value) => this.title = value).inputEl.focus());
+    new import_obsidian8.Setting(contentEl).setName("Task").addText((text) => {
+      text.setPlaceholder("Read Chapter 4...").onChange((value) => this.title = value).inputEl.focus();
+    });
     new import_obsidian8.Setting(contentEl).setName("Destination");
     new import_obsidian8.Setting(contentEl).setName("Destination").addDropdown((drop) => {
       const activeView = this.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
@@ -1067,23 +1065,22 @@ var QuickAddModal = class extends import_obsidian8.Modal {
       text.inputEl.type = "date";
       text.onChange((value) => this.date = value);
     });
-    new import_obsidian8.Setting(contentEl).addButton((btn) => btn.setButtonText("Add Task").setCta().onClick(async () => {
-      if (!this.title || !this.selectedFile)
-        return;
+    new import_obsidian8.Setting(contentEl).addButton((btn) => btn.setButtonText("Add Task").setCta().onClick(() => {
+      if (!this.title || !this.selectedFile) return;
       if (this.selectedFile === "__CURSOR__") {
         const view = this.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
-        if (view && view.editor) {
-          const dateStr = this.date ? ` [due:: ${this.date}]` : "";
-          const taskLine = `- [ ] ${this.title}${dateStr}
+        const dateStr = this.date ? ` [due:: ${this.date}]` : "";
+        const taskLine = `- [ ] ${this.title}${dateStr}
 `;
+        if (view == null ? void 0 : view.editor) {
           view.editor.replaceSelection(taskLine);
           if (view.file) {
-            await this.taskManager.refreshFileTask(view.file.path);
+            void this.taskManager.refreshFileTask(view.file.path);
           }
         }
       } else {
         const dateObj = this.date ? new Date(this.date) : null;
-        await this.taskManager.addTask(this.title, dateObj, this.selectedFile);
+        void this.taskManager.addTask(this.title, dateObj, this.selectedFile);
       }
       this.close();
     }));
@@ -1097,18 +1094,14 @@ var QuickAddModal = class extends import_obsidian8.Modal {
 var VIEW_TYPE_DASHBOARD = "tasklens-dashboard-view";
 function setupViewDOM(containerEl, isLocked) {
   const leafRootEl = containerEl.closest(".workspace-leaf-content");
-  if (leafRootEl)
-    leafRootEl.classList.add("tasklens-chromeless");
+  if (leafRootEl) leafRootEl.classList.add("tasklens-chromeless");
   const tabContainer = containerEl.closest(".workspace-tabs");
-  if (tabContainer && isLocked)
-    tabContainer.classList.add("tasklens-hide-tabs");
+  if (tabContainer && isLocked) tabContainer.classList.add("tasklens-hide-tabs");
   return { leafRootEl, tabContainer };
 }
 function cleanupViewDOM(leafRootEl, tabContainer) {
-  if (tabContainer)
-    tabContainer.classList.remove("tasklens-hide-tabs");
-  if (leafRootEl)
-    leafRootEl.classList.remove("tasklens-chromeless");
+  if (tabContainer) tabContainer.classList.remove("tasklens-hide-tabs");
+  if (leafRootEl) leafRootEl.classList.remove("tasklens-chromeless");
 }
 var DashboardView = class extends import_obsidian9.ItemView {
   constructor(leaf, plugin) {
@@ -1129,8 +1122,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.forceScrollToToday = false;
     this.taskManager = this.plugin.taskManager;
     this.taskManager.on("tasks-updated", () => {
-      if (this.renderTimer)
-        clearTimeout(this.renderTimer);
+      if (this.renderTimer) clearTimeout(this.renderTimer);
       this.renderTimer = setTimeout(() => {
         if (this.timelineComponent && !this.forceScrollToToday) {
           this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
@@ -1165,57 +1157,53 @@ var DashboardView = class extends import_obsidian9.ItemView {
     return "layout-dashboard";
   }
   async setState(state, result) {
-    var _a, _b, _c, _d, _e;
-    if (state) {
+    if (state && Object.keys(state).length > 0) {
       const parsedState = state;
-      this.showControls = (_a = parsedState.showControls) != null ? _a : this.showControls;
-      this.showTimeline = (_b = parsedState.showTimeline) != null ? _b : this.showTimeline;
-      this.showList = (_c = parsedState.showList) != null ? _c : this.showList;
-      this.showStats = (_d = parsedState.showStats) != null ? _d : this.showStats;
-      this.timelineDaysToShow = (_e = parsedState.zoomLevel) != null ? _e : 10;
-      if (parsedState.statusFilter)
-        this.taskManager.setStatusFilter(parsedState.statusFilter);
-      if (parsedState.courseFilter)
-        this.taskManager.setCourseFilter(parsedState.courseFilter);
-      if (parsedState.headerState)
-        this.headerState = parsedState.headerState;
+      this.showControls = parsedState.showControls !== void 0 ? parsedState.showControls : true;
+      this.showTimeline = parsedState.showTimeline !== void 0 ? parsedState.showTimeline : true;
+      this.showList = parsedState.showList !== void 0 ? parsedState.showList : true;
+      this.showStats = parsedState.showStats !== void 0 ? parsedState.showStats : true;
+      this.timelineDaysToShow = parsedState.zoomLevel !== void 0 ? parsedState.zoomLevel : 10;
+      if (parsedState.statusFilter) this.taskManager.setStatusFilter(parsedState.statusFilter);
+      if (parsedState.courseFilter) this.taskManager.setCourseFilter(parsedState.courseFilter);
+      if (parsedState.headerState) this.headerState = parsedState.headerState;
+    } else {
+      this.showControls = true;
+      this.showTimeline = true;
+      this.showList = true;
+      this.showStats = true;
     }
     await super.setState(state, result);
     this.render();
+    setTimeout(() => {
+      if (this.timelineComponent) this.timelineComponent.scrollToToday();
+    }, 300);
   }
-  getState() {
-    const filters = this.taskManager.getCurrentFilters();
-    if (this.headerComponent) {
-      this.headerState = this.headerComponent.getState();
+  onOpen() {
+    const parent = this.containerEl.closest(".workspace-leaf-content");
+    if (parent) parent.classList.add("tasklens-chromeless");
+    this.tabContainer = this.containerEl.closest(".workspace-tabs");
+    if (this.plugin.isLayoutLocked && this.tabContainer) {
+      this.tabContainer.classList.add("tasklens-hide-tabs");
     }
-    return {
-      showControls: this.showControls,
-      showTimeline: this.showTimeline,
-      showList: this.showList,
-      showStats: this.showStats,
-      zoomLevel: this.timelineDaysToShow,
-      statusFilter: filters.status,
-      courseFilter: filters.course,
-      headerState: this.headerState
-    };
-  }
-  async onOpen() {
-    const dom = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
-    this.leafRootEl = dom.leafRootEl;
-    this.tabContainer = dom.tabContainer;
+    this.leafRootEl = this.containerEl.closest(".workspace-leaf-content");
+    if (this.leafRootEl) this.leafRootEl.classList.add("tasklens-chromeless");
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.applyColorTheme();
-    await this.taskManager.loadTasks();
-    this.render();
-    setTimeout(() => {
-      if (this.timelineComponent) {
-        this.timelineComponent.scrollToToday();
-      }
-    }, 250);
+    void this.taskManager.loadTasks().then(() => {
+      this.render();
+      setTimeout(() => {
+        if (this.timelineComponent) {
+          this.timelineComponent.scrollToToday();
+        }
+      }, 250);
+    });
+    return Promise.resolve();
   }
   onClose() {
-    cleanupViewDOM(this.leafRootEl, this.tabContainer);
+    if (this.tabContainer) this.tabContainer.classList.remove("tasklens-hide-tabs");
+    if (this.leafRootEl) this.leafRootEl.classList.remove("tasklens-chromeless");
     return Promise.resolve();
   }
   render() {
@@ -1235,9 +1223,9 @@ var DashboardView = class extends import_obsidian9.ItemView {
           this.app.workspace.requestSaveLayout();
           this.render();
         },
-        onRefresh: async () => {
+        onRefresh: () => {
           this.forceScrollToToday = true;
-          await this.taskManager.loadTasks();
+          void this.taskManager.loadTasks();
         },
         onSettings: () => {
           this.showControls = !this.showControls;
@@ -1255,7 +1243,9 @@ var DashboardView = class extends import_obsidian9.ItemView {
         highlightAddButton: !this.plugin.settings.hasSeenWelcome,
         onHighlightDismiss: () => {
           this.plugin.settings.hasSeenWelcome = true;
-          void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
         }
       }
     );
@@ -1263,17 +1253,13 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.renderControls();
     const layoutOrder = ["stats", "timeline", "list"];
     layoutOrder.forEach((component) => {
-      if (component === "stats" && this.showStats)
-        this.renderStatistics();
-      if (component === "timeline" && this.showTimeline)
-        this.renderTimeline();
-      if (component === "list" && this.showList)
-        this.renderTaskList();
+      if (component === "stats" && this.showStats) this.renderStatistics();
+      if (component === "timeline" && this.showTimeline) this.renderTimeline();
+      if (component === "list" && this.showList) this.renderTaskList();
     });
   }
   renderControls() {
-    if (!this.showControls)
-      return;
+    if (!this.showControls) return;
     const controls = this.contentEl.createDiv("dashboard-controls");
     const filtersDiv = controls.createDiv("filters-wrapper");
     filtersDiv.setCssProps({ display: "flex", gap: "12px", "flex-wrap": "wrap" });
@@ -1287,8 +1273,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     ];
     statusOptions.forEach((opt) => {
       const option = statusSelect.createEl("option", { value: opt.value, text: opt.label });
-      if (opt.value === this.taskManager.getCurrentFilters().status)
-        option.selected = true;
+      if (opt.value === this.taskManager.getCurrentFilters().status) option.selected = true;
     });
     statusSelect.addEventListener("change", () => {
       this.taskManager.setStatusFilter(statusSelect.value);
@@ -1299,8 +1284,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     courseSelect.createEl("option", { value: "", text: "All topics" });
     this.taskManager.getCourseNames().forEach((course) => {
       const option = courseSelect.createEl("option", { value: course, text: course });
-      if (course === this.taskManager.getCurrentFilters().course)
-        option.selected = true;
+      if (course === this.taskManager.getCurrentFilters().course) option.selected = true;
     });
     courseSelect.addEventListener("change", () => {
       this.taskManager.setCourseFilter(courseSelect.value || null);
@@ -1358,12 +1342,14 @@ var DashboardView = class extends import_obsidian9.ItemView {
   renderTaskList() {
     const container = this.contentEl.createDiv();
     const list = new TaskListComponent(container, this.app, {
-      onToggle: (t) => this.taskManager.toggleTaskCompletion(t),
-      onEdit: async (t, newTitle, newDate) => {
-        await this.taskManager.updateTask(t, newTitle, newDate);
+      onToggle: (t) => {
+        void this.taskManager.toggleTaskCompletion(t);
       },
-      onDelete: async (t) => {
-        await this.taskManager.deleteTask(t);
+      onEdit: (t, newTitle, newDate) => {
+        void this.taskManager.updateTask(t, newTitle, newDate);
+      },
+      onDelete: (t) => {
+        void this.taskManager.deleteTask(t);
       }
     }, this.plugin.settings);
     list.render(this.taskManager.getFilteredTasks());
@@ -1392,7 +1378,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
       this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
       this.render();
     });
-    zoomControls.createSpan({ text: ` ${this.timelineDaysToShow} Days ` });
+    zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} Days ` });
     const zoomIn = zoomControls.createEl("button", { text: "+", cls: "view-toggle-btn" });
     zoomIn.addEventListener("click", () => {
       this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);
@@ -1426,6 +1412,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
 var import_obsidian10 = require("obsidian");
 var VIEW_TYPE_TIMELINE = "tasklens-timeline-view";
 var TimelineView = class extends import_obsidian10.ItemView {
+  // <-- Missing property added
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -1433,7 +1420,10 @@ var TimelineView = class extends import_obsidian10.ItemView {
     this.tabContainer = null;
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
-    this.plugin.taskManager.on("tasks-updated", () => this.render());
+    this.isOpen = false;
+    this.plugin.taskManager.on("tasks-updated", () => {
+      if (this.isOpen) this.render();
+    });
   }
   getViewType() {
     return VIEW_TYPE_TIMELINE;
@@ -1446,7 +1436,7 @@ var TimelineView = class extends import_obsidian10.ItemView {
   }
   async setState(state, result) {
     const parsedState = state;
-    if (parsedState == null ? void 0 : parsedState.headerState) {
+    if (parsedState.headerState) {
       this.headerState = parsedState.headerState;
     }
     await super.setState(state, result);
@@ -1458,20 +1448,26 @@ var TimelineView = class extends import_obsidian10.ItemView {
     }
     return { headerState: this.headerState };
   }
-  async onOpen() {
+  onOpen() {
     const dom = setupViewDOM(this.containerEl, true);
     this.leafRootEl = dom.leafRootEl;
     this.tabContainer = dom.tabContainer;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.contentEl.addClass("is-single-view");
-    await this.plugin.taskManager.loadTasks();
-    this.render();
+    this.isOpen = true;
+    void this.plugin.taskManager.loadTasks().then(() => {
+      this.render();
+    });
+    return Promise.resolve();
   }
-  async onClose() {
+  onClose() {
+    this.isOpen = false;
     cleanupViewDOM(this.leafRootEl, this.tabContainer);
+    return Promise.resolve();
   }
   render() {
+    if (!this.isOpen || !this.contentEl.isConnected) return;
     this.contentEl.empty();
     this.headerComponent = new HeaderComponent(
       this.contentEl,
@@ -1485,8 +1481,8 @@ var TimelineView = class extends import_obsidian10.ItemView {
           this.app.workspace.requestSaveLayout();
           this.render();
         },
-        onRefresh: async () => {
-          await this.plugin.taskManager.loadTasks();
+        onRefresh: () => {
+          void this.plugin.taskManager.loadTasks();
         }
       }
     );
@@ -1509,9 +1505,7 @@ var TaskListView = class extends import_obsidian11.ItemView {
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
     this.onTasksUpdated = () => {
-      var _a;
-      if (!this.isOpen || !((_a = this.contentEl) == null ? void 0 : _a.isConnected))
-        return;
+      if (!this.isOpen || !this.contentEl.isConnected) return;
       this.render();
     };
     this.plugin.taskManager.on("tasks-updated", this.onTasksUpdated);
@@ -1527,7 +1521,7 @@ var TaskListView = class extends import_obsidian11.ItemView {
   }
   async setState(state, result) {
     const parsedState = state;
-    if (parsedState == null ? void 0 : parsedState.headerState) {
+    if (parsedState.headerState) {
       this.headerState = parsedState.headerState;
     }
     await super.setState(state, result);
@@ -1556,9 +1550,7 @@ var TaskListView = class extends import_obsidian11.ItemView {
     return Promise.resolve();
   }
   render() {
-    var _a;
-    if (!this.isOpen || !((_a = this.contentEl) == null ? void 0 : _a.isConnected))
-      return;
+    if (!this.isOpen || !this.contentEl.isConnected) return;
     this.contentEl.empty();
     this.headerComponent = new HeaderComponent(
       this.contentEl,
@@ -1572,29 +1564,34 @@ var TaskListView = class extends import_obsidian11.ItemView {
           this.app.workspace.requestSaveLayout();
           this.render();
         },
-        onRefresh: async () => {
-          await this.plugin.taskManager.loadTasks();
+        onRefresh: () => {
+          void this.plugin.taskManager.loadTasks();
         },
         onAdd: () => {
-          new QuickAddModal(this.app, this.plugin.taskManager).open();
+          const modal = new QuickAddModal(this.app, this.plugin.taskManager);
+          modal.open();
         }
       },
       {
         highlightAddButton: !this.plugin.settings.hasSeenWelcome,
         onHighlightDismiss: () => {
           this.plugin.settings.hasSeenWelcome = true;
-          void this.plugin.saveSettings().then(() => this.plugin.refreshViews());
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
         }
       }
     );
     this.headerComponent.render();
     const list = new TaskListComponent(this.contentEl, this.app, {
-      onToggle: (t) => this.plugin.taskManager.toggleTaskCompletion(t),
-      onEdit: async (t, newTitle, newDate) => {
-        await this.plugin.taskManager.updateTask(t, newTitle, newDate);
+      onToggle: (t) => {
+        void this.plugin.taskManager.toggleTaskCompletion(t);
       },
-      onDelete: async (t) => {
-        await this.plugin.taskManager.deleteTask(t);
+      onEdit: (t, newTitle, newDate) => {
+        void this.plugin.taskManager.updateTask(t, newTitle, newDate);
+      },
+      onDelete: (t) => {
+        void this.plugin.taskManager.deleteTask(t);
       }
     }, this.plugin.settings);
     list.render(this.plugin.taskManager.getFilteredTasks());
@@ -1640,7 +1637,9 @@ var StatsView = class extends import_obsidian12.ItemView {
     this.tabContainer = null;
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
-    this.plugin.taskManager.on("tasks-updated", () => this.render());
+    this.plugin.taskManager.on("tasks-updated", () => {
+      this.render();
+    });
   }
   getViewType() {
     return VIEW_TYPE_STATS;
@@ -1653,7 +1652,7 @@ var StatsView = class extends import_obsidian12.ItemView {
   }
   async setState(state, result) {
     const parsedState = state;
-    if (parsedState == null ? void 0 : parsedState.headerState) {
+    if (parsedState.headerState) {
       this.headerState = parsedState.headerState;
     }
     await super.setState(state, result);
@@ -1665,16 +1664,18 @@ var StatsView = class extends import_obsidian12.ItemView {
     }
     return { headerState: this.headerState };
   }
-  async onOpen() {
+  onOpen() {
     const dom = setupViewDOM(this.containerEl, true);
     this.leafRootEl = dom.leafRootEl;
     this.tabContainer = dom.tabContainer;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.render();
+    return Promise.resolve();
   }
-  async onClose() {
+  onClose() {
     cleanupViewDOM(this.leafRootEl, this.tabContainer);
+    return Promise.resolve();
   }
   render() {
     this.contentEl.empty();
@@ -1690,8 +1691,8 @@ var StatsView = class extends import_obsidian12.ItemView {
           this.app.workspace.requestSaveLayout();
           this.render();
         },
-        onRefresh: async () => {
-          await this.plugin.taskManager.loadTasks();
+        onRefresh: () => {
+          void this.plugin.taskManager.loadTasks();
         }
       }
     );
@@ -1716,6 +1717,9 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
   }
   async onload() {
     await this.loadSettings();
+    if (this.settings.savedFocusLayout) {
+      this.isFocusMode = true;
+    }
     const parser = new TaskParser(this.app, this.settings);
     this.taskManager = new TaskManager(parser, this.app);
     this.registerView(VIEW_TYPE_DASHBOARD, (leaf) => new DashboardView(leaf, this));
@@ -1731,19 +1735,23 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
       }
       const menu = new import_obsidian13.Menu();
       menu.addItem(
-        (item) => item.setTitle("Open dashboard").setIcon("layout-dashboard").onClick(() => {
+        (item) => item.setTitle("Add Widget").setIcon("layout-dashboard").onClick(() => {
           void this.activateView(VIEW_TYPE_DASHBOARD);
         })
       );
       menu.addItem(
-        (item) => item.setTitle("Quick add task").setIcon("plus-circle").onClick(() => new QuickAddModal(this.app, this.taskManager).open())
+        (item) => item.setTitle("Quick add task").setIcon("plus-circle").onClick(() => {
+          new QuickAddModal(this.app, this.taskManager).open();
+        })
       );
       menu.addSeparator();
       menu.addItem(
-        (item) => item.setTitle(this.isLayoutLocked ? "Unlock layout" : "Lock layout").setIcon(this.isLayoutLocked ? "unlock" : "lock").onClick(() => this.toggleLayoutMode())
+        (item) => item.setTitle(this.isLayoutLocked ? "Unlock Layout" : "Lock Layout").setIcon(this.isLayoutLocked ? "unlock" : "lock").onClick(() => {
+          this.toggleLayoutMode();
+        })
       );
       menu.addItem(
-        (item) => item.setTitle(this.isFocusMode ? "Exit focus mode" : "Enter focus mode").setIcon(this.isFocusMode ? "eye" : "eye-off").onClick(() => {
+        (item) => item.setTitle(this.isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode").setIcon(this.isFocusMode ? "eye" : "eye-off").onClick(() => {
           void this.toggleFocusMode();
         })
       );
@@ -1782,7 +1790,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     });
     this.addCommand({
       id: "quick-add-task",
-      name: "Quick add task",
+      name: "Quick Add Task",
       callback: () => {
         new QuickAddModal(this.app, this.taskManager).open();
       }
@@ -1790,7 +1798,9 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     this.addCommand({
       id: "refresh-dashboard-styles",
       name: "Reload dashboard colors/styles",
-      callback: () => this.refreshViews()
+      callback: () => {
+        this.refreshViews();
+      }
     });
     if (!this.settings.hasSeenWelcome) {
       setTimeout(() => {
@@ -1820,41 +1830,40 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
   async toggleFocusMode() {
     const workspace = this.app.workspace;
     if (!this.isFocusMode) {
-      this.savedLayout = this.app.workspace.getLayout();
+      this.settings.savedFocusLayout = this.app.workspace.getLayout();
       this.isFocusMode = true;
-      if (workspace.leftSplit && typeof workspace.leftSplit.collapse === "function") {
-        workspace.leftSplit.collapse();
-      }
-      if (workspace.rightSplit && typeof workspace.rightSplit.collapse === "function") {
-        workspace.rightSplit.collapse();
-      }
+      await this.saveSettings();
+      if (typeof workspace.leftSplit.collapse === "function") workspace.leftSplit.collapse();
+      if (typeof workspace.rightSplit.collapse === "function") workspace.rightSplit.collapse();
       const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
       let closedCount = 0;
       viewTypes.forEach((type) => {
-        this.app.workspace.getLeavesOfType(type).forEach((leaf) => {
-          leaf.detach();
-          closedCount++;
-        });
+        const leaves = this.app.workspace.getLeavesOfType(type);
+        if (leaves.length > 0) {
+          closedCount += leaves.length;
+          this.app.workspace.detachLeavesOfType(type);
+        }
       });
-      if (closedCount > 0) {
-        new import_obsidian13.Notice("Focus mode enabled");
-      } else {
+      if (closedCount > 0) new import_obsidian13.Notice("Focus mode enabled");
+      else {
         this.isFocusMode = false;
-        this.savedLayout = null;
+        this.settings.savedFocusLayout = null;
+        await this.saveSettings();
         new import_obsidian13.Notice("No TaskLenses were open");
       }
     } else {
       this.isFocusMode = false;
-      if (this.savedLayout) {
-        await workspace.setLayout(this.savedLayout);
-        this.savedLayout = null;
+      if (this.settings.savedFocusLayout) {
+        await workspace.setLayout(this.settings.savedFocusLayout);
+        this.settings.savedFocusLayout = null;
+        await this.saveSettings();
         new import_obsidian13.Notice("Focus mode disabled");
       }
     }
   }
   async activateView(viewType) {
     let leaf = this.app.workspace.getLeaf(false);
-    if (leaf && leaf.view.getViewType() !== "empty") {
+    if (leaf.view.getViewType() !== "empty") {
       leaf = this.app.workspace.getLeaf("split");
     }
     await leaf.setViewState({ type: viewType, active: true });
@@ -1864,12 +1873,14 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
       new import_obsidian13.Notice("Layout auto-unlocked for placement \u{1F513}");
     } else {
       const tabContainer = leaf.view.containerEl.closest(".workspace-tabs");
-      if (tabContainer)
+      if (tabContainer instanceof HTMLElement) {
         tabContainer.classList.remove("tasklens-hide-tabs");
+      }
     }
   }
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {});
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -1883,8 +1894,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
         if (typeof view.refreshFromSettings === "function") {
           view.refreshFromSettings();
         } else if (typeof view.render === "function") {
-          if (typeof view.applyColorTheme === "function")
-            view.applyColorTheme();
+          if (typeof view.applyColorTheme === "function") view.applyColorTheme();
           view.render();
         }
       });

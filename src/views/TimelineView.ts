@@ -2,19 +2,23 @@ import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
-import { setupViewDOM, cleanupViewDOM } from './DashboardView';
+import { setupViewDOM, cleanupViewDOM } from './DashboardView'; // <-- Missing import added
 
 export const VIEW_TYPE_TIMELINE = 'tasklens-timeline-view';
 
 export class TimelineView extends ItemView {
-    private leafRootEl: HTMLElement | null = null;
-    private tabContainer: HTMLElement | null = null;
+    private leafRootEl: Element | null = null;
+    private tabContainer: Element | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
+    private isOpen = false; // <-- Missing property added
 
     constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
         super(leaf);
-        this.plugin.taskManager.on('tasks-updated', () => this.render());
+        // Subscribe to shared updates
+        this.plugin.taskManager.on('tasks-updated', () => {
+            if (this.isOpen) this.render();
+        });
     }
 
     getViewType() { return VIEW_TYPE_TIMELINE; }
@@ -22,9 +26,9 @@ export class TimelineView extends ItemView {
     getIcon() { return 'calendar-range'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
-        const parsedState = state as any;
-        if (parsedState?.headerState) {
-            this.headerState = parsedState.headerState;
+        const parsedState = state as Record<string, unknown>;
+        if (parsedState.headerState) {
+            this.headerState = parsedState.headerState as HeaderState;
         }
         await super.setState(state, result);
         this.render();
@@ -34,10 +38,10 @@ export class TimelineView extends ItemView {
         if (this.headerComponent) {
             this.headerState = this.headerComponent.getState();
         }
-        return { headerState: this.headerState as unknown };
+        return { headerState: this.headerState as unknown } as Record<string, unknown>;
     }
 
-    async onOpen() {
+    onOpen(): Promise<void> {
         const dom = setupViewDOM(this.containerEl, true);
         this.leafRootEl = dom.leafRootEl;
         this.tabContainer = dom.tabContainer;
@@ -45,16 +49,22 @@ export class TimelineView extends ItemView {
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
         this.contentEl.addClass('is-single-view');
+        this.isOpen = true;
 
-        await this.plugin.taskManager.loadTasks();
-        this.render();
+        void this.plugin.taskManager.loadTasks().then(() => { this.render(); });
+
+        return Promise.resolve();
     }
 
-    async onClose(): Promise<void> {
+    onClose(): Promise<void> {
+        this.isOpen = false;
         cleanupViewDOM(this.leafRootEl, this.tabContainer);
+
+        return Promise.resolve();
     }
 
     render() {
+        if (!this.isOpen || !this.contentEl.isConnected) return;
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -69,8 +79,8 @@ export class TimelineView extends ItemView {
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
-                onRefresh: async () => {
-                    await this.plugin.taskManager.loadTasks();
+                onRefresh: () => {
+                    void this.plugin.taskManager.loadTasks();
                 }
             }
         );

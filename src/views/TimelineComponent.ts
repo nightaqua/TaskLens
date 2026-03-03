@@ -26,7 +26,7 @@ export class TimelineComponent {
     }
 
     private getCourseColor(courseName: string): string {
-        if (this.settings?.topicColors && this.settings.topicColors[courseName]) {
+        if (this.settings.topicColors[courseName]) {
             return this.settings.topicColors[courseName];
         }
         
@@ -47,7 +47,9 @@ export class TimelineComponent {
             return;
         }
 
-        const dates = validTasks.map(t => t.dueDate!);
+        const dates = validTasks
+            .map(t => t.dueDate)
+            .filter((d): d is Date => Boolean(d));
         dates.push(new Date());
 
         const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
@@ -73,7 +75,7 @@ export class TimelineComponent {
 
         // Ensure width scales perfectly to fit all days
         const totalWidthPercent = (allDays.length / this.daysToShow) * 100;
-        scrollContent.style.width = `${totalWidthPercent}%`;
+        scrollContent.style.width = String(totalWidthPercent) + '%';
 
         const colWidthPercent = 100 / allDays.length;
 
@@ -91,8 +93,8 @@ export class TimelineComponent {
                     const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
                     const mDiv = monthHeader.createDiv('timeline-month-cell');
                     mDiv.setText(monthName);
-                    mDiv.style.width = `${span * colWidthPercent}%`;
-                    mDiv.style.left = `${monthStartIdx * colWidthPercent}%`;
+                    mDiv.style.width = String(span * colWidthPercent) + '%';
+                    mDiv.style.left = String(monthStartIdx * colWidthPercent) + '%';
                 }
                 currentMonth = m;
                 monthStartIdx = idx;
@@ -103,23 +105,23 @@ export class TimelineComponent {
         const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
         const mDiv = monthHeader.createDiv('timeline-month-cell');
         mDiv.setText(monthName);
-        mDiv.style.width = `${span * colWidthPercent}%`;
-        mDiv.style.left = `${monthStartIdx * colWidthPercent}%`;
+        mDiv.style.width = String(span * colWidthPercent) + '%';
+        mDiv.style.left = String(monthStartIdx * colWidthPercent) + '%';
 
         // 4. GRID & DAYS (Solid grid lines)
         const grid = scrollContent.createDiv('timeline-grid');
-        grid.style.gridTemplateColumns = `repeat(${allDays.length}, 1fr)`;
+        grid.style.gridTemplateColumns = `repeat(${String(allDays.length)}, 1fr)`;
 
         allDays.forEach((day, idx) => {
             const cell = grid.createDiv('timeline-header-cell');
             cell.setText(day.getDate().toString());
             const dayName = day.toLocaleString('default', { weekday: 'short' });
             cell.createDiv('timeline-day-name').setText(dayName);
-            cell.style.gridColumn = `${idx + 1}`;
+            cell.style.gridColumn = String(idx + 1);
             cell.style.gridRow = `1`;
 
             const bgCell = grid.createDiv('timeline-bg-cell');
-            bgCell.style.gridColumn = `${idx + 1}`;
+            bgCell.style.gridColumn = String(idx + 1);
             bgCell.style.gridRow = `2 / -1`;
 
             if (day.getDate() === 1) {
@@ -132,7 +134,7 @@ export class TimelineComponent {
                 bgCell.addClass('is-today-bg');
 
                 const marker = grid.createDiv('timeline-today-marker');
-                marker.style.gridColumn = `${idx + 1}`;
+                marker.style.gridColumn = String(idx + 1);
                 marker.style.gridRow = `1 / -1`;
             }
         });
@@ -141,11 +143,12 @@ export class TimelineComponent {
         validTasks.forEach((task, rowIndex) => {
             const rowBg = grid.createDiv('timeline-row-bg');
             rowBg.style.gridColumn = `1 / -1`;
-            rowBg.style.gridRow = `${rowIndex + 2}`;
+            rowBg.style.gridRow = String(rowIndex + 2);
 
             // Treat start date as due date if no start date exists
-            const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate!);
-            const taskEnd = new Date(task.dueDate!);
+            if (!task.dueDate) return;
+            const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
+            const taskEnd = new Date(task.dueDate);
 
             // Normalize times to midnight to avoid timezone shifting bugs
             taskStart.setHours(0,0,0,0);
@@ -164,7 +167,7 @@ export class TimelineComponent {
                 const bar = grid.createDiv('timeline-task-bar');
                 bar.setText(task.title);
 
-                if (this.settings?.colorMode === 'course' && task.fileName) {
+                if (this.settings.colorMode === 'course' && task.fileName) {
                     bar.style.backgroundColor = this.getCourseColor(task.fileName);
                 } else {
                     const status = getTaskStatus(task);
@@ -177,17 +180,17 @@ export class TimelineComponent {
                 // Calculate how many days the task spans (minimum 1 day)
                 const span = (dueIdx - startIdx) + 1;
 
-                bar.style.gridColumnStart = `${startIdx + 1}`;
-                bar.style.gridColumnEnd = `span ${span}`;
-                bar.style.gridRow = `${rowIndex + 2}`;
+                bar.style.gridColumnStart = String(startIdx + 1);
+                bar.style.gridColumnEnd = `span ${String(span)}`;
+                bar.style.gridRow = String(rowIndex + 2);
 
-                bar.addEventListener('mouseenter', (e) => this.showTooltip(e, task));
-                bar.addEventListener('mouseleave', () => this.hideTooltip());
-                bar.addEventListener('mousemove', (e) => this.moveTooltip(e));
+                bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task); });
+                bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
+                bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
 
                 bar.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.openTaskFile(task);
+                    void this.openTaskFile(task);
                 });
             }
         });
@@ -205,15 +208,18 @@ export class TimelineComponent {
             this.scrollContainer.scrollTo({ left: pos, behavior: 'auto' });
         }
     }
+
     public scrollToToday(): void {
         setTimeout(() => {
             if (!this.scrollContainer) return;
-            const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today') as HTMLElement;
-            if (todayCell) {
+            const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today');
+
+            // Guard: Only scroll if the cell actually exists in the DOM
+            if (todayCell instanceof HTMLElement) {
                 const scrollPos = todayCell.offsetLeft - (this.scrollContainer.clientWidth / 2) + (todayCell.clientWidth / 2);
-                this.scrollContainer.scrollTo({ left: scrollPos, behavior: 'smooth' });
+                this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
             }
-        }, 100);
+        }, 300); // 300ms ensures the widget is fully visible before math happens
     }
 
     // --- PUBLIC SCROLL METHOD ---
@@ -274,20 +280,20 @@ export class TimelineComponent {
             this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${task.dueDate.toDateString()}`);
         }
 
-        this.tooltipEl.style.display = 'block';
+        this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
     }
 
     private moveTooltip(e: MouseEvent): void {
         if (this.tooltipEl) {
-            this.tooltipEl.style.top = `${e.clientY + 15}px`;
-            this.tooltipEl.style.left = `${e.clientX + 15}px`;
+            this.tooltipEl.style.top = String(e.clientY + 15) + 'px';
+            this.tooltipEl.style.left = String(e.clientX + 15) + 'px';
         }
     }
 
     private hideTooltip(): void {
         if (this.tooltipEl) {
-            this.tooltipEl.style.display = 'none';
+            this.tooltipEl.setCssProps({ display: 'none' });
         }
     }
 

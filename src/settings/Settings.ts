@@ -24,6 +24,8 @@ export interface SemesterSettings {
 
     hasSeenWelcome: boolean;
     hasClickedRibbonIcon: boolean;
+
+    savedFocusLayout?: unknown;
 }
 
 export const DEFAULT_SETTINGS: SemesterSettings = {
@@ -46,11 +48,12 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
     topicColors: {},
 
     hasSeenWelcome: false,
-    hasClickedRibbonIcon: false
+    hasClickedRibbonIcon: false,
+    savedFocusLayout: null
 };
 
 export function getTopicColor(topic: string, settings: SemesterSettings): string {
-    if (settings?.topicColors && settings.topicColors[topic]) {
+    if (settings.topicColors[topic]) {
         return settings.topicColors[topic];
     }
     const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
