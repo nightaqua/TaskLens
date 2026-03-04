@@ -151,7 +151,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.headerComponent = new HeaderComponent(
             this.contentEl,
             this.headerState,
-            'TaskLens dashboard',
+            'Tasklens dashboard',
             {
                 onStateChange: () => {
                     if (this.headerComponent) {

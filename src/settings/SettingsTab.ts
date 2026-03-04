@@ -18,7 +18,7 @@ export class SettingsTab extends PluginSettingTab {
 
         // --- NATIVE HEADER WITH HELP BUTTON ---
         new Setting(containerEl)
-            .setName('TaskLens settings')
+            .setName('configuration')
             .setHeading()
             .addExtraButton(btn => btn
                 .setIcon('help-circle')

@@ -18,7 +18,7 @@ export class StatsView extends ItemView {
     }
 
     getViewType() { return VIEW_TYPE_STATS; }
-    getDisplayText() { return 'Dashboard Stats'; }
+    getDisplayText() { return 'dashboard stats'; }
     getIcon() { return 'bar-chart-3'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {

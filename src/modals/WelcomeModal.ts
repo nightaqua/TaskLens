@@ -13,7 +13,7 @@ export class WelcomeModal extends Modal {
 
         const header = contentEl.createDiv('welcome-header');
         header.setCssProps({ 'text-align': 'center', 'margin-bottom': '20px' });
-        header.createEl('h1', { text: 'Welcome to TaskLens 🚀' });
+        header.createEl('h1', { text: 'Welcome to tasklens 🚀' });
         header.createEl('p', { text: 'Your command center for tasks, timelines, and projects.', cls: 'text-muted' });
 
         const tutorial = contentEl.createDiv('welcome-tutorial');
@@ -28,7 +28,7 @@ export class WelcomeModal extends Modal {
 
         new Setting(contentEl)
             .setName('Do not show this window again')
-            .setDesc('You can always reopen this from the Settings tab.')
+            .setDesc('You can always reopen this from the settings tab.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.hasSeenWelcome)
                 .onChange(value => {

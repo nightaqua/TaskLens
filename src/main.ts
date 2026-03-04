@@ -47,7 +47,7 @@ export default class TaskLensPlugin extends Plugin {
 
         addIcon('tasklens-icon', TASKLENS_ICON);
 
-        const ribbonIconEl = this.addRibbonIcon('tasklens-icon', 'TaskLens', (evt: MouseEvent) => {
+        const ribbonIconEl = this.addRibbonIcon('tasklens-icon', 'Tasklens', (evt: MouseEvent) => {
             ribbonIconEl.removeClass('feature-highlight');
             if (!this.settings.hasClickedRibbonIcon) {
                 this.settings.hasClickedRibbonIcon = true;
@@ -58,7 +58,7 @@ export default class TaskLensPlugin extends Plugin {
 
             menu.addItem((item) =>
                 item
-                    .setTitle('Add Widget')
+                    .setTitle('Add widget')
                     .setIcon('layout-dashboard')
                     .onClick(() => { void this.activateView(VIEW_TYPE_DASHBOARD); })
             );
@@ -119,7 +119,7 @@ export default class TaskLensPlugin extends Plugin {
 
         this.addCommand({
             id: 'quick-add-task',
-            name: 'Quick Add Task',
+            name: 'Quick add task',
             callback: () => {
                 new QuickAddModal(this.app, this.taskManager).open();
             }
@@ -191,7 +191,7 @@ export default class TaskLensPlugin extends Plugin {
                 this.isFocusMode = false;
                 this.settings.savedFocusLayout = null;
                 await this.saveSettings();
-                new Notice('No TaskLenses were open');
+                new Notice('No tasklenses were open');
             }
         } else {
             this.isFocusMode = false;

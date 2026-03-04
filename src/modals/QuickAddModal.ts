@@ -12,13 +12,13 @@ export class QuickAddModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
-        contentEl.createEl('h2', { text: 'Quick Add Task' });
+        contentEl.createEl('h2', { text: 'Quick add task' });
 
         // 1. Task Title
         new Setting(contentEl)
             .setName('Task')
             .addText(text => { text
-                .setPlaceholder('Read Chapter 4...')
+                .setPlaceholder('Read chapter 4...')
                 .onChange(value => this.title = value)
                 .inputEl.focus(); });
 
@@ -32,7 +32,7 @@ export class QuickAddModal extends Modal {
                 const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
                 // Add the Cursor option first
-                drop.addOption('__CURSOR__', '📍 Insert at Cursor (Active File)');
+                drop.addOption('__CURSOR__', '📍 Insert at cursor (active file)');
 
                 // Use the smart scanned files list instead of the whole vault
                 const allFiles = this.taskManager.getScannedFiles();
@@ -55,7 +55,7 @@ export class QuickAddModal extends Modal {
 
         // 3. Due Date
         new Setting(contentEl)
-            .setName('Due Date')
+            .setName('Due date')
             .addText(text => {
                 text.inputEl.type = 'date';
                 text.onChange(value => this.date = value);
@@ -64,7 +64,7 @@ export class QuickAddModal extends Modal {
         // 4. Buttons
         new Setting(contentEl)
             .addButton(btn => btn
-                .setButtonText('Add Task')
+                .setButtonText('Add task')
                 .setCta()
                 .onClick(() => {
                     if (!this.title || !this.selectedFile) return;
