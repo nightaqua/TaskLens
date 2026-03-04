@@ -99,7 +99,7 @@ export class HeaderComponent {
             const addBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
             if (this.highlightAddButton) addBtn.addClass('feature-highlight');
             setIcon(addBtn, 'plus');
-            addBtn.setAttribute('aria-label', 'quick add task');
+            addBtn.setAttribute('aria-label', 'Quick add task');
             addBtn.addEventListener('click', () => {
                 if (this.highlightAddButton) {
                     this.highlightAddButton = false;
@@ -112,7 +112,7 @@ export class HeaderComponent {
 
         const refreshBtn = rightGroup.createEl('button', { cls: 'dashboard-refresh-btn header-icon-btn' });
         setIcon(refreshBtn, 'refresh-cw');
-        refreshBtn.setAttribute('aria-label', 'refresh data');
+        refreshBtn.setAttribute('aria-label', 'Refresh data');
         refreshBtn.addEventListener('click', () => {
             refreshBtn.addClass('is-rotating');
             this.onRefresh();
@@ -121,7 +121,7 @@ export class HeaderComponent {
 
         const hideBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
         setIcon(hideBtn, 'panel-top-close');
-        hideBtn.setAttribute('aria-label', 'hide header');
+        hideBtn.setAttribute('aria-label', 'Hide header');
         hideBtn.addEventListener('click', () => {
             this.isCollapsed = true;
             this.updateVisibility();

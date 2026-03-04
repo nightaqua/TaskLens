@@ -18,7 +18,7 @@ export class SettingsTab extends PluginSettingTab {
 
         // --- NATIVE HEADER WITH HELP BUTTON ---
         new Setting(containerEl)
-            .setName('configuration')
+            .setName('Configuration')
             .setHeading()
             .addExtraButton(btn => btn
                 .setIcon('help-circle')

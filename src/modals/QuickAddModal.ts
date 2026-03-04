@@ -32,7 +32,7 @@ export class QuickAddModal extends Modal {
                 const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
                 // Add the Cursor option first
-                drop.addOption('__CURSOR__', '📍 Insert at cursor (active file)');
+                drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
 
                 // Use the smart scanned files list instead of the whole vault
                 const allFiles = this.taskManager.getScannedFiles();

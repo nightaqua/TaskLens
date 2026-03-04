@@ -77,7 +77,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     }
 
     getViewType(): string { return VIEW_TYPE_DASHBOARD; }
-    getDisplayText(): string { return 'TaskLens dashboard'; }
+    getDisplayText(): string { return 'Tasklens dashboard'; }
     getIcon(): string { return 'layout-dashboard'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
