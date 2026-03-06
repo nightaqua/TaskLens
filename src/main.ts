@@ -241,3 +241,5 @@ export default class TaskLensPlugin extends Plugin {
         });
     }
 }
+
+/* #TODO constants file*/
