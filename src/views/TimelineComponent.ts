@@ -3,11 +3,11 @@ import { App, MarkdownView, TFile } from 'obsidian';
 import { SemesterSettings } from '../settings/Settings';
 
 export class TimelineComponent {
-    private container: HTMLElement;
-    private tasks: Task[];
-    private daysToShow: number;
-    private app: App;
-    private settings: SemesterSettings;
+    private readonly container: HTMLElement;
+    private readonly tasks: Task[];
+    private readonly daysToShow: number;
+    private readonly app: App;
+    private readonly settings: SemesterSettings;
 
     private scrollContainer: HTMLElement | null = null;
     private tooltipEl: HTMLElement | null = null;
@@ -25,15 +25,26 @@ export class TimelineComponent {
         this.settings = settings;
     }
 
-    private getCourseColor(courseName: string): string {
-        if (this.settings.topicColors[courseName]) {
-            return this.settings.topicColors[courseName];
-        }
-        
-        const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
+    // Fix: "Duplicated code fragment (4 lines long)"
+    private getPaletteColor(index: number): string {
+        const palette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
+        return palette[index % palette.length];
+    }
+
+    private getTopicColor(topic: string): string {
+        if (this.settings.topicColors[topic]) return this.settings.topicColors[topic];
         let hash = 0;
-        for (let i = 0; i < courseName.length; i++) hash = courseName.charCodeAt(i) + ((hash << 5) - hash);
-        return defaultPalette[Math.abs(hash) % defaultPalette.length];
+        for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
+        return this.getPaletteColor(Math.abs(hash));
+    }
+
+    // Fix: "Duplicated code fragment (5 lines long)" (Month Name logic)
+    private renderMonthCell(headerRow: HTMLElement, day: Date, span: number, colWidth: number, startIdx: number): void {
+        const monthName = day.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const mDiv = headerRow.createDiv('timeline-month-cell');
+        mDiv.setText(monthName);
+        mDiv.style.width = `${String(span * colWidth)}%`;
+        mDiv.style.left = `${String(startIdx * colWidth)}%`;
     }
 
     public render(): void {
@@ -90,11 +101,7 @@ export class TimelineComponent {
             if (m !== currentMonth) {
                 if (currentMonth !== -1) {
                     const span = idx - monthStartIdx;
-                    const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
-                    const mDiv = monthHeader.createDiv('timeline-month-cell');
-                    mDiv.setText(monthName);
-                    mDiv.style.width = String(span * colWidthPercent) + '%';
-                    mDiv.style.left = String(monthStartIdx * colWidthPercent) + '%';
+                    this.renderMonthCell(monthHeader, allDays[monthStartIdx], span, colWidthPercent, monthStartIdx);
                 }
                 currentMonth = m;
                 monthStartIdx = idx;
@@ -102,11 +109,7 @@ export class TimelineComponent {
         });
 
         const span = allDays.length - monthStartIdx;
-        const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
-        const mDiv = monthHeader.createDiv('timeline-month-cell');
-        mDiv.setText(monthName);
-        mDiv.style.width = String(span * colWidthPercent) + '%';
-        mDiv.style.left = String(monthStartIdx * colWidthPercent) + '%';
+        this.renderMonthCell(monthHeader, allDays[monthStartIdx], span, colWidthPercent, monthStartIdx);
 
         // 4. GRID & DAYS (Solid grid lines)
         const grid = scrollContent.createDiv('timeline-grid');
@@ -139,55 +142,88 @@ export class TimelineComponent {
             }
         });
 
-        // 5. TASKS
-        validTasks.forEach((task, rowIndex) => {
-            const rowBg = grid.createDiv('timeline-row-bg');
-            rowBg.style.gridColumn = `1 / -1`;
-            rowBg.style.gridRow = String(rowIndex + 2);
+        // 5. TASKS --- COMPACT PACKING LOGIC WITH TOPIC GROUPING ---
+        const rowEndTimes: number[] = [];
 
-            // Treat start date as due date if no start date exists
+        // Sort by FileName (Topic) first, then by Start Date
+        const sortedTasks = [...validTasks].sort((a, b) => {
+            // Sort by Topic (fileName) alphabetically
+            if (a.fileName !== b.fileName) {
+                return (a.fileName || "").localeCompare(b.fileName || "");
+            }
+
+            // If topics are the same, sort by date
+            const aStart = a.startDate?.getTime() || a.dueDate?.getTime() || 0;
+            const bStart = b.startDate?.getTime() || b.dueDate?.getTime() || 0;
+            return aStart - bStart;
+        });
+
+        let lastTopic = "";
+
+        sortedTasks.forEach((task) => {
+            // If the topic changes, we can choose to reset the packer to start a new "band"
+            if (task.fileName !== lastTopic) {
+                // To keep it ULTRA compact, don't clear rowEndTimes.
+                // To keep it grouped in distinct blocks, uncomment the line below:
+                // rowEndTimes.length = 0;
+                lastTopic = task.fileName || "";
+            }
+
             if (!task.dueDate) return;
             const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
             const taskEnd = new Date(task.dueDate);
 
-            // Normalize times to midnight to avoid timezone shifting bugs
-            taskStart.setHours(0,0,0,0);
-            taskEnd.setHours(0,0,0,0);
+            taskStart.setHours(0, 0, 0, 0);
+            taskEnd.setHours(0, 0, 0, 0);
 
-            // Find columns
             let startIdx = allDays.findIndex(d => d.toDateString() === taskStart.toDateString());
             let dueIdx = allDays.findIndex(d => d.toDateString() === taskEnd.toDateString());
 
-            // If task starts before our rendered timeline, snap it to the left edge
             if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
-            // If task ends after our rendered timeline, snap it to the right edge
             if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
 
             if (dueIdx >= 0 && startIdx >= 0) {
+                // --- COMPACT ROW CALCULATION ---
+                let rowIndex = rowEndTimes.findIndex(endTime => endTime < taskStart.getTime());
+
+                if (rowIndex === -1) {
+                    // No existing row is free; add a new one
+                    rowIndex = rowEndTimes.length;
+                    rowEndTimes.push(taskEnd.getTime());
+
+                    // Add background for the new row
+                    const rowBg = grid.createDiv('timeline-row-bg');
+                    rowBg.style.gridColumn = '1 / -1';
+                    rowBg.style.gridRow = String(rowIndex + 2);
+                } else {
+                    // Re-use the existing row and update its new end time
+                    rowEndTimes[rowIndex] = taskEnd.getTime();
+                }
+
                 const bar = grid.createDiv('timeline-task-bar');
                 bar.setText(task.title);
 
                 if (this.settings.colorMode === 'course' && task.fileName) {
-                    bar.style.backgroundColor = this.getCourseColor(task.fileName);
+                    bar.style.backgroundColor = this.getTopicColor(task.fileName);
                 } else {
                     const status = getTaskStatus(task);
-                    if (status === TaskStatus.Overdue) bar.addClass('status-overdue');
-                    if (status === TaskStatus.Urgent) bar.addClass('status-urgent');
-                    if (status === TaskStatus.Completed) bar.addClass('status-completed');
-                    if (status === TaskStatus.UpcomingWeek) bar.addClass('status-active');
+                    const classes: Record<string, string> = {
+                        [TaskStatus.Overdue]: 'status-overdue',
+                        [TaskStatus.Urgent]: 'status-urgent',
+                        [TaskStatus.Completed]: 'status-completed',
+                        [TaskStatus.UpcomingWeek]: 'status-active'
+                    };
+                    if (classes[status]) bar.addClass(classes[status]);
                 }
 
-                // Calculate how many days the task spans (minimum 1 day)
                 const span = (dueIdx - startIdx) + 1;
-
                 bar.style.gridColumnStart = String(startIdx + 1);
-                bar.style.gridColumnEnd = `span ${String(span)}`;
+                bar.style.gridColumnEnd = 'span ' + String(span);
                 bar.style.gridRow = String(rowIndex + 2);
 
                 bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task); });
                 bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
                 bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
-
                 bar.addEventListener('click', (e) => {
                     e.stopPropagation();
                     void this.openTaskFile(task);
@@ -299,15 +335,16 @@ export class TimelineComponent {
 
     private async openTaskFile(task: Task): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file instanceof TFile) {
-            const leaf = this.app.workspace.getLeaf(false);
-            await leaf.openFile(file);
+        if (!(file instanceof TFile)) return;
 
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view) {
-                view.editor.setCursor({ line: task.lineNumber, ch: 0 });
-                view.editor.scrollIntoView({ from: {line: task.lineNumber, ch: 0}, to: {line: task.lineNumber, ch: 0} }, true);
-            }
+        const leaf = this.app.workspace.getLeaf(false);
+        await leaf.openFile(file);
+
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view) {
+            const pos = { line: task.lineNumber, ch: 0 };
+            view.editor.setCursor(pos);
+            view.editor.scrollIntoView({ from: pos, to: pos }, true);
         }
     }
 }

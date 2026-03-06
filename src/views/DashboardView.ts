@@ -81,33 +81,55 @@ export class DashboardView extends ItemView implements RefreshableView {
     getIcon(): string { return 'layout-dashboard'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
-        if (state && Object.keys(state as Record<string, unknown>).length > 0) {
-            const parsedState = state as Record<string, unknown>;
-            // Safe fallback: If undefined (new leaf), keep it true!
-            this.showControls = parsedState.showControls !== undefined ? parsedState.showControls as boolean : true;
-            this.showTimeline = parsedState.showTimeline !== undefined ? parsedState.showTimeline as boolean : true;
-            this.showList = parsedState.showList !== undefined ? parsedState.showList as boolean : true;
-            this.showStats = parsedState.showStats !== undefined ? parsedState.showStats as boolean : true;
-            this.timelineDaysToShow = parsedState.zoomLevel !== undefined ? parsedState.zoomLevel as number : 10;
+        await super.setState(state, result);
 
-            if (parsedState.statusFilter) this.taskManager.setStatusFilter(parsedState.statusFilter as TaskStatus);
-            if (parsedState.courseFilter) this.taskManager.setCourseFilter(parsedState.courseFilter as string);
-            if (parsedState.headerState) this.headerState = parsedState.headerState as HeaderState;
-        } else {
-            // Completely fresh widget - set defaults
-            this.showControls = true;
-            this.showTimeline = true;
-            this.showList = true;
-            this.showStats = true;
+        // 1. Guard against null or non-objects immediately
+        if (!state || typeof state !== 'object') {
+            this.render();
+            return;
         }
 
-        await super.setState(state, result);
+        let s = state as Record<string, unknown>;
+
+        // 2. Handle nested state without the redundant 'if (s &&'
+        if (s.state && typeof s.state === 'object') {
+            s = s.state as Record<string, unknown>;
+        }
+
+        // 3. Only override if the object has actual keys
+        if (Object.keys(s).length > 0) {
+
+            if (Object.prototype.hasOwnProperty.call(s, 'showControls')) this.showControls = s.showControls as boolean;
+            if (Object.prototype.hasOwnProperty.call(s, 'showTimeline')) this.showTimeline = s.showTimeline as boolean;
+            if (Object.prototype.hasOwnProperty.call(s, 'showList')) this.showList = s.showList as boolean;
+            if (Object.prototype.hasOwnProperty.call(s, 'showStats')) this.showStats = s.showStats as boolean;
+            if (Object.prototype.hasOwnProperty.call(s, 'zoomLevel')) this.timelineDaysToShow = s.zoomLevel as number;
+
+            if (s.statusFilter) this.taskManager.setStatusFilter(s.statusFilter as TaskStatus);
+            if (s.courseFilter) this.taskManager.setCourseFilter(s.courseFilter as string);
+            if (s.headerState) this.headerState = s.headerState as HeaderState;
+        }
+
         this.render();
 
-        // Ensure timeline scrolls to today on restore
         setTimeout(() => {
             if (this.timelineComponent) this.timelineComponent.scrollToToday();
         }, 300);
+    }
+
+    getState(): Record<string, unknown> {
+        const filters = this.taskManager.getCurrentFilters();
+
+        return Object.assign(super.getState(), {
+            showControls: this.showControls,
+            showTimeline: this.showTimeline,
+            showList: this.showList,
+            showStats: this.showStats,
+            zoomLevel: this.timelineDaysToShow,
+            statusFilter: filters.status,
+            courseFilter: filters.course,
+            headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState
+        });
     }
 
     onOpen(): Promise<void> {
