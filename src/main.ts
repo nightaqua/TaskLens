@@ -182,7 +182,7 @@ export default class TaskLensPlugin extends Plugin {
                 this.isFocusMode = false;
                 this.settings.savedFocusLayout = null;
                 await this.saveSettings();
-                new Notice('No tasklenses were open');
+                new Notice('No task lenses were open');
             }
         } else {
             this.isFocusMode = false;

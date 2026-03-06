@@ -12,6 +12,7 @@
   "author": "Selim",
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.4",
     "@types/node": "^16.11.6",
     "@types/react": "^16.9.0",
     "@types/react-dom": "^16.9.0",

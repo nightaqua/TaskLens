@@ -19,9 +19,9 @@ export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean) {
 }
 
 // Reverses the DOM changes made by setupViewDOM on close
-export function cleanupViewDOM(leafRootEl: Element | null, tabContainer: Element | null) {
-    if (tabContainer) tabContainer.classList.remove('tasklens-hide-tabs');
-    if (leafRootEl) leafRootEl.classList.remove('tasklens-chromeless');
+export function cleanUpViewDOM(leafRootEl: HTMLElement | null, tabContainer: HTMLElement | null): void {
+    if (tabContainer instanceof HTMLElement) tabContainer.classList.remove('tasklens-hide-tabs');
+    if (leafRootEl instanceof HTMLElement) leafRootEl.classList.remove('tasklens-chromeless');
 }
 
 export class DashboardView extends ItemView implements RefreshableView {
@@ -72,7 +72,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             }, 500);
         });
 
-        // Refresh tasks whenever a markdown file is saved
+        // Refresh tasks whenever a Markdown file is saved
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
                 if (file.path.endsWith('.md')) {
@@ -119,7 +119,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         // Delay scroll until the timeline DOM is ready
         setTimeout(() => {
             if (this.timelineComponent) this.timelineComponent.scrollToToday();
-        }, 300);
+        }, 500);
     }
 
     getState(): Record<string, unknown> {
@@ -156,9 +156,12 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         void this.taskManager.loadTasks().then(() => {
             this.render();
+            this.forceScrollToToday = true;
             setTimeout(() => {
-                if (this.timelineComponent) this.timelineComponent.scrollToToday();
-            }, 250);
+                if (this.timelineComponent) {
+                    this.timelineComponent.scrollToToday();
+                }
+            }, 500);
         });
 
         return Promise.resolve();

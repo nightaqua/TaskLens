@@ -3,7 +3,7 @@ import TaskLensPlugin from '../main';
 import { TaskListComponent } from './TaskListComponent';
 import { Task } from '../models/Task';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
-import { setupViewDOM, cleanupViewDOM } from './DashboardView';
+import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
 import { QuickAddModal } from '../modals/QuickAddModal';
 
 export const VIEW_TYPE_LIST = 'tasklens-list-view';
@@ -61,8 +61,10 @@ export class TaskListView extends ItemView {
 
     onClose(): Promise<void> {
         this.isOpen = false;
-        cleanupViewDOM(this.leafRootEl, this.tabContainer);
-
+        this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
+        const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
+        const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
+        cleanUpViewDOM(root, tabs);
         return Promise.resolve();
     }
 

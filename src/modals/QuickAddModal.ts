@@ -1,97 +1,185 @@
 import { App, Modal, Setting, MarkdownView } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
 
+/**
+ * QuickAddModal
+ *
+ * A modal dialogue that lets the user quickly create a new task without
+ * leaving their current note. It supports two insertion modes:
+ *
+ *  - **Insert at cursor** – writes the task line directly into the active
+ *    Markdown editor at the current cursor position, then triggers an
+ *    immediate rescan of that file so the TaskManager stays in sync.
+ *  - **Append to file** – delegates to `TaskManager.addTask()`, which
+ *    appends the formatted task to the end of an existing destination file.
+ *
+ * The available destination files come from `TaskManager.getScannedFiles()`,
+ * so only files already known to the plugin are offered.
+ */
 export class QuickAddModal extends Modal {
+    /** Raw text entered by the user for the task title. */
     private title: string = '';
+
+    /** ISO date string (YYYY-MM-DD) from the date picker, or empty string. */
     private date: string = '';
+
+    /**
+     * Path of the chosen destination file, or the sentinel value
+     * `'__CURSOR__'` when the user wants to insert at the cursor position.
+     */
     private selectedFile: string = '';
+
+    /**
+     * The Markdown view that was active at the moment the modal was constructed.
+     *
+     * Captured in the constructor — not in onOpen() — because by the time
+     * onOpen() fires, Obsidian has already transferred focus to the modal's
+     * container element, causing getActiveViewOfType() to return null even
+     * though the editor is still visible behind the modal.
+     */
+    private readonly activeViewAtOpen: MarkdownView | null;
 
     constructor(app: App, private taskManager: TaskManager) {
         super(app);
+
+        // 1. First, try the standard active view (works for Ribbon clicks)
+        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+        // 2. If null (Dashboard button click), find the first visible Markdown leaf
+        if (!view) {
+            const markdownLeaves = this.app.workspace.getLeavesOfType('markdown');
+
+            const visibleMarkdownLeaf = markdownLeaves.find(leaf =>
+                leaf.view instanceof MarkdownView && (leaf.view.containerEl.isShown())
+            );
+
+            if (visibleMarkdownLeaf) {
+                view = visibleMarkdownLeaf.view as MarkdownView;
+            } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof MarkdownView) {
+                // Fallback to the first Markdown leaf found if none are explicitly 'shown'
+                view = markdownLeaves[0].view;
+            }
+        }
+
+        this.activeViewAtOpen = view;
     }
 
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    /** Builds and renders the modal UI when it is opened. */
     onOpen() {
         const { contentEl } = this;
+
         contentEl.createEl('h2', { text: 'Quick add task' });
 
-        // 1. Task Title
+        // --- 1. Task title input -------------------------------------------
         new Setting(contentEl)
             .setName('Task')
-            .addText(text => { text
-                .setPlaceholder('Read chapter 4...')
-                .onChange(value => this.title = value)
-                .inputEl.focus(); });
+            .addText(text => {
+                text
+                    .setPlaceholder('Read chapter 4...')
+                    .onChange(value => { this.title = value; });
 
-        // 2. Destination Selection (Cursor + All Files)
-        new Setting(contentEl)
-            .setName('Destination')
-        // 2. Destination Selection (Cursor + Scanned Files)
+                // Auto-focus so the user can start typing immediately.
+                text.inputEl.focus();
+            });
+
+        // --- 2. Destination dropdown ----------------------------------------
         new Setting(contentEl)
             .setName('Destination')
             .addDropdown(drop => {
-                const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-                // Add the Cursor option first
+                // Always offer "insert at cursor" as the first option, so it is
+                // the most ergonomic choice when a Markdown file is already open.
                 drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
 
-                // Use the smart scanned files list instead of the whole vault
-                const allFiles = this.taskManager.getScannedFiles();
-
-                allFiles.forEach((path) => {
-                    const name = path.split('/').pop()?.replace('.md', '') || path;
-                    drop.addOption(path, name);
+                // Only show files the plugin has already scanned rather than
+                // every file in the vault, keeping the list focused and relevant.
+                const scannedFiles = this.taskManager.getScannedFiles();
+                scannedFiles.forEach((path) => {
+                    // Strip the directory path and .md extension for a clean label.
+                    const label = path.split('/').pop()?.replace('.md', '') || path;
+                    drop.addOption(path, label);
                 });
 
-                // Default to Cursor if a file is open, otherwise the first valid file
-                if (activeView) {
+                // Pre-select a sensible default:
+                //   • Cursor mode if a Markdown file was open when the modal launched.
+                //   • Otherwise fall back to the first scanned file.
+                if (this.activeViewAtOpen) {
                     this.selectedFile = '__CURSOR__';
-                } else if (allFiles.length > 0) {
-                    this.selectedFile = allFiles[0];
+                } else if (scannedFiles.length > 0) {
+                    this.selectedFile = scannedFiles[0];
                 }
 
                 drop.setValue(this.selectedFile);
-                drop.onChange(value => this.selectedFile = value);
+                drop.onChange(value => { this.selectedFile = value; });
             });
 
-        // 3. Due Date
+        // --- 3. Due date picker ---------------------------------------------
         new Setting(contentEl)
             .setName('Due date')
             .addText(text => {
+                // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
-                text.onChange(value => this.date = value);
+                text.onChange(value => { this.date = value; });
             });
 
-        // 4. Buttons
+        // --- 4. Submit button -----------------------------------------------
         new Setting(contentEl)
             .addButton(btn => btn
                 .setButtonText('Add task')
                 .setCta()
-                .onClick(() => {
+                .onClick(async () => {
+                    // Guard: both a title and a destination are required.
                     if (!this.title || !this.selectedFile) return;
 
                     if (this.selectedFile === '__CURSOR__') {
-                        // Logic to insert directly into the text editor
-                        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                        const dateStr = this.date ? ` [due:: ${this.date}]` : '';
-                        const taskLine = `- [ ] ${this.title}${dateStr}\n`;
-                        if (view?.editor) {
-                            view.editor.replaceSelection(taskLine);
+                        // -----------------------------------------------------
+                        // Cursor-insertion path
+                        // -----------------------------------------------------
+                        if (this.activeViewAtOpen) {
+                            // Build and insert the task line synchronously
+                            // BEFORE closing the modal. Closing first (even with
+                            // a setTimeout) risks losing the editor reference or
+                            // landing at a stale cursor position.
+                            const dateStr = this.date ? ` [due:: ${this.date}]` : '';
+                            const taskLine = `- [ ] ${this.title}${dateStr}\n`;
 
-                            // Tell the task manager to rescan this specific file immediately
-                            if (view.file) {
-                                void this.taskManager.refreshFileTask(view.file.path);
+                            this.activeViewAtOpen.editor.replaceSelection(taskLine);
+
+                            // Rescan so the TaskManager reflects the new entry
+                            // without waiting for the next background sweep.
+                            if (this.activeViewAtOpen.file) {
+                                await this.taskManager.refreshFileTask(this.activeViewAtOpen.file.path);
+                            }
+                        } else {
+                            // Fallback: the view was closed before the user submitted.
+                            // Append to the first available scanned file instead.
+                            // Do NOT pass '__CURSOR__' — addTask expects a real path.
+                            const fallbackFile = this.taskManager.getScannedFiles()[0];
+                            if (fallbackFile) {
+                                const dateObj = this.date ? new Date(this.date) : null;
+                                await this.taskManager.addTask(this.title, dateObj, fallbackFile);
                             }
                         }
                     } else {
-                        // Standard append to the end of file logic
+                        // -----------------------------------------------------
+                        // Append-to-file path
+                        //
+                        // Delegate entirely to TaskManager, which handles
+                        // formatting and writing to the end of the chosen file.
+                        // -----------------------------------------------------
                         const dateObj = this.date ? new Date(this.date) : null;
-                        void this.taskManager.addTask(this.title, dateObj, this.selectedFile);
+                        await this.taskManager.addTask(this.title, dateObj, this.selectedFile);
                     }
 
                     this.close();
-                }));
+                }),
+            );
     }
 
+    /** Cleans up the modal's DOM when it is closed. */
     onClose() {
         this.contentEl.empty();
     }

@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { StatsComponent } from './StatsComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
-import { setupViewDOM, cleanupViewDOM } from './DashboardView';
+import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
 
 export const VIEW_TYPE_STATS = 'tasklens-stats-view';
 
@@ -11,10 +11,11 @@ export class StatsView extends ItemView {
     private tabContainer: Element | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
+    private onTasksUpdated = (): void => { this.render(); };
 
     constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
         super(leaf);
-        this.plugin.taskManager.on('tasks-updated', () => { this.render(); });
+        this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
     }
 
     getViewType(): string { return VIEW_TYPE_STATS; }
@@ -50,7 +51,10 @@ export class StatsView extends ItemView {
     }
 
     onClose(): Promise<void> {
-        cleanupViewDOM(this.leafRootEl, this.tabContainer);
+        this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
+        const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
+        const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
+        cleanUpViewDOM(root, tabs);
         return Promise.resolve();
     }
 

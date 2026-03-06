@@ -781,3 +781,13 @@
     margin-bottom: 16px; 
 }
 
+.timeline-task-bar.is-clamped-left {
+    border-left: 3px solid var(--text-accent);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+.timeline-task-bar.is-clamped-right {
+    border-right: 3px solid var(--text-accent);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}

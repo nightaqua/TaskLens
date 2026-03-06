@@ -1,34 +1,28 @@
-import js from "@eslint/js";
 import tseslint from "typescript-eslint";
-import obsidian from "eslint-plugin-obsidianmd";
+import tsparser from "@typescript-eslint/parser";
+import { defineConfig } from "eslint/config";
+import obsidianmd from "eslint-plugin-obsidianmd";
 
-export default [
+export default defineConfig([
     {
-        ignores: ["main.js", "*.mjs", "node_modules/**"]
+        ignores: ["main.js", "*.mjs", "node_modules/**", "**/*.json"]
     },
 
-    js.configs.recommended,
-
-    ...tseslint.configs.strictTypeChecked,
-
-    {
-        plugins: {
-            obsidianmd: obsidian,
-        },
-        rules: {
-            // Use strict rules manually
-            ...obsidian.configs.strict?.rules,
-        },
-    },
+    ...obsidianmd.configs.recommended,
 
     {
         files: ["**/*.ts"],
+        extends: [...tseslint.configs.strictTypeChecked],
         languageOptions: {
-            parser: tseslint.parser,
+            parser: tsparser,
             parserOptions: {
                 project: "./tsconfig.json",
                 tsconfigRootDir: import.meta.dirname,
             },
         },
+        rules: {
+            "obsidianmd/ui/sentence-case": "warn",
+            "obsidianmd/no-static-styles-assignment": "warn",
+        },
     },
-];
+]);

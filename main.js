@@ -750,14 +750,12 @@ var TimelineComponent = class {
   }
   // Smoothly centers the viewport on today's column
   scrollToToday() {
-    setTimeout(() => {
-      if (!this.scrollContainer) return;
-      const todayCell = this.scrollContainer.querySelector(".timeline-header-cell.is-today");
-      if (todayCell instanceof HTMLElement) {
-        const scrollPos = todayCell.offsetLeft - this.scrollContainer.clientWidth / 2 + todayCell.clientWidth / 2;
-        this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: "smooth" });
-      }
-    }, 300);
+    if (!this.scrollContainer) return;
+    const todayCell = this.scrollContainer.querySelector(".timeline-header-cell.is-today");
+    if (todayCell instanceof HTMLElement) {
+      const scrollPos = todayCell.offsetLeft - this.scrollContainer.clientWidth / 2 + todayCell.clientWidth / 2;
+      this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: "smooth" });
+    }
   }
   scroll(direction) {
     if (!this.scrollContainer) return;
@@ -812,8 +810,10 @@ var TimelineComponent = class {
   }
   moveTooltip(e) {
     if (this.tooltipEl) {
-      this.tooltipEl.style.top = `${String(e.clientY + 15)}px`;
-      this.tooltipEl.style.left = `${String(e.clientX + 15)}px`;
+      this.tooltipEl.setCssProps({
+        top: `${String(e.clientY + 15)}px`,
+        left: `${String(e.clientX + 15)}px`
+      });
     }
   }
   hideTooltip() {
@@ -1045,58 +1045,95 @@ var QuickAddModal = class extends import_obsidian8.Modal {
   constructor(app, taskManager) {
     super(app);
     this.taskManager = taskManager;
+    /** Raw text entered by the user for the task title. */
     this.title = "";
+    /** ISO date string (YYYY-MM-DD) from the date picker, or empty string. */
     this.date = "";
+    /**
+     * Path of the chosen destination file, or the sentinel value
+     * `'__CURSOR__'` when the user wants to insert at the cursor position.
+     */
     this.selectedFile = "";
+    let view = this.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
+    if (!view) {
+      const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
+      const visibleMarkdownLeaf = markdownLeaves.find(
+        (leaf) => leaf.view instanceof import_obsidian8.MarkdownView && leaf.view.containerEl.isShown()
+      );
+      if (visibleMarkdownLeaf) {
+        view = visibleMarkdownLeaf.view;
+      } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian8.MarkdownView) {
+        view = markdownLeaves[0].view;
+      }
+    }
+    this.activeViewAtOpen = view;
   }
+  // -------------------------------------------------------------------------
+  // Lifecycle
+  // -------------------------------------------------------------------------
+  /** Builds and renders the modal UI when it is opened. */
   onOpen() {
     const { contentEl } = this;
     contentEl.createEl("h2", { text: "Quick add task" });
     new import_obsidian8.Setting(contentEl).setName("Task").addText((text) => {
-      text.setPlaceholder("Read chapter 4...").onChange((value) => this.title = value).inputEl.focus();
-    });
-    new import_obsidian8.Setting(contentEl).setName("Destination");
-    new import_obsidian8.Setting(contentEl).setName("Destination").addDropdown((drop) => {
-      const activeView = this.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
-      drop.addOption("__CURSOR__", "Insert at cursor (active file)");
-      const allFiles = this.taskManager.getScannedFiles();
-      allFiles.forEach((path) => {
-        var _a;
-        const name = ((_a = path.split("/").pop()) == null ? void 0 : _a.replace(".md", "")) || path;
-        drop.addOption(path, name);
+      text.setPlaceholder("Read chapter 4...").onChange((value) => {
+        this.title = value;
       });
-      if (activeView) {
+      text.inputEl.focus();
+    });
+    new import_obsidian8.Setting(contentEl).setName("Destination").addDropdown((drop) => {
+      drop.addOption("__CURSOR__", "Insert at cursor (active file)");
+      const scannedFiles = this.taskManager.getScannedFiles();
+      scannedFiles.forEach((path) => {
+        var _a;
+        const label = ((_a = path.split("/").pop()) == null ? void 0 : _a.replace(".md", "")) || path;
+        drop.addOption(path, label);
+      });
+      if (this.activeViewAtOpen) {
         this.selectedFile = "__CURSOR__";
-      } else if (allFiles.length > 0) {
-        this.selectedFile = allFiles[0];
+      } else if (scannedFiles.length > 0) {
+        this.selectedFile = scannedFiles[0];
       }
       drop.setValue(this.selectedFile);
-      drop.onChange((value) => this.selectedFile = value);
+      drop.onChange((value) => {
+        this.selectedFile = value;
+      });
     });
     new import_obsidian8.Setting(contentEl).setName("Due date").addText((text) => {
       text.inputEl.type = "date";
-      text.onChange((value) => this.date = value);
+      text.onChange((value) => {
+        this.date = value;
+      });
     });
-    new import_obsidian8.Setting(contentEl).addButton((btn) => btn.setButtonText("Add task").setCta().onClick(() => {
-      if (!this.title || !this.selectedFile) return;
-      if (this.selectedFile === "__CURSOR__") {
-        const view = this.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
-        const dateStr = this.date ? ` [due:: ${this.date}]` : "";
-        const taskLine = `- [ ] ${this.title}${dateStr}
+    new import_obsidian8.Setting(contentEl).addButton(
+      (btn) => btn.setButtonText("Add task").setCta().onClick(async () => {
+        if (!this.title || !this.selectedFile) return;
+        if (this.selectedFile === "__CURSOR__") {
+          const view = this.activeViewAtOpen;
+          if (view) {
+            const dateStr = this.date ? ` [due:: ${this.date}]` : "";
+            const taskLine = `- [ ] ${this.title}${dateStr}
 `;
-        if (view == null ? void 0 : view.editor) {
-          view.editor.replaceSelection(taskLine);
-          if (view.file) {
-            void this.taskManager.refreshFileTask(view.file.path);
+            view.editor.replaceSelection(taskLine);
+            if (view.file) {
+              await this.taskManager.refreshFileTask(view.file.path);
+            }
+          } else {
+            const fallbackFile = this.taskManager.getScannedFiles()[0];
+            if (fallbackFile) {
+              const dateObj = this.date ? new Date(this.date) : null;
+              await this.taskManager.addTask(this.title, dateObj, fallbackFile);
+            }
           }
+        } else {
+          const dateObj = this.date ? new Date(this.date) : null;
+          await this.taskManager.addTask(this.title, dateObj, this.selectedFile);
         }
-      } else {
-        const dateObj = this.date ? new Date(this.date) : null;
-        void this.taskManager.addTask(this.title, dateObj, this.selectedFile);
-      }
-      this.close();
-    }));
+        this.close();
+      })
+    );
   }
+  /** Cleans up the modal's DOM when it is closed. */
   onClose() {
     this.contentEl.empty();
   }
@@ -1194,7 +1231,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.render();
     setTimeout(() => {
       if (this.timelineComponent) this.timelineComponent.scrollToToday();
-    }, 300);
+    }, 500);
   }
   getState() {
     const filters = this.taskManager.getCurrentFilters();
@@ -1223,9 +1260,12 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.applyColorTheme();
     void this.taskManager.loadTasks().then(() => {
       this.render();
+      this.forceScrollToToday = true;
       setTimeout(() => {
-        if (this.timelineComponent) this.timelineComponent.scrollToToday();
-      }, 250);
+        if (this.timelineComponent) {
+          this.timelineComponent.scrollToToday();
+        }
+      }, 500);
     });
     return Promise.resolve();
   }
@@ -1434,7 +1474,6 @@ var DashboardView = class extends import_obsidian9.ItemView {
 var import_obsidian10 = require("obsidian");
 var VIEW_TYPE_TIMELINE = "tasklens-timeline-view";
 var TimelineView = class extends import_obsidian10.ItemView {
-  // <-- Missing property added
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -1443,6 +1482,7 @@ var TimelineView = class extends import_obsidian10.ItemView {
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
     this.isOpen = false;
+    this.timelineComponent = null;
     this.plugin.taskManager.on("tasks-updated", () => {
       if (this.isOpen) this.render();
     });
@@ -1463,12 +1503,18 @@ var TimelineView = class extends import_obsidian10.ItemView {
     }
     await super.setState(state, result);
     this.render();
+    this.scrollToTodaySoon();
   }
   getState() {
     if (this.headerComponent) {
       this.headerState = this.headerComponent.getState();
     }
     return { headerState: this.headerState };
+  }
+  scrollToTodaySoon() {
+    setTimeout(() => {
+      if (this.timelineComponent) this.timelineComponent.scrollToToday();
+    }, 500);
   }
   onOpen() {
     const dom = setupViewDOM(this.containerEl, true);
@@ -1480,6 +1526,7 @@ var TimelineView = class extends import_obsidian10.ItemView {
     this.isOpen = true;
     void this.plugin.taskManager.loadTasks().then(() => {
       this.render();
+      this.scrollToTodaySoon();
     });
     return Promise.resolve();
   }
@@ -1509,8 +1556,8 @@ var TimelineView = class extends import_obsidian10.ItemView {
       }
     );
     this.headerComponent.render();
-    const timeline = new TimelineComponent(this.contentEl, this.app, this.plugin.taskManager.getFilteredTasks(), 7, this.plugin.settings);
-    timeline.render();
+    this.timelineComponent = new TimelineComponent(this.contentEl, this.app, this.plugin.taskManager.getFilteredTasks(), 7, this.plugin.settings);
+    this.timelineComponent.render();
   }
 };
 

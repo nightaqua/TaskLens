@@ -31,13 +31,13 @@ export class TimelineComponent {
         this.settings = settings;
     }
 
-    // Cycles through a fixed palette by index — used as a fallback color
+    // Cycles through a fixed palette by index — used as a fallback colour
     private getPaletteColor(index: number): string {
         const palette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
         return palette[index % palette.length];
     }
 
-    // Returns a deterministic color per topic: uses explicit setting if defined, otherwise hashes the name
+    // Returns a deterministic colour per topic: uses explicit setting if defined, otherwise hashes the name
     private getTopicColor(topic: string): string {
         if (this.settings.topicColors[topic]) return this.settings.topicColors[topic];
         let hash = 0;
@@ -56,8 +56,10 @@ export class TimelineComponent {
         const monthName = day.toLocaleString('default', { month: 'long', year: 'numeric' });
         const cell = headerRow.createDiv('timeline-month-cell');
         cell.setText(monthName);
-        cell.style.width = `${String(span * colWidth)}%`;
-        cell.style.left = `${String(startIdx * colWidth)}%`;
+        cell.setCssProps({
+            width: `${String(span * colWidth)}%`,
+            left: `${String(startIdx * colWidth)}%`
+        });
     }
 
     public render(): void {
@@ -72,13 +74,26 @@ export class TimelineComponent {
         }
 
         // Build the date range: from the earliest task date to the latest, with padding
+        // Ensure the current date is ALWAYS in the pool of dates
         const dates = validTasks
             .map(t => t.dueDate)
-            .filter((d): d is Date => Boolean(d));
-        dates.push(new Date());
+            .filter((d): d is Date => d instanceof Date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        dates.push(today);
 
-        const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        let minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+        let maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+        // Limit the view to 3 months before today and 6 months after today
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(today.getMonth() - 3);
+        const sixMonthsAhead = new Date();
+        sixMonthsAhead.setMonth(today.getMonth() + 6);
+
+        if (minDate < threeMonthsAgo) minDate = threeMonthsAgo;
+        if (maxDate > sixMonthsAhead) maxDate = sixMonthsAhead;
+
         minDate.setDate(minDate.getDate() - 2);
         maxDate.setDate(maxDate.getDate() + this.daysToShow + 2);
 
@@ -96,7 +111,7 @@ export class TimelineComponent {
         // Outer scroll container; inner content scaled to represent all days proportionally
         this.scrollContainer = this.container.createDiv('timeline-container');
         const scrollContent = this.scrollContainer.createDiv('timeline-scroll-content');
-        scrollContent.style.width = `${String((allDays.length / this.daysToShow) * 100)}%`;
+        scrollContent.setCssProps({ width: `${String((allDays.length / this.daysToShow) * 100)}%` });
 
         const colWidthPercent = 100 / allDays.length;
 
@@ -120,7 +135,7 @@ export class TimelineComponent {
 
         // CSS grid for day columns — row 1 is the date header, rows 2+ hold task bars
         const grid = scrollContent.createDiv('timeline-grid');
-        grid.style.gridTemplateColumns = `repeat(${String(allDays.length)}, 1fr)`;
+        grid.setCssProps({ 'grid-template-columns': `repeat(${String(allDays.length)}, 1fr)` });
 
         allDays.forEach((day, idx) => {
             // Day number + weekday label in the header row
@@ -176,7 +191,7 @@ export class TimelineComponent {
             if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
             if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
 
-            if (startIdx < 0 || dueIdx < 0) return;
+            if (startIdx === -1 || dueIdx === -1 || (startIdx === 0 && dueIdx === 0 && taskEnd < allDays[0])) return;
 
             // Find the first row whose last task has already ended before this one starts
             let rowIndex = rowEndTimes.findIndex(endTime => endTime < taskStart.getTime());
@@ -193,13 +208,18 @@ export class TimelineComponent {
 
             const bar = grid.createDiv('timeline-task-bar');
             bar.setText(task.title);
-            bar.style.gridColumnStart = String(startIdx + 1);
-            bar.style.gridColumnEnd = `span ${String((dueIdx - startIdx) + 1)}`;
-            bar.style.gridRow = String(rowIndex + 2);
+            bar.setCssProps({
+                'grid-column-start': String(startIdx + 1),
+                'grid-column-end': `span ${String((dueIdx - startIdx) + 1)}`,
+                'grid-row': String(rowIndex + 2)
+            });
 
-            // Color by course/topic or by urgency status depending on settings
+            if (taskStart < allDays[0]) bar.addClass('is-clamped-left');
+            if (taskEnd > allDays[allDays.length - 1]) bar.addClass('is-clamped-right');
+
+            // Colour by course/topic or by urgency status depending on settings
             if (this.settings.colorMode === 'course' && task.fileName) {
-                bar.style.backgroundColor = this.getTopicColor(task.fileName);
+                bar.setCssProps({ 'background-color': this.getTopicColor(task.fileName) });
             } else {
                 const statusClass: Record<string, string> = {
                     [TaskStatus.Overdue]: 'status-overdue',
@@ -233,16 +253,14 @@ export class TimelineComponent {
 
     // Smoothly centers the viewport on today's column
     public scrollToToday(): void {
-        setTimeout(() => {
-            if (!this.scrollContainer) return;
-            const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today');
-            if (todayCell instanceof HTMLElement) {
-                const scrollPos = todayCell.offsetLeft
-                    - (this.scrollContainer.clientWidth / 2)
-                    + (todayCell.clientWidth / 2);
-                this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
-            }
-        }, 300); // Delay ensures the widget is fully rendered before calculating offsets
+        if (!this.scrollContainer) return;
+        const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today');
+        if (todayCell instanceof HTMLElement) {
+            const scrollPos = todayCell.offsetLeft
+                - (this.scrollContainer.clientWidth / 2)
+                + (todayCell.clientWidth / 2);
+            this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
+        }
     }
 
     public scroll(direction: 'left' | 'right'): void {
@@ -305,8 +323,10 @@ export class TimelineComponent {
 
     private moveTooltip(e: MouseEvent): void {
         if (this.tooltipEl) {
-            this.tooltipEl.style.top = `${String(e.clientY + 15)}px`;
-            this.tooltipEl.style.left = `${String(e.clientX + 15)}px`;
+            this.tooltipEl.setCssProps({
+                top: `${String(e.clientY + 15)}px`,
+                left: `${String(e.clientX + 15)}px`
+            });
         }
     }
 
