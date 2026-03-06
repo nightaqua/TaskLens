@@ -1782,12 +1782,12 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
       );
       menu.addSeparator();
       menu.addItem(
-        (item) => item.setTitle(this.isLayoutLocked ? "Unlock Layout" : "Lock Layout").setIcon(this.isLayoutLocked ? "unlock" : "lock").onClick(() => {
+        (item) => item.setTitle(this.isLayoutLocked ? "Unlock layout" : "Lock layout").setIcon(this.isLayoutLocked ? "unlock" : "lock").onClick(() => {
           this.toggleLayoutMode();
         })
       );
       menu.addItem(
-        (item) => item.setTitle(this.isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode").setIcon(this.isFocusMode ? "eye" : "eye-off").onClick(() => {
+        (item) => item.setTitle(this.isFocusMode ? "Exit focus mode" : "Enter focus mode").setIcon(this.isFocusMode ? "eye" : "eye-off").onClick(() => {
           void this.toggleFocusMode();
         })
       );
@@ -1834,7 +1834,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
         }
       });
     });
-    new import_obsidian13.Notice(this.isLayoutLocked ? "Dashboard layout: Locked \u{1F512}" : "Dashboard layout: Unlocked \u{1F513}");
+    new import_obsidian13.Notice(this.isLayoutLocked ? "Dashboard layout: locked \u{1F512}" : "Dashboard layout: unlocked \u{1F513}");
   }
   async toggleFocusMode() {
     const workspace = this.app.workspace;
