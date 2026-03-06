@@ -9,6 +9,7 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 
 export const VIEW_TYPE_DASHBOARD = 'tasklens-dashboard-view';
 
+// Applies chromeless styling to the leaf and optionally hides tabs when the layout is locked
 export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean) {
     const leafRootEl = containerEl.closest('.workspace-leaf-content');
     if (leafRootEl) leafRootEl.classList.add('tasklens-chromeless');
@@ -17,6 +18,7 @@ export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean) {
     return { leafRootEl, tabContainer };
 }
 
+// Reverses the DOM changes made by setupViewDOM on close
 export function cleanupViewDOM(leafRootEl: Element | null, tabContainer: Element | null) {
     if (tabContainer) tabContainer.classList.remove('tasklens-hide-tabs');
     if (leafRootEl) leafRootEl.classList.remove('tasklens-chromeless');
@@ -27,16 +29,20 @@ export class DashboardView extends ItemView implements RefreshableView {
     private tabContainer: HTMLElement | null = null;
     private taskManager: TaskManager;
     private timelineComponent: TimelineComponent | null = null;
-
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
+    // Section visibility toggles — persisted via getState/setState
     private showControls: boolean = true;
     private showTimeline: boolean = true;
     private showList: boolean = true;
     private showStats: boolean = true;
+
     private timelineDaysToShow: number = 10;
     private renderTimer: NodeJS.Timeout | null = null;
+
+    // Tracks scroll position so re-renders don't jump the timeline,
+    // unless a forced scroll-to-today is requested
     private lastTimelineScroll: number | null = null;
     private forceScrollToToday: boolean = false;
 
@@ -44,6 +50,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         super(leaf);
         this.taskManager = this.plugin.taskManager;
 
+        // Debounce renders triggered by task updates to avoid rapid successive redraws
         this.taskManager.on('tasks-updated', () => {
             if (this.renderTimer) clearTimeout(this.renderTimer);
 
@@ -65,6 +72,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             }, 500);
         });
 
+        // Refresh tasks whenever a markdown file is saved
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
                 if (file.path.endsWith('.md')) {
@@ -83,22 +91,18 @@ export class DashboardView extends ItemView implements RefreshableView {
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
         await super.setState(state, result);
 
-        // 1. Guard against null or non-objects immediately
         if (!state || typeof state !== 'object') {
             this.render();
             return;
         }
 
+        // Unwrap nested state object if present (Obsidian sometimes wraps it)
         let s = state as Record<string, unknown>;
-
-        // 2. Handle nested state without the redundant 'if (s &&'
         if (s.state && typeof s.state === 'object') {
             s = s.state as Record<string, unknown>;
         }
 
-        // 3. Only override if the object has actual keys
         if (Object.keys(s).length > 0) {
-
             if (Object.prototype.hasOwnProperty.call(s, 'showControls')) this.showControls = s.showControls as boolean;
             if (Object.prototype.hasOwnProperty.call(s, 'showTimeline')) this.showTimeline = s.showTimeline as boolean;
             if (Object.prototype.hasOwnProperty.call(s, 'showList')) this.showList = s.showList as boolean;
@@ -112,6 +116,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         this.render();
 
+        // Delay scroll until the timeline DOM is ready
         setTimeout(() => {
             if (this.timelineComponent) this.timelineComponent.scrollToToday();
         }, 300);
@@ -128,11 +133,12 @@ export class DashboardView extends ItemView implements RefreshableView {
             zoomLevel: this.timelineDaysToShow,
             statusFilter: filters.status,
             courseFilter: filters.course,
-            headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState
+            headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState,
         });
     }
 
     onOpen(): Promise<void> {
+        // Apply chromeless styling and conditionally hide tabs
         const parent = this.containerEl.closest('.workspace-leaf-content');
         if (parent) parent.classList.add('tasklens-chromeless');
 
@@ -146,15 +152,12 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
-
         this.applyColorTheme();
 
         void this.taskManager.loadTasks().then(() => {
             this.render();
             setTimeout(() => {
-                if (this.timelineComponent) {
-                    this.timelineComponent.scrollToToday();
-                }
+                if (this.timelineComponent) this.timelineComponent.scrollToToday();
             }, 250);
         });
 
@@ -179,6 +182,7 @@ export class DashboardView extends ItemView implements RefreshableView {
                     if (this.headerComponent) {
                         this.headerState = this.headerComponent.getState();
                     }
+                    // Collapsing the header also hides controls
                     if (this.headerState.isCollapsed) {
                         this.showControls = false;
                     }
@@ -191,6 +195,7 @@ export class DashboardView extends ItemView implements RefreshableView {
                 },
                 onSettings: () => {
                     this.showControls = !this.showControls;
+                    // Expanding controls requires the header to be uncollapsed
                     if (this.showControls && this.headerState.isCollapsed) {
                         this.headerState.isCollapsed = false;
                     }
@@ -213,9 +218,8 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         this.renderControls();
 
-        const layoutOrder = ['stats', 'timeline', 'list'];
-
-        layoutOrder.forEach(component => {
+        // Render sections in order; each is gated by its visibility toggle
+        ['stats', 'timeline', 'list'].forEach(component => {
             if (component === 'stats' && this.showStats) this.renderStatistics();
             if (component === 'timeline' && this.showTimeline) this.renderTimeline();
             if (component === 'list' && this.showList) this.renderTaskList();
@@ -224,8 +228,10 @@ export class DashboardView extends ItemView implements RefreshableView {
 
     private renderControls(): void {
         if (!this.showControls) return;
+
         const controls = this.contentEl.createDiv('dashboard-controls');
 
+        // Left side: status and topic filter dropdowns
         const filtersDiv = controls.createDiv('filters-wrapper');
         filtersDiv.setCssProps({ display: 'flex', gap: '12px', 'flex-wrap': 'wrap' });
 
@@ -238,12 +244,10 @@ export class DashboardView extends ItemView implements RefreshableView {
             { value: TaskStatus.All, label: 'All tasks' },
             { value: TaskStatus.Completed, label: 'Completed' },
         ];
-
         statusOptions.forEach(opt => {
             const option = statusSelect.createEl('option', { value: opt.value, text: opt.label });
             if (opt.value === this.taskManager.getCurrentFilters().status) option.selected = true;
         });
-
         statusSelect.addEventListener('change', () => {
             this.taskManager.setStatusFilter(statusSelect.value as TaskStatus);
         });
@@ -261,37 +265,26 @@ export class DashboardView extends ItemView implements RefreshableView {
             this.taskManager.setCourseFilter(courseSelect.value || null);
         });
 
+        // Right side: section visibility toggles
         const actionsDiv = controls.createDiv('actions-wrapper');
         actionsDiv.setCssProps({ display: 'flex', gap: '12px', 'align-items': 'center' });
 
-        const toggleTimeline = actionsDiv.createEl('button', {
-            cls: `view-toggle-btn ${this.showTimeline ? 'is-active' : ''}`,
-            text: 'Timeline'
-        });
-        toggleTimeline.addEventListener('click', () => {
-            this.showTimeline = !this.showTimeline;
-            this.app.workspace.requestSaveLayout();
-            this.render();
-        });
+        const toggles = [
+            { label: 'Timeline', getter: () => this.showTimeline, setter: (v: boolean) => { this.showTimeline = v; } },
+            { label: 'List', getter: () => this.showList, setter: (v: boolean) => { this.showList = v; } },
+            { label: 'Stats', getter: () => this.showStats, setter: (v: boolean) => { this.showStats = v; } },
+        ];
 
-        const toggleList = actionsDiv.createEl('button', {
-            cls: `view-toggle-btn ${this.showList ? 'is-active' : ''}`,
-            text: 'List'
-        });
-        toggleList.addEventListener('click', () => {
-            this.showList = !this.showList;
-            this.app.workspace.requestSaveLayout();
-            this.render();
-        });
-
-        const statsBtn = actionsDiv.createEl('button', {
-            cls: `view-toggle-btn ${this.showStats ? 'is-active' : ''}`,
-            text: 'Stats'
-        });
-        statsBtn.addEventListener('click', () => {
-            this.showStats = !this.showStats;
-            this.app.workspace.requestSaveLayout();
-            this.render();
+        toggles.forEach(({ label, getter, setter }) => {
+            const btn = actionsDiv.createEl('button', {
+                cls: `view-toggle-btn ${getter() ? 'is-active' : ''}`,
+                text: label,
+            });
+            btn.addEventListener('click', () => {
+                setter(!getter());
+                this.app.workspace.requestSaveLayout();
+                this.render();
+            });
         });
     }
 
@@ -300,19 +293,18 @@ export class DashboardView extends ItemView implements RefreshableView {
         const container = this.contentEl.createDiv('dashboard-stats');
 
         const statCards = [
-            { label: 'Total', value: stats.total, cls: 'stat-total', filter: TaskStatus.All },
-            { label: 'Active', value: stats.upcoming, cls: 'stat-active', filter: TaskStatus.UpcomingWeek },
-            { label: 'Urgent', value: stats.urgent, cls: 'stat-urgent', filter: TaskStatus.Urgent },
-            { label: 'Overdue', value: stats.overdue, cls: 'stat-overdue', filter: TaskStatus.Overdue },
-            { label: 'Completed', value: stats.completed, cls: 'stat-completed', filter: TaskStatus.Completed }
+            { label: 'Total',     value: stats.total,     cls: 'stat-total',     filter: TaskStatus.All },
+            { label: 'Active',    value: stats.upcoming,  cls: 'stat-active',    filter: TaskStatus.UpcomingWeek },
+            { label: 'Urgent',    value: stats.urgent,    cls: 'stat-urgent',    filter: TaskStatus.Urgent },
+            { label: 'Overdue',   value: stats.overdue,   cls: 'stat-overdue',   filter: TaskStatus.Overdue },
+            { label: 'Completed', value: stats.completed, cls: 'stat-completed', filter: TaskStatus.Completed },
         ];
 
+        // Each card acts as a filter shortcut — clicking it filters the list to that status
         statCards.forEach(stat => {
             const card = container.createDiv({ cls: ['stat-card', stat.cls] });
             card.addClass('is-clickable');
-            card.addEventListener('click', () => {
-                this.taskManager.setStatusFilter(stat.filter);
-            });
+            card.addEventListener('click', () => { this.taskManager.setStatusFilter(stat.filter); });
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
@@ -324,7 +316,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         const list = new TaskListComponent(container, this.app, {
             onToggle: (t) => { void this.taskManager.toggleTaskCompletion(t); },
             onEdit: (t, newTitle, newDate) => { void this.taskManager.updateTask(t, newTitle, newDate); },
-            onDelete: (t) => { void this.taskManager.deleteTask(t); }
+            onDelete: (t) => { void this.taskManager.deleteTask(t); },
         }, this.plugin.settings);
 
         list.render(this.taskManager.getFilteredTasks());
@@ -337,7 +329,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             '--color-orange': cols.urgent,
             '--color-green': cols.active,
             '--color-blue': cols.completed,
-            '--color-purple': '#7209b7'
+            '--color-purple': '#7209b7',
         });
     }
 
@@ -348,11 +340,12 @@ export class DashboardView extends ItemView implements RefreshableView {
 
     private renderTimeline(): void {
         const container = this.contentEl.createDiv('dashboard-timeline-view');
-
         const controls = container.createDiv('timeline-controls');
 
+        // Zoom out = more days visible (wider view); zoom in = fewer days (narrower/tighter)
         const zoomControls = controls.createDiv('zoom-controls');
         zoomControls.createSpan({ text: 'Zoom: ' });
+
         const zoomOut = zoomControls.createEl('button', { text: '-', cls: 'view-toggle-btn' });
         zoomOut.addEventListener('click', () => {
             this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
@@ -365,10 +358,10 @@ export class DashboardView extends ItemView implements RefreshableView {
             this.render();
         });
 
+        // Manual scroll buttons — delegate to TimelineComponent.scroll()
         const navControls = controls.createDiv('nav-controls');
         const scrollLeft = navControls.createEl('button', { cls: 'view-toggle-btn' });
         setIcon(scrollLeft, 'chevron-left');
-
         const scrollRight = navControls.createEl('button', { cls: 'view-toggle-btn' });
         setIcon(scrollRight, 'chevron-right');
 
@@ -381,7 +374,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         );
         this.timelineComponent.render();
 
-        scrollLeft.addEventListener('click', () => this.timelineComponent?.scroll('left'));
-        scrollRight.addEventListener('click', () => this.timelineComponent?.scroll('right'));
+        scrollLeft.addEventListener('click', () => { this.timelineComponent?.scroll('left'); });
+        scrollRight.addEventListener('click', () => { this.timelineComponent?.scroll('right'); });
     }
 }

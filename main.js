@@ -585,7 +585,7 @@ var TimelineComponent = class {
   constructor(container, app, tasks, daysToShow = 10, settings) {
     this.scrollContainer = null;
     this.tooltipEl = null;
-    // Drag state
+    // Drag-to-scroll state
     this.isDragging = false;
     this.startX = 0;
     this.scrollLeftPos = 0;
@@ -595,24 +595,25 @@ var TimelineComponent = class {
     this.daysToShow = daysToShow;
     this.settings = settings;
   }
-  // Fix: "Duplicated code fragment (4 lines long)"
+  // Cycles through a fixed palette by index — used as a fallback color
   getPaletteColor(index) {
     const palette = ["#4cc9f0", "#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4caf50"];
     return palette[index % palette.length];
   }
+  // Returns a deterministic color per topic: uses explicit setting if defined, otherwise hashes the name
   getTopicColor(topic) {
     if (this.settings.topicColors[topic]) return this.settings.topicColors[topic];
     let hash = 0;
     for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
     return this.getPaletteColor(Math.abs(hash));
   }
-  // Fix: "Duplicated code fragment (5 lines long)" (Month Name logic)
+  // Renders a single month label cell in the month header row
   renderMonthCell(headerRow, day, span, colWidth, startIdx) {
     const monthName = day.toLocaleString("default", { month: "long", year: "numeric" });
-    const mDiv = headerRow.createDiv("timeline-month-cell");
-    mDiv.setText(monthName);
-    mDiv.style.width = `${String(span * colWidth)}%`;
-    mDiv.style.left = `${String(startIdx * colWidth)}%`;
+    const cell = headerRow.createDiv("timeline-month-cell");
+    cell.setText(monthName);
+    cell.style.width = `${String(span * colWidth)}%`;
+    cell.style.left = `${String(startIdx * colWidth)}%`;
   }
   render() {
     this.container.empty();
@@ -639,8 +640,7 @@ var TimelineComponent = class {
     this.createNavigationOverlay("right");
     this.scrollContainer = this.container.createDiv("timeline-container");
     const scrollContent = this.scrollContainer.createDiv("timeline-scroll-content");
-    const totalWidthPercent = allDays.length / this.daysToShow * 100;
-    scrollContent.style.width = String(totalWidthPercent) + "%";
+    scrollContent.style.width = `${String(allDays.length / this.daysToShow * 100)}%`;
     const colWidthPercent = 100 / allDays.length;
     const monthHeader = scrollContent.createDiv("timeline-month-row");
     let currentMonth = -1;
@@ -649,27 +649,24 @@ var TimelineComponent = class {
       const m = day.getMonth();
       if (m !== currentMonth) {
         if (currentMonth !== -1) {
-          const span2 = idx - monthStartIdx;
-          this.renderMonthCell(monthHeader, allDays[monthStartIdx], span2, colWidthPercent, monthStartIdx);
+          this.renderMonthCell(monthHeader, allDays[monthStartIdx], idx - monthStartIdx, colWidthPercent, monthStartIdx);
         }
         currentMonth = m;
         monthStartIdx = idx;
       }
     });
-    const span = allDays.length - monthStartIdx;
-    this.renderMonthCell(monthHeader, allDays[monthStartIdx], span, colWidthPercent, monthStartIdx);
+    this.renderMonthCell(monthHeader, allDays[monthStartIdx], allDays.length - monthStartIdx, colWidthPercent, monthStartIdx);
     const grid = scrollContent.createDiv("timeline-grid");
     grid.style.gridTemplateColumns = `repeat(${String(allDays.length)}, 1fr)`;
     allDays.forEach((day, idx) => {
       const cell = grid.createDiv("timeline-header-cell");
       cell.setText(day.getDate().toString());
-      const dayName = day.toLocaleString("default", { weekday: "short" });
-      cell.createDiv("timeline-day-name").setText(dayName);
+      cell.createDiv("timeline-day-name").setText(day.toLocaleString("default", { weekday: "short" }));
       cell.style.gridColumn = String(idx + 1);
-      cell.style.gridRow = `1`;
+      cell.style.gridRow = "1";
       const bgCell = grid.createDiv("timeline-bg-cell");
       bgCell.style.gridColumn = String(idx + 1);
-      bgCell.style.gridRow = `2 / -1`;
+      bgCell.style.gridRow = "2 / -1";
       if (day.getDate() === 1) {
         cell.addClass("is-month-start");
         bgCell.addClass("is-month-start-bg");
@@ -679,7 +676,7 @@ var TimelineComponent = class {
         bgCell.addClass("is-today-bg");
         const marker = grid.createDiv("timeline-today-marker");
         marker.style.gridColumn = String(idx + 1);
-        marker.style.gridRow = `1 / -1`;
+        marker.style.gridRow = "1 / -1";
       }
     });
     const rowEndTimes = [];
@@ -692,13 +689,10 @@ var TimelineComponent = class {
       const bStart = ((_c = b.startDate) == null ? void 0 : _c.getTime()) || ((_d = b.dueDate) == null ? void 0 : _d.getTime()) || 0;
       return aStart - bStart;
     });
-    let lastTopic = "";
     sortedTasks.forEach((task) => {
-      if (task.fileName !== lastTopic) {
-        lastTopic = task.fileName || "";
-      }
+      var _a;
       if (!task.dueDate) return;
-      const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
+      const taskStart = new Date((_a = task.startDate) != null ? _a : task.dueDate);
       const taskEnd = new Date(task.dueDate);
       taskStart.setHours(0, 0, 0, 0);
       taskEnd.setHours(0, 0, 0, 0);
@@ -706,60 +700,59 @@ var TimelineComponent = class {
       let dueIdx = allDays.findIndex((d) => d.toDateString() === taskEnd.toDateString());
       if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
       if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
-      if (dueIdx >= 0 && startIdx >= 0) {
-        let rowIndex = rowEndTimes.findIndex((endTime) => endTime < taskStart.getTime());
-        if (rowIndex === -1) {
-          rowIndex = rowEndTimes.length;
-          rowEndTimes.push(taskEnd.getTime());
-          const rowBg = grid.createDiv("timeline-row-bg");
-          rowBg.style.gridColumn = "1 / -1";
-          rowBg.style.gridRow = String(rowIndex + 2);
-        } else {
-          rowEndTimes[rowIndex] = taskEnd.getTime();
-        }
-        const bar = grid.createDiv("timeline-task-bar");
-        bar.setText(task.title);
-        if (this.settings.colorMode === "course" && task.fileName) {
-          bar.style.backgroundColor = this.getTopicColor(task.fileName);
-        } else {
-          const status = getTaskStatus(task);
-          const classes = {
-            ["overdue" /* Overdue */]: "status-overdue",
-            ["urgent" /* Urgent */]: "status-urgent",
-            ["completed" /* Completed */]: "status-completed",
-            ["upcoming_week" /* UpcomingWeek */]: "status-active"
-          };
-          if (classes[status]) bar.addClass(classes[status]);
-        }
-        const span2 = dueIdx - startIdx + 1;
-        bar.style.gridColumnStart = String(startIdx + 1);
-        bar.style.gridColumnEnd = "span " + String(span2);
-        bar.style.gridRow = String(rowIndex + 2);
-        bar.addEventListener("mouseenter", (e) => {
-          this.showTooltip(e, task);
-        });
-        bar.addEventListener("mouseleave", () => {
-          this.hideTooltip();
-        });
-        bar.addEventListener("mousemove", (e) => {
-          this.moveTooltip(e);
-        });
-        bar.addEventListener("click", (e) => {
-          e.stopPropagation();
-          void this.openTaskFile(task);
-        });
+      if (startIdx < 0 || dueIdx < 0) return;
+      let rowIndex = rowEndTimes.findIndex((endTime) => endTime < taskStart.getTime());
+      if (rowIndex === -1) {
+        rowIndex = rowEndTimes.length;
+        rowEndTimes.push(taskEnd.getTime());
+        const rowBg = grid.createDiv("timeline-row-bg");
+        rowBg.style.gridColumn = "1 / -1";
+        rowBg.style.gridRow = String(rowIndex + 2);
+      } else {
+        rowEndTimes[rowIndex] = taskEnd.getTime();
       }
+      const bar = grid.createDiv("timeline-task-bar");
+      bar.setText(task.title);
+      bar.style.gridColumnStart = String(startIdx + 1);
+      bar.style.gridColumnEnd = `span ${String(dueIdx - startIdx + 1)}`;
+      bar.style.gridRow = String(rowIndex + 2);
+      if (this.settings.colorMode === "course" && task.fileName) {
+        bar.style.backgroundColor = this.getTopicColor(task.fileName);
+      } else {
+        const statusClass = {
+          ["overdue" /* Overdue */]: "status-overdue",
+          ["urgent" /* Urgent */]: "status-urgent",
+          ["completed" /* Completed */]: "status-completed",
+          ["upcoming_week" /* UpcomingWeek */]: "status-active"
+        };
+        const cls = statusClass[getTaskStatus(task)];
+        if (cls) bar.addClass(cls);
+      }
+      bar.addEventListener("mouseenter", (e) => {
+        this.showTooltip(e, task);
+      });
+      bar.addEventListener("mouseleave", () => {
+        this.hideTooltip();
+      });
+      bar.addEventListener("mousemove", (e) => {
+        this.moveTooltip(e);
+      });
+      bar.addEventListener("click", (e) => {
+        e.stopPropagation();
+        void this.openTaskFile(task);
+      });
     });
     this.setupEventListeners(this.scrollContainer);
   }
   getScrollPosition() {
-    return this.scrollContainer ? this.scrollContainer.scrollLeft : 0;
+    var _a, _b;
+    return (_b = (_a = this.scrollContainer) == null ? void 0 : _a.scrollLeft) != null ? _b : 0;
   }
   setScrollPosition(pos) {
-    if (this.scrollContainer) {
-      this.scrollContainer.scrollTo({ left: pos, behavior: "auto" });
-    }
+    var _a;
+    (_a = this.scrollContainer) == null ? void 0 : _a.scrollTo({ left: pos, behavior: "auto" });
   }
+  // Smoothly centers the viewport on today's column
   scrollToToday() {
     setTimeout(() => {
       if (!this.scrollContainer) return;
@@ -770,12 +763,11 @@ var TimelineComponent = class {
       }
     }, 300);
   }
-  // --- PUBLIC SCROLL METHOD ---
   scroll(direction) {
     if (!this.scrollContainer) return;
-    const scrollAmount = this.scrollContainer.clientWidth * 0.8;
+    const amount = this.scrollContainer.clientWidth * 0.8;
     this.scrollContainer.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
+      left: direction === "left" ? -amount : amount,
       behavior: "smooth"
     });
   }
@@ -806,8 +798,7 @@ var TimelineComponent = class {
       if (!this.isDragging) return;
       e.preventDefault();
       const x = e.pageX - container.offsetLeft;
-      const walk = (x - this.startX) * 1.5;
-      container.scrollLeft = this.scrollLeftPos - walk;
+      container.scrollLeft = this.scrollLeftPos - (x - this.startX) * 1.5;
     });
   }
   showTooltip(e, task) {
@@ -825,14 +816,13 @@ var TimelineComponent = class {
   }
   moveTooltip(e) {
     if (this.tooltipEl) {
-      this.tooltipEl.style.top = String(e.clientY + 15) + "px";
-      this.tooltipEl.style.left = String(e.clientX + 15) + "px";
+      this.tooltipEl.style.top = `${String(e.clientY + 15)}px`;
+      this.tooltipEl.style.left = `${String(e.clientX + 15)}px`;
     }
   }
   hideTooltip() {
-    if (this.tooltipEl) {
-      this.tooltipEl.setCssProps({ display: "none" });
-    }
+    var _a;
+    (_a = this.tooltipEl) == null ? void 0 : _a.setCssProps({ display: "none" });
   }
   async openTaskFile(task) {
     const file = this.app.vault.getAbstractFileByPath(task.filePath);
@@ -1138,12 +1128,15 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.timelineComponent = null;
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
+    // Section visibility toggles — persisted via getState/setState
     this.showControls = true;
     this.showTimeline = true;
     this.showList = true;
     this.showStats = true;
     this.timelineDaysToShow = 10;
     this.renderTimer = null;
+    // Tracks scroll position so re-renders don't jump the timeline,
+    // unless a forced scroll-to-today is requested
     this.lastTimelineScroll = null;
     this.forceScrollToToday = false;
     this.taskManager = this.plugin.taskManager;
@@ -1235,9 +1228,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     void this.taskManager.loadTasks().then(() => {
       this.render();
       setTimeout(() => {
-        if (this.timelineComponent) {
-          this.timelineComponent.scrollToToday();
-        }
+        if (this.timelineComponent) this.timelineComponent.scrollToToday();
       }, 250);
     });
     return Promise.resolve();
@@ -1292,8 +1283,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     );
     this.headerComponent.render();
     this.renderControls();
-    const layoutOrder = ["stats", "timeline", "list"];
-    layoutOrder.forEach((component) => {
+    ["stats", "timeline", "list"].forEach((component) => {
       if (component === "stats" && this.showStats) this.renderStatistics();
       if (component === "timeline" && this.showTimeline) this.renderTimeline();
       if (component === "list" && this.showList) this.renderTaskList();
@@ -1332,32 +1322,27 @@ var DashboardView = class extends import_obsidian9.ItemView {
     });
     const actionsDiv = controls.createDiv("actions-wrapper");
     actionsDiv.setCssProps({ display: "flex", gap: "12px", "align-items": "center" });
-    const toggleTimeline = actionsDiv.createEl("button", {
-      cls: `view-toggle-btn ${this.showTimeline ? "is-active" : ""}`,
-      text: "Timeline"
-    });
-    toggleTimeline.addEventListener("click", () => {
-      this.showTimeline = !this.showTimeline;
-      this.app.workspace.requestSaveLayout();
-      this.render();
-    });
-    const toggleList = actionsDiv.createEl("button", {
-      cls: `view-toggle-btn ${this.showList ? "is-active" : ""}`,
-      text: "List"
-    });
-    toggleList.addEventListener("click", () => {
-      this.showList = !this.showList;
-      this.app.workspace.requestSaveLayout();
-      this.render();
-    });
-    const statsBtn = actionsDiv.createEl("button", {
-      cls: `view-toggle-btn ${this.showStats ? "is-active" : ""}`,
-      text: "Stats"
-    });
-    statsBtn.addEventListener("click", () => {
-      this.showStats = !this.showStats;
-      this.app.workspace.requestSaveLayout();
-      this.render();
+    const toggles = [
+      { label: "Timeline", getter: () => this.showTimeline, setter: (v) => {
+        this.showTimeline = v;
+      } },
+      { label: "List", getter: () => this.showList, setter: (v) => {
+        this.showList = v;
+      } },
+      { label: "Stats", getter: () => this.showStats, setter: (v) => {
+        this.showStats = v;
+      } }
+    ];
+    toggles.forEach(({ label, getter, setter }) => {
+      const btn = actionsDiv.createEl("button", {
+        cls: `view-toggle-btn ${getter() ? "is-active" : ""}`,
+        text: label
+      });
+      btn.addEventListener("click", () => {
+        setter(!getter());
+        this.app.workspace.requestSaveLayout();
+        this.render();
+      });
     });
   }
   renderStatistics() {
@@ -1440,11 +1425,11 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.timelineComponent.render();
     scrollLeft.addEventListener("click", () => {
       var _a;
-      return (_a = this.timelineComponent) == null ? void 0 : _a.scroll("left");
+      (_a = this.timelineComponent) == null ? void 0 : _a.scroll("left");
     });
     scrollRight.addEventListener("click", () => {
       var _a;
-      return (_a = this.timelineComponent) == null ? void 0 : _a.scroll("right");
+      (_a = this.timelineComponent) == null ? void 0 : _a.scroll("right");
     });
   }
 };
@@ -1706,9 +1691,9 @@ var StatsView = class extends import_obsidian12.ItemView {
     return { headerState: this.headerState };
   }
   onOpen() {
-    const dom = setupViewDOM(this.containerEl, true);
-    this.leafRootEl = dom.leafRootEl;
-    this.tabContainer = dom.tabContainer;
+    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, true);
+    this.leafRootEl = leafRootEl;
+    this.tabContainer = tabContainer;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.render();

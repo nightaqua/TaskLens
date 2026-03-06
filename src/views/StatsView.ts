@@ -17,12 +17,11 @@ export class StatsView extends ItemView {
         this.plugin.taskManager.on('tasks-updated', () => { this.render(); });
     }
 
-    getViewType() { return VIEW_TYPE_STATS; }
-    getDisplayText() { return 'Dashboard stats'; }
-    getIcon() { return 'bar-chart-3'; }
+    getViewType(): string { return VIEW_TYPE_STATS; }
+    getDisplayText(): string { return 'Dashboard stats'; }
+    getIcon(): string { return 'bar-chart-3'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
-        // Change "as any" to "as Record<string, unknown>"
         const parsedState = state as Record<string, unknown>;
         if (parsedState.headerState) {
             this.headerState = parsedState.headerState as HeaderState;
@@ -39,9 +38,9 @@ export class StatsView extends ItemView {
     }
 
     onOpen(): Promise<void> {
-        const dom = setupViewDOM(this.containerEl, true);
-        this.leafRootEl = dom.leafRootEl;
-        this.tabContainer = dom.tabContainer;
+        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, true);
+        this.leafRootEl = leafRootEl;
+        this.tabContainer = tabContainer;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
@@ -52,11 +51,10 @@ export class StatsView extends ItemView {
 
     onClose(): Promise<void> {
         cleanupViewDOM(this.leafRootEl, this.tabContainer);
-
         return Promise.resolve();
     }
 
-    render() {
+    render(): void {
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -71,9 +69,7 @@ export class StatsView extends ItemView {
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
-                onRefresh: () => {
-                    void this.plugin.taskManager.loadTasks();
-                }
+                onRefresh: () => { void this.plugin.taskManager.loadTasks(); },
             }
         );
         this.headerComponent.render();

@@ -143,7 +143,7 @@ export class SettingsTab extends PluginSettingTab {
             'margin-bottom': '20px'
         });
 
-        // The weak grey, centered text
+        // The weak gray, centered text
         const supportText = supportDiv.createEl('p', {
             text: 'If this dashboard helps you stay organized, consider supporting its development!'
         });

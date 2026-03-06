@@ -12,12 +12,18 @@ export class TimelineComponent {
     private scrollContainer: HTMLElement | null = null;
     private tooltipEl: HTMLElement | null = null;
 
-    // Drag state
+    // Drag-to-scroll state
     private isDragging = false;
     private startX = 0;
     private scrollLeftPos = 0;
 
-    constructor(container: HTMLElement, app: App, tasks: Task[], daysToShow: number = 10, settings: SemesterSettings) {
+    constructor(
+        container: HTMLElement,
+        app: App,
+        tasks: Task[],
+        daysToShow: number = 10,
+        settings: SemesterSettings
+    ) {
         this.container = container;
         this.app = app;
         this.tasks = tasks;
@@ -25,12 +31,13 @@ export class TimelineComponent {
         this.settings = settings;
     }
 
-    // Fix: "Duplicated code fragment (4 lines long)"
+    // Cycles through a fixed palette by index — used as a fallback color
     private getPaletteColor(index: number): string {
         const palette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
         return palette[index % palette.length];
     }
 
+    // Returns a deterministic color per topic: uses explicit setting if defined, otherwise hashes the name
     private getTopicColor(topic: string): string {
         if (this.settings.topicColors[topic]) return this.settings.topicColors[topic];
         let hash = 0;
@@ -38,13 +45,19 @@ export class TimelineComponent {
         return this.getPaletteColor(Math.abs(hash));
     }
 
-    // Fix: "Duplicated code fragment (5 lines long)" (Month Name logic)
-    private renderMonthCell(headerRow: HTMLElement, day: Date, span: number, colWidth: number, startIdx: number): void {
+    // Renders a single month label cell in the month header row
+    private renderMonthCell(
+        headerRow: HTMLElement,
+        day: Date,
+        span: number,
+        colWidth: number,
+        startIdx: number
+    ): void {
         const monthName = day.toLocaleString('default', { month: 'long', year: 'numeric' });
-        const mDiv = headerRow.createDiv('timeline-month-cell');
-        mDiv.setText(monthName);
-        mDiv.style.width = `${String(span * colWidth)}%`;
-        mDiv.style.left = `${String(startIdx * colWidth)}%`;
+        const cell = headerRow.createDiv('timeline-month-cell');
+        cell.setText(monthName);
+        cell.style.width = `${String(span * colWidth)}%`;
+        cell.style.left = `${String(startIdx * colWidth)}%`;
     }
 
     public render(): void {
@@ -58,6 +71,7 @@ export class TimelineComponent {
             return;
         }
 
+        // Build the date range: from the earliest task date to the latest, with padding
         const dates = validTasks
             .map(t => t.dueDate)
             .filter((d): d is Date => Boolean(d));
@@ -65,7 +79,6 @@ export class TimelineComponent {
 
         const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
         const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-
         minDate.setDate(minDate.getDate() - 2);
         maxDate.setDate(maxDate.getDate() + this.daysToShow + 2);
 
@@ -76,23 +89,19 @@ export class TimelineComponent {
             curr.setDate(curr.getDate() + 1);
         }
 
-        // 1. ADD NAVIGATION ARROWS (Hover Overlays)
+        // Left/right hover-overlay arrows for scrolling
         this.createNavigationOverlay('left');
         this.createNavigationOverlay('right');
 
-        // 2. SETUP CONTAINERS
+        // Outer scroll container; inner content scaled to represent all days proportionally
         this.scrollContainer = this.container.createDiv('timeline-container');
         const scrollContent = this.scrollContainer.createDiv('timeline-scroll-content');
-
-        // Ensure width scales perfectly to fit all days
-        const totalWidthPercent = (allDays.length / this.daysToShow) * 100;
-        scrollContent.style.width = String(totalWidthPercent) + '%';
+        scrollContent.style.width = `${String((allDays.length / this.daysToShow) * 100)}%`;
 
         const colWidthPercent = 100 / allDays.length;
 
-        // 3. MONTH HEADER ROW
+        // Month header: groups day columns under their respective month labels
         const monthHeader = scrollContent.createDiv('timeline-month-row');
-
         let currentMonth = -1;
         let monthStartIdx = 0;
 
@@ -100,32 +109,31 @@ export class TimelineComponent {
             const m = day.getMonth();
             if (m !== currentMonth) {
                 if (currentMonth !== -1) {
-                    const span = idx - monthStartIdx;
-                    this.renderMonthCell(monthHeader, allDays[monthStartIdx], span, colWidthPercent, monthStartIdx);
+                    this.renderMonthCell(monthHeader, allDays[monthStartIdx], idx - monthStartIdx, colWidthPercent, monthStartIdx);
                 }
                 currentMonth = m;
                 monthStartIdx = idx;
             }
         });
+        // Flush the final month segment
+        this.renderMonthCell(monthHeader, allDays[monthStartIdx], allDays.length - monthStartIdx, colWidthPercent, monthStartIdx);
 
-        const span = allDays.length - monthStartIdx;
-        this.renderMonthCell(monthHeader, allDays[monthStartIdx], span, colWidthPercent, monthStartIdx);
-
-        // 4. GRID & DAYS (Solid grid lines)
+        // CSS grid for day columns — row 1 is the date header, rows 2+ hold task bars
         const grid = scrollContent.createDiv('timeline-grid');
         grid.style.gridTemplateColumns = `repeat(${String(allDays.length)}, 1fr)`;
 
         allDays.forEach((day, idx) => {
+            // Day number + weekday label in the header row
             const cell = grid.createDiv('timeline-header-cell');
             cell.setText(day.getDate().toString());
-            const dayName = day.toLocaleString('default', { weekday: 'short' });
-            cell.createDiv('timeline-day-name').setText(dayName);
+            cell.createDiv('timeline-day-name').setText(day.toLocaleString('default', { weekday: 'short' }));
             cell.style.gridColumn = String(idx + 1);
-            cell.style.gridRow = `1`;
+            cell.style.gridRow = '1';
 
+            // Background column cell spanning all task rows
             const bgCell = grid.createDiv('timeline-bg-cell');
             bgCell.style.gridColumn = String(idx + 1);
-            bgCell.style.gridRow = `2 / -1`;
+            bgCell.style.gridRow = '2 / -1';
 
             if (day.getDate() === 1) {
                 cell.addClass('is-month-start');
@@ -136,145 +144,126 @@ export class TimelineComponent {
                 cell.addClass('is-today');
                 bgCell.addClass('is-today-bg');
 
+                // Vertical line marking today across all rows
                 const marker = grid.createDiv('timeline-today-marker');
                 marker.style.gridColumn = String(idx + 1);
-                marker.style.gridRow = `1 / -1`;
+                marker.style.gridRow = '1 / -1';
             }
         });
 
-        // 5. TASKS --- COMPACT PACKING LOGIC WITH TOPIC GROUPING ---
+        // Task bar layout: compact row-packing sorted by topic then start date.
+        // Tracks the latest end time per row to find the first available slot for each task.
         const rowEndTimes: number[] = [];
 
-        // Sort by FileName (Topic) first, then by Start Date
         const sortedTasks = [...validTasks].sort((a, b) => {
-            // Sort by Topic (fileName) alphabetically
             if (a.fileName !== b.fileName) {
-                return (a.fileName || "").localeCompare(b.fileName || "");
+                return (a.fileName || '').localeCompare(b.fileName || '');
             }
-
-            // If topics are the same, sort by date
             const aStart = a.startDate?.getTime() || a.dueDate?.getTime() || 0;
             const bStart = b.startDate?.getTime() || b.dueDate?.getTime() || 0;
             return aStart - bStart;
         });
 
-        let lastTopic = "";
-
         sortedTasks.forEach((task) => {
-            // If the topic changes, we can choose to reset the packer to start a new "band"
-            if (task.fileName !== lastTopic) {
-                // To keep it ULTRA compact, don't clear rowEndTimes.
-                // To keep it grouped in distinct blocks, uncomment the line below:
-                // rowEndTimes.length = 0;
-                lastTopic = task.fileName || "";
-            }
-
             if (!task.dueDate) return;
-            const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
-            const taskEnd = new Date(task.dueDate);
 
+            const taskStart = new Date(task.startDate ?? task.dueDate);
+            const taskEnd = new Date(task.dueDate);
             taskStart.setHours(0, 0, 0, 0);
             taskEnd.setHours(0, 0, 0, 0);
 
             let startIdx = allDays.findIndex(d => d.toDateString() === taskStart.toDateString());
             let dueIdx = allDays.findIndex(d => d.toDateString() === taskEnd.toDateString());
 
+            // Clamp tasks that extend beyond the visible range
             if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
             if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
 
-            if (dueIdx >= 0 && startIdx >= 0) {
-                // --- COMPACT ROW CALCULATION ---
-                let rowIndex = rowEndTimes.findIndex(endTime => endTime < taskStart.getTime());
+            if (startIdx < 0 || dueIdx < 0) return;
 
-                if (rowIndex === -1) {
-                    // No existing row is free; add a new one
-                    rowIndex = rowEndTimes.length;
-                    rowEndTimes.push(taskEnd.getTime());
+            // Find the first row whose last task has already ended before this one starts
+            let rowIndex = rowEndTimes.findIndex(endTime => endTime < taskStart.getTime());
+            if (rowIndex === -1) {
+                // All rows occupied — open a new one with a background stripe
+                rowIndex = rowEndTimes.length;
+                rowEndTimes.push(taskEnd.getTime());
 
-                    // Add background for the new row
-                    const rowBg = grid.createDiv('timeline-row-bg');
-                    rowBg.style.gridColumn = '1 / -1';
-                    rowBg.style.gridRow = String(rowIndex + 2);
-                } else {
-                    // Re-use the existing row and update its new end time
-                    rowEndTimes[rowIndex] = taskEnd.getTime();
-                }
-
-                const bar = grid.createDiv('timeline-task-bar');
-                bar.setText(task.title);
-
-                if (this.settings.colorMode === 'course' && task.fileName) {
-                    bar.style.backgroundColor = this.getTopicColor(task.fileName);
-                } else {
-                    const status = getTaskStatus(task);
-                    const classes: Record<string, string> = {
-                        [TaskStatus.Overdue]: 'status-overdue',
-                        [TaskStatus.Urgent]: 'status-urgent',
-                        [TaskStatus.Completed]: 'status-completed',
-                        [TaskStatus.UpcomingWeek]: 'status-active'
-                    };
-                    if (classes[status]) bar.addClass(classes[status]);
-                }
-
-                const span = (dueIdx - startIdx) + 1;
-                bar.style.gridColumnStart = String(startIdx + 1);
-                bar.style.gridColumnEnd = 'span ' + String(span);
-                bar.style.gridRow = String(rowIndex + 2);
-
-                bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task); });
-                bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
-                bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
-                bar.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    void this.openTaskFile(task);
-                });
+                const rowBg = grid.createDiv('timeline-row-bg');
+                rowBg.style.gridColumn = '1 / -1';
+                rowBg.style.gridRow = String(rowIndex + 2);
+            } else {
+                rowEndTimes[rowIndex] = taskEnd.getTime();
             }
+
+            const bar = grid.createDiv('timeline-task-bar');
+            bar.setText(task.title);
+            bar.style.gridColumnStart = String(startIdx + 1);
+            bar.style.gridColumnEnd = `span ${String((dueIdx - startIdx) + 1)}`;
+            bar.style.gridRow = String(rowIndex + 2);
+
+            // Color by course/topic or by urgency status depending on settings
+            if (this.settings.colorMode === 'course' && task.fileName) {
+                bar.style.backgroundColor = this.getTopicColor(task.fileName);
+            } else {
+                const statusClass: Record<string, string> = {
+                    [TaskStatus.Overdue]: 'status-overdue',
+                    [TaskStatus.Urgent]: 'status-urgent',
+                    [TaskStatus.Completed]: 'status-completed',
+                    [TaskStatus.UpcomingWeek]: 'status-active',
+                };
+                const cls = statusClass[getTaskStatus(task)];
+                if (cls) bar.addClass(cls);
+            }
+
+            bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task); });
+            bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
+            bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
+            bar.addEventListener('click', (e) => {
+                e.stopPropagation();
+                void this.openTaskFile(task);
+            });
         });
 
-        // 6. INITIALIZE DRAGGING & SCROLL
         this.setupEventListeners(this.scrollContainer);
     }
 
     public getScrollPosition(): number {
-        return this.scrollContainer ? this.scrollContainer.scrollLeft : 0;
+        return this.scrollContainer?.scrollLeft ?? 0;
     }
 
     public setScrollPosition(pos: number): void {
-        if (this.scrollContainer) {
-            this.scrollContainer.scrollTo({ left: pos, behavior: 'auto' });
-        }
+        this.scrollContainer?.scrollTo({ left: pos, behavior: 'auto' });
     }
 
+    // Smoothly centers the viewport on today's column
     public scrollToToday(): void {
         setTimeout(() => {
             if (!this.scrollContainer) return;
             const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today');
-
-            // Guard: Only scroll if the cell actually exists in the DOM
             if (todayCell instanceof HTMLElement) {
-                const scrollPos = todayCell.offsetLeft - (this.scrollContainer.clientWidth / 2) + (todayCell.clientWidth / 2);
+                const scrollPos = todayCell.offsetLeft
+                    - (this.scrollContainer.clientWidth / 2)
+                    + (todayCell.clientWidth / 2);
                 this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
             }
-        }, 300); // 300ms ensures the widget is fully visible before math happens
+        }, 300); // Delay ensures the widget is fully rendered before calculating offsets
     }
 
-    // --- PUBLIC SCROLL METHOD ---
     public scroll(direction: 'left' | 'right'): void {
         if (!this.scrollContainer) return;
-        const scrollAmount = this.scrollContainer.clientWidth * 0.8;
+        const amount = this.scrollContainer.clientWidth * 0.8;
         this.scrollContainer.scrollBy({
-            left: direction === 'left' ? -scrollAmount : scrollAmount,
-            behavior: 'smooth'
+            left: direction === 'left' ? -amount : amount,
+            behavior: 'smooth',
         });
     }
 
     private createNavigationOverlay(direction: 'left' | 'right'): void {
         const overlay = this.container.createDiv(`timeline-nav-overlay nav-${direction}`);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
-
         overlay.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.scroll(direction); // Reuse the release method
+            this.scroll(direction);
         });
     }
 
@@ -300,8 +289,7 @@ export class TimelineComponent {
             if (!this.isDragging) return;
             e.preventDefault();
             const x = e.pageX - container.offsetLeft;
-            const walk = (x - this.startX) * 1.5;
-            container.scrollLeft = this.scrollLeftPos - walk;
+            container.scrollLeft = this.scrollLeftPos - (x - this.startX) * 1.5;
         });
     }
 
@@ -315,22 +303,19 @@ export class TimelineComponent {
         if (task.dueDate) {
             this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${task.dueDate.toDateString()}`);
         }
-
         this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
     }
 
     private moveTooltip(e: MouseEvent): void {
         if (this.tooltipEl) {
-            this.tooltipEl.style.top = String(e.clientY + 15) + 'px';
-            this.tooltipEl.style.left = String(e.clientX + 15) + 'px';
+            this.tooltipEl.style.top = `${String(e.clientY + 15)}px`;
+            this.tooltipEl.style.left = `${String(e.clientX + 15)}px`;
         }
     }
 
     private hideTooltip(): void {
-        if (this.tooltipEl) {
-            this.tooltipEl.setCssProps({ display: 'none' });
-        }
+        this.tooltipEl?.setCssProps({ display: 'none' });
     }
 
     private async openTaskFile(task: Task): Promise<void> {
@@ -340,6 +325,7 @@ export class TimelineComponent {
         const leaf = this.app.workspace.getLeaf(false);
         await leaf.openFile(file);
 
+        // Move the editor cursor to the exact line of the task
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
             const pos = { line: task.lineNumber, ch: 0 };

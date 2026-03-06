@@ -77,13 +77,13 @@ export class QuickAddModal extends Modal {
                         if (view?.editor) {
                             view.editor.replaceSelection(taskLine);
 
-                            // Tell task manager to rescan this specific file immediately
+                            // Tell the task manager to rescan this specific file immediately
                             if (view.file) {
                                 void this.taskManager.refreshFileTask(view.file.path);
                             }
                         }
                     } else {
-                        // Standard append to end of file logic
+                        // Standard append to the end of file logic
                         const dateObj = this.date ? new Date(this.date) : null;
                         void this.taskManager.addTask(this.title, dateObj, this.selectedFile);
                     }
