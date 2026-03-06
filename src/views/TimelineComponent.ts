@@ -127,13 +127,11 @@ export class TimelineComponent {
             const cell = grid.createDiv('timeline-header-cell');
             cell.setText(day.getDate().toString());
             cell.createDiv('timeline-day-name').setText(day.toLocaleString('default', { weekday: 'short' }));
-            cell.style.gridColumn = String(idx + 1);
-            cell.style.gridRow = '1';
+            cell.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '1' });
 
             // Background column cell spanning all task rows
             const bgCell = grid.createDiv('timeline-bg-cell');
-            bgCell.style.gridColumn = String(idx + 1);
-            bgCell.style.gridRow = '2 / -1';
+            bgCell.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '2 / -1' });
 
             if (day.getDate() === 1) {
                 cell.addClass('is-month-start');
@@ -146,8 +144,7 @@ export class TimelineComponent {
 
                 // Vertical line marking today across all rows
                 const marker = grid.createDiv('timeline-today-marker');
-                marker.style.gridColumn = String(idx + 1);
-                marker.style.gridRow = '1 / -1';
+                marker.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '1 / -1' });
             }
         });
 
@@ -189,8 +186,7 @@ export class TimelineComponent {
                 rowEndTimes.push(taskEnd.getTime());
 
                 const rowBg = grid.createDiv('timeline-row-bg');
-                rowBg.style.gridColumn = '1 / -1';
-                rowBg.style.gridRow = String(rowIndex + 2);
+                rowBg.setCssProps({ 'grid-column': '1 / -1', 'grid-row': String(rowIndex + 2) });
             } else {
                 rowEndTimes[rowIndex] = taskEnd.getTime();
             }
