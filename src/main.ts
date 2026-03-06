@@ -94,13 +94,13 @@ export default class TaskLensPlugin extends Plugin {
 
             menu.addItem((item) =>
                 item
-                    .setTitle(this.isLayoutLocked ? 'Unlock Layout' : 'Lock Layout')
+                    .setTitle(this.isLayoutLocked ? 'Unlock layout' : 'Lock layout')
                     .setIcon(this.isLayoutLocked ? 'unlock' : 'lock')
                     .onClick(() => { this.toggleLayoutMode(); })
             );
             menu.addItem((item) =>
                 item
-                    .setTitle(this.isFocusMode ? 'Exit Focus Mode' : 'Enter Focus Mode')
+                    .setTitle(this.isFocusMode ? 'Exit focus mode' : 'Enter focus mode')
                     .setIcon(this.isFocusMode ? 'eye' : 'eye-off')
                     .onClick(() => { void this.toggleFocusMode(); })
             );
@@ -152,7 +152,7 @@ export default class TaskLensPlugin extends Plugin {
             });
         });
 
-        new Notice(this.isLayoutLocked ? 'Dashboard layout: Locked 🔒' : 'Dashboard layout: Unlocked 🔓');
+        new Notice(this.isLayoutLocked ? 'Dashboard layout: locked 🔒' : 'Dashboard layout: unlocked 🔓');
     }
 
     async toggleFocusMode(): Promise<void> {

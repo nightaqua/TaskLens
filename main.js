@@ -1729,6 +1729,7 @@ var StatsView = class extends import_obsidian12.ItemView {
 };
 
 // src/main.ts
+var ALL_VIEW_TYPES = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
 var TASKLENS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <circle cx="11" cy="11" r="8"></circle>
   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1739,7 +1740,6 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     super(...arguments);
     this.isLayoutLocked = true;
     this.isFocusMode = false;
-    this.savedLayout = null;
   }
   async onload() {
     await this.loadSettings();
@@ -1753,6 +1753,16 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
     this.registerView(VIEW_TYPE_STATS, (leaf) => new StatsView(leaf, this));
     (0, import_obsidian13.addIcon)("tasklens-icon", TASKLENS_ICON);
+    this.setupRibbonIcon();
+    this.setupCommands();
+    if (!this.settings.hasSeenWelcome) {
+      setTimeout(() => {
+        new WelcomeModal(this.app, this).open();
+      }, 1e3);
+    }
+    this.addSettingTab(new SettingsTab(this.app, this));
+  }
+  setupRibbonIcon() {
     const ribbonIconEl = this.addRibbonIcon("tasklens-icon", "Tasklens", (evt) => {
       ribbonIconEl.removeClass("feature-highlight");
       if (!this.settings.hasClickedRibbonIcon) {
@@ -1786,33 +1796,18 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     if (!this.settings.hasSeenWelcome || !this.settings.hasClickedRibbonIcon) {
       ribbonIconEl.addClass("feature-highlight");
     }
-    this.addCommand({
-      id: "open-dashboard",
-      name: "Open dashboard (all-in-one)",
-      callback: () => {
-        void this.activateView(VIEW_TYPE_DASHBOARD);
-      }
-    });
-    this.addCommand({
-      id: "open-timeline",
-      name: "Open timeline view",
-      callback: () => {
-        void this.activateView(VIEW_TYPE_TIMELINE);
-      }
-    });
-    this.addCommand({
-      id: "open-task-list",
-      name: "Open task list",
-      callback: () => {
-        void this.activateView(VIEW_TYPE_LIST);
-      }
-    });
-    this.addCommand({
-      id: "open-stats",
-      name: "Open statistics",
-      callback: () => {
-        void this.activateView(VIEW_TYPE_STATS);
-      }
+  }
+  setupCommands() {
+    const viewCommands = [
+      { id: "open-dashboard", name: "Open dashboard (all-in-one)", type: VIEW_TYPE_DASHBOARD },
+      { id: "open-timeline", name: "Open timeline view", type: VIEW_TYPE_TIMELINE },
+      { id: "open-task-list", name: "Open task list", type: VIEW_TYPE_LIST },
+      { id: "open-stats", name: "Open statistics", type: VIEW_TYPE_STATS }
+    ];
+    viewCommands.forEach(({ id, name, type }) => {
+      this.addCommand({ id, name, callback: () => {
+        void this.activateView(type);
+      } });
     });
     this.addCommand({
       id: "quick-add-task",
@@ -1828,26 +1823,14 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
         this.refreshViews();
       }
     });
-    if (!this.settings.hasSeenWelcome) {
-      setTimeout(() => {
-        new WelcomeModal(this.app, this).open();
-      }, 1e3);
-    }
-    this.addSettingTab(new SettingsTab(this.app, this));
   }
   toggleLayoutMode() {
     this.isLayoutLocked = !this.isLayoutLocked;
-    const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
-    viewTypes.forEach((type) => {
-      const leaves = this.app.workspace.getLeavesOfType(type);
-      leaves.forEach((leaf) => {
+    ALL_VIEW_TYPES.forEach((type) => {
+      this.app.workspace.getLeavesOfType(type).forEach((leaf) => {
         const tabContainer = leaf.view.containerEl.closest(".workspace-tabs");
         if (tabContainer) {
-          if (this.isLayoutLocked) {
-            tabContainer.classList.add("tasklens-hide-tabs");
-          } else {
-            tabContainer.classList.remove("tasklens-hide-tabs");
-          }
+          tabContainer.classList.toggle("tasklens-hide-tabs", this.isLayoutLocked);
         }
       });
     });
@@ -1861,17 +1844,15 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
       await this.saveSettings();
       if (typeof workspace.leftSplit.collapse === "function") workspace.leftSplit.collapse();
       if (typeof workspace.rightSplit.collapse === "function") workspace.rightSplit.collapse();
-      const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
       let closedCount = 0;
-      viewTypes.forEach((type) => {
+      ALL_VIEW_TYPES.forEach((type) => {
         const leaves = this.app.workspace.getLeavesOfType(type);
-        if (leaves.length > 0) {
-          closedCount += leaves.length;
-          this.app.workspace.detachLeavesOfType(type);
-        }
+        closedCount += leaves.length;
+        if (leaves.length > 0) this.app.workspace.detachLeavesOfType(type);
       });
-      if (closedCount > 0) new import_obsidian13.Notice("Focus mode enabled");
-      else {
+      if (closedCount > 0) {
+        new import_obsidian13.Notice("Focus mode enabled");
+      } else {
         this.isFocusMode = false;
         this.settings.savedFocusLayout = null;
         await this.saveSettings();
@@ -1913,8 +1894,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     await this.taskManager.loadTasks();
   }
   refreshViews() {
-    const viewTypes = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
-    viewTypes.forEach((type) => {
+    ALL_VIEW_TYPES.forEach((type) => {
       this.app.workspace.getLeavesOfType(type).forEach((leaf) => {
         const view = leaf.view;
         if (typeof view.refreshFromSettings === "function") {
