@@ -595,12 +595,12 @@ var TimelineComponent = class {
     this.daysToShow = daysToShow;
     this.settings = settings;
   }
-  // Cycles through a fixed palette by index — used as a fallback color
+  // Cycles through a fixed palette by index — used as a fallback colour
   getPaletteColor(index) {
     const palette = ["#4cc9f0", "#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4caf50"];
     return palette[index % palette.length];
   }
-  // Returns a deterministic color per topic: uses explicit setting if defined, otherwise hashes the name
+  // Returns a deterministic colour per topic: uses explicit setting if defined, otherwise hashes the name
   getTopicColor(topic) {
     if (this.settings.topicColors[topic]) return this.settings.topicColors[topic];
     let hash = 0;
@@ -612,8 +612,10 @@ var TimelineComponent = class {
     const monthName = day.toLocaleString("default", { month: "long", year: "numeric" });
     const cell = headerRow.createDiv("timeline-month-cell");
     cell.setText(monthName);
-    cell.style.width = `${String(span * colWidth)}%`;
-    cell.style.left = `${String(startIdx * colWidth)}%`;
+    cell.setCssProps({
+      width: `${String(span * colWidth)}%`,
+      left: `${String(startIdx * colWidth)}%`
+    });
   }
   render() {
     this.container.empty();
@@ -624,10 +626,18 @@ var TimelineComponent = class {
       empty.createEl("p", { text: "No dated tasks to display." });
       return;
     }
-    const dates = validTasks.map((t) => t.dueDate).filter((d) => Boolean(d));
-    dates.push(/* @__PURE__ */ new Date());
-    const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
-    const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+    const dates = validTasks.map((t) => t.dueDate).filter((d) => d instanceof Date);
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    dates.push(today);
+    let minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+    let maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+    const threeMonthsAgo = /* @__PURE__ */ new Date();
+    threeMonthsAgo.setMonth(today.getMonth() - 3);
+    const sixMonthsAhead = /* @__PURE__ */ new Date();
+    sixMonthsAhead.setMonth(today.getMonth() + 6);
+    if (minDate < threeMonthsAgo) minDate = threeMonthsAgo;
+    if (maxDate > sixMonthsAhead) maxDate = sixMonthsAhead;
     minDate.setDate(minDate.getDate() - 2);
     maxDate.setDate(maxDate.getDate() + this.daysToShow + 2);
     const allDays = [];
@@ -640,7 +650,7 @@ var TimelineComponent = class {
     this.createNavigationOverlay("right");
     this.scrollContainer = this.container.createDiv("timeline-container");
     const scrollContent = this.scrollContainer.createDiv("timeline-scroll-content");
-    scrollContent.style.width = `${String(allDays.length / this.daysToShow * 100)}%`;
+    scrollContent.setCssProps({ width: `${String(allDays.length / this.daysToShow * 100)}%` });
     const colWidthPercent = 100 / allDays.length;
     const monthHeader = scrollContent.createDiv("timeline-month-row");
     let currentMonth = -1;
@@ -657,7 +667,7 @@ var TimelineComponent = class {
     });
     this.renderMonthCell(monthHeader, allDays[monthStartIdx], allDays.length - monthStartIdx, colWidthPercent, monthStartIdx);
     const grid = scrollContent.createDiv("timeline-grid");
-    grid.style.gridTemplateColumns = `repeat(${String(allDays.length)}, 1fr)`;
+    grid.setCssProps({ "grid-template-columns": `repeat(${String(allDays.length)}, 1fr)` });
     allDays.forEach((day, idx) => {
       const cell = grid.createDiv("timeline-header-cell");
       cell.setText(day.getDate().toString());
@@ -697,7 +707,7 @@ var TimelineComponent = class {
       let dueIdx = allDays.findIndex((d) => d.toDateString() === taskEnd.toDateString());
       if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
       if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
-      if (startIdx < 0 || dueIdx < 0) return;
+      if (startIdx === -1 || dueIdx === -1 || startIdx === 0 && dueIdx === 0 && taskEnd < allDays[0]) return;
       let rowIndex = rowEndTimes.findIndex((endTime) => endTime < taskStart.getTime());
       if (rowIndex === -1) {
         rowIndex = rowEndTimes.length;
@@ -709,11 +719,15 @@ var TimelineComponent = class {
       }
       const bar = grid.createDiv("timeline-task-bar");
       bar.setText(task.title);
-      bar.style.gridColumnStart = String(startIdx + 1);
-      bar.style.gridColumnEnd = `span ${String(dueIdx - startIdx + 1)}`;
-      bar.style.gridRow = String(rowIndex + 2);
+      bar.setCssProps({
+        "grid-column-start": String(startIdx + 1),
+        "grid-column-end": `span ${String(dueIdx - startIdx + 1)}`,
+        "grid-row": String(rowIndex + 2)
+      });
+      if (taskStart < allDays[0]) bar.addClass("is-clamped-left");
+      if (taskEnd > allDays[allDays.length - 1]) bar.addClass("is-clamped-right");
       if (this.settings.colorMode === "course" && task.fileName) {
-        bar.style.backgroundColor = this.getTopicColor(task.fileName);
+        bar.setCssProps({ "background-color": this.getTopicColor(task.fileName) });
       } else {
         const statusClass = {
           ["overdue" /* Overdue */]: "status-overdue",
@@ -1109,14 +1123,13 @@ var QuickAddModal = class extends import_obsidian8.Modal {
       (btn) => btn.setButtonText("Add task").setCta().onClick(async () => {
         if (!this.title || !this.selectedFile) return;
         if (this.selectedFile === "__CURSOR__") {
-          const view = this.activeViewAtOpen;
-          if (view) {
+          if (this.activeViewAtOpen) {
             const dateStr = this.date ? ` [due:: ${this.date}]` : "";
             const taskLine = `- [ ] ${this.title}${dateStr}
 `;
-            view.editor.replaceSelection(taskLine);
-            if (view.file) {
-              await this.taskManager.refreshFileTask(view.file.path);
+            this.activeViewAtOpen.editor.replaceSelection(taskLine);
+            if (this.activeViewAtOpen.file) {
+              await this.taskManager.refreshFileTask(this.activeViewAtOpen.file.path);
             }
           } else {
             const fallbackFile = this.taskManager.getScannedFiles()[0];
@@ -1148,9 +1161,9 @@ function setupViewDOM(containerEl, isLocked) {
   if (tabContainer && isLocked) tabContainer.classList.add("tasklens-hide-tabs");
   return { leafRootEl, tabContainer };
 }
-function cleanupViewDOM(leafRootEl, tabContainer) {
-  if (tabContainer) tabContainer.classList.remove("tasklens-hide-tabs");
-  if (leafRootEl) leafRootEl.classList.remove("tasklens-chromeless");
+function cleanUpViewDOM(leafRootEl, tabContainer) {
+  if (tabContainer instanceof HTMLElement) tabContainer.classList.remove("tasklens-hide-tabs");
+  if (leafRootEl instanceof HTMLElement) leafRootEl.classList.remove("tasklens-chromeless");
 }
 var DashboardView = class extends import_obsidian9.ItemView {
   constructor(leaf, plugin) {
@@ -1479,64 +1492,68 @@ var TimelineView = class extends import_obsidian10.ItemView {
     this.plugin = plugin;
     this.leafRootEl = null;
     this.tabContainer = null;
+    this.timelineComponent = null;
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
-    this.isOpen = false;
-    this.timelineComponent = null;
-    this.plugin.taskManager.on("tasks-updated", () => {
-      if (this.isOpen) this.render();
-    });
+    this.timelineDaysToShow = 10;
+    // Named event handler to prevent listener stacking
+    this.onTasksUpdated = () => {
+      this.render();
+    };
+    this.plugin.taskManager.on("tasks-updated", this.onTasksUpdated);
   }
   getViewType() {
     return VIEW_TYPE_TIMELINE;
   }
   getDisplayText() {
-    return "Timeline";
+    return "Timeline view";
   }
   getIcon() {
-    return "calendar-range";
+    return "clock";
   }
   async setState(state, result) {
-    const parsedState = state;
-    if (parsedState.headerState) {
-      this.headerState = parsedState.headerState;
-    }
     await super.setState(state, result);
+    if (state && typeof state === "object") {
+      const s = state;
+      if (Object.prototype.hasOwnProperty.call(s, "headerState")) this.headerState = s.headerState;
+      if (Object.prototype.hasOwnProperty.call(s, "zoomLevel")) this.timelineDaysToShow = s.zoomLevel;
+    }
     this.render();
-    this.scrollToTodaySoon();
+    setTimeout(() => {
+      var _a;
+      (_a = this.timelineComponent) == null ? void 0 : _a.scrollToToday();
+    }, 300);
   }
   getState() {
-    if (this.headerComponent) {
-      this.headerState = this.headerComponent.getState();
-    }
-    return { headerState: this.headerState };
-  }
-  scrollToTodaySoon() {
-    setTimeout(() => {
-      if (this.timelineComponent) this.timelineComponent.scrollToToday();
-    }, 500);
+    return Object.assign(super.getState(), {
+      headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState,
+      zoomLevel: this.timelineDaysToShow
+    });
   }
   onOpen() {
-    const dom = setupViewDOM(this.containerEl, true);
-    this.leafRootEl = dom.leafRootEl;
-    this.tabContainer = dom.tabContainer;
+    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+    this.leafRootEl = leafRootEl;
+    this.tabContainer = tabContainer;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
-    this.contentEl.addClass("is-single-view");
-    this.isOpen = true;
     void this.plugin.taskManager.loadTasks().then(() => {
       this.render();
-      this.scrollToTodaySoon();
+      setTimeout(() => {
+        var _a;
+        (_a = this.timelineComponent) == null ? void 0 : _a.scrollToToday();
+      }, 500);
     });
     return Promise.resolve();
   }
   onClose() {
-    this.isOpen = false;
-    cleanupViewDOM(this.leafRootEl, this.tabContainer);
+    this.plugin.taskManager.off("tasks-updated", this.onTasksUpdated);
+    this.performCleanUp();
     return Promise.resolve();
   }
+  performCleanUp() {
+    cleanUpViewDOM(this.leafRootEl, this.tabContainer);
+  }
   render() {
-    if (!this.isOpen || !this.contentEl.isConnected) return;
     this.contentEl.empty();
     this.headerComponent = new HeaderComponent(
       this.contentEl,
@@ -1544,9 +1561,7 @@ var TimelineView = class extends import_obsidian10.ItemView {
       "Timeline",
       {
         onStateChange: () => {
-          if (this.headerComponent) {
-            this.headerState = this.headerComponent.getState();
-          }
+          if (this.headerComponent) this.headerState = this.headerComponent.getState();
           this.app.workspace.requestSaveLayout();
           this.render();
         },
@@ -1556,8 +1571,18 @@ var TimelineView = class extends import_obsidian10.ItemView {
       }
     );
     this.headerComponent.render();
-    this.timelineComponent = new TimelineComponent(this.contentEl, this.app, this.plugin.taskManager.getFilteredTasks(), 7, this.plugin.settings);
+    const container = this.contentEl.createDiv("dashboard-timeline-view");
+    this.timelineComponent = new TimelineComponent(
+      container,
+      this.app,
+      this.plugin.taskManager.getFilteredTasks(),
+      this.timelineDaysToShow,
+      this.plugin.settings
+    );
     this.timelineComponent.render();
+  }
+  refreshFromSettings() {
+    this.render();
   }
 };
 
@@ -1615,7 +1640,10 @@ var TaskListView = class extends import_obsidian11.ItemView {
   }
   onClose() {
     this.isOpen = false;
-    cleanupViewDOM(this.leafRootEl, this.tabContainer);
+    this.plugin.taskManager.off("tasks-updated", this.onTasksUpdated);
+    const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
+    const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
+    cleanUpViewDOM(root, tabs);
     return Promise.resolve();
   }
   render() {
@@ -1706,9 +1734,10 @@ var StatsView = class extends import_obsidian12.ItemView {
     this.tabContainer = null;
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
-    this.plugin.taskManager.on("tasks-updated", () => {
+    this.onTasksUpdated = () => {
       this.render();
-    });
+    };
+    this.plugin.taskManager.on("tasks-updated", this.onTasksUpdated);
   }
   getViewType() {
     return VIEW_TYPE_STATS;
@@ -1743,7 +1772,10 @@ var StatsView = class extends import_obsidian12.ItemView {
     return Promise.resolve();
   }
   onClose() {
-    cleanupViewDOM(this.leafRootEl, this.tabContainer);
+    this.plugin.taskManager.off("tasks-updated", this.onTasksUpdated);
+    const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
+    const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
+    cleanUpViewDOM(root, tabs);
     return Promise.resolve();
   }
   render() {
@@ -1899,7 +1931,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
         this.isFocusMode = false;
         this.settings.savedFocusLayout = null;
         await this.saveSettings();
-        new import_obsidian13.Notice("No tasklenses were open");
+        new import_obsidian13.Notice("No task lenses were open");
       }
     } else {
       this.isFocusMode = false;
