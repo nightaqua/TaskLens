@@ -253,9 +253,7 @@ var TaskManager = class extends import_obsidian.Events {
   getAllTasks() {
     return [...this.tasks];
   }
-  getFilteredTasks() {
-    return [...this.filteredTasks];
-  }
+  // COMMENTED OUT FOR NOW getFilteredTasks(): Task[] { return [...this.filteredTasks]; } #TODO
   /**
    * Collapses recurring clones into one TaskGroup per series.
    * Non-recurring tasks each become their own group (openCount: 1, isRecurring: false).
@@ -621,6 +619,11 @@ var DEFAULT_SETTINGS = {
   appWideAutomation: true,
   hasSeenWelcome: false,
   hasClickedRibbonIcon: false,
+  settingsTabState: {
+    scanOpen: true,
+    parserOpen: false,
+    uiOpen: true
+  },
   savedFocusLayout: null
 };
 function getTopicColor(topic, settings) {
@@ -706,8 +709,12 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
       })
     );
     const scanDetails = containerEl.createEl("details");
-    scanDetails.open = true;
+    scanDetails.open = this.plugin.settings.settingsTabState.scanOpen;
     scanDetails.createEl("summary", { text: "Vault scanning" });
+    scanDetails.addEventListener("toggle", () => {
+      this.plugin.settings.settingsTabState.scanOpen = scanDetails.open;
+      void this.plugin.saveSettings();
+    });
     const scanPathsSetting = new import_obsidian4.Setting(scanDetails).setName("Scan paths").setDesc("Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.").addTextArea((text) => {
       text.setPlaceholder("Projects\nUni/History\nTo-Do.md").setValue(this.plugin.settings.scanFolders.join("\n")).onChange((value) => {
         this.plugin.settings.scanFolders = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
@@ -720,7 +727,12 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
       void this.plugin.saveSettings();
     }));
     const parserDetails = containerEl.createEl("details");
+    parserDetails.open = this.plugin.settings.settingsTabState.parserOpen;
     parserDetails.createEl("summary", { text: "Task parsing & automation" });
+    parserDetails.addEventListener("toggle", () => {
+      this.plugin.settings.settingsTabState.parserOpen = parserDetails.open;
+      void this.plugin.saveSettings();
+    });
     new import_obsidian4.Setting(parserDetails).setName("App-wide automation").setDesc("Apply date stamping and recurrence even when editing notes directly.").addToggle((t) => t.setValue(this.plugin.settings.appWideAutomation).onChange((v) => {
       this.plugin.settings.appWideAutomation = v;
       void this.plugin.saveSettings();
@@ -734,8 +746,12 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
       void this.plugin.saveSettings();
     }));
     const uiDetails = containerEl.createEl("details");
-    uiDetails.open = true;
+    uiDetails.open = this.plugin.settings.settingsTabState.uiOpen;
     uiDetails.createEl("summary", { text: "Appearance & colors" });
+    uiDetails.addEventListener("toggle", () => {
+      this.plugin.settings.settingsTabState.uiOpen = uiDetails.open;
+      void this.plugin.saveSettings();
+    });
     new import_obsidian4.Setting(uiDetails).setName("Color mode").addDropdown((d) => d.addOption("status", "By urgency (overdue, active)").addOption("course", "By topic (file palette)").setValue(this.plugin.settings.colorMode).onChange((v) => {
       this.plugin.settings.colorMode = v;
       void this.plugin.saveSettings().then(() => {
@@ -1591,7 +1607,10 @@ function setupViewDOM(containerEl, isLocked) {
   if (leafRootEl) leafRootEl.classList.add("tasklens-chromeless");
   const tabContainer = containerEl.closest(".workspace-tabs");
   if (tabContainer && isLocked) tabContainer.classList.add("tasklens-hide-tabs");
-  return { leafRootEl, tabContainer };
+  return {
+    leafRootEl: leafRootEl instanceof HTMLElement ? leafRootEl : null,
+    tabContainer: tabContainer instanceof HTMLElement ? tabContainer : null
+  };
 }
 function cleanUpViewDOM(leafRootEl, tabContainer) {
   if (tabContainer instanceof HTMLElement) tabContainer.classList.remove("tasklens-hide-tabs");
@@ -1697,9 +1716,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     });
   }
   onOpen() {
-    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
-    this.leafRootEl = leafRootEl instanceof HTMLElement ? leafRootEl : null;
-    this.tabContainer = tabContainer instanceof HTMLElement ? tabContainer : null;
+    ({ leafRootEl: this.leafRootEl, tabContainer: this.tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked));
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.applyColorTheme();
@@ -1804,7 +1821,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     completionGroup.createEl("label", { text: "Completed:" });
     const completionSelect = completionGroup.createEl("select");
     [
-      { value: "all", text: "All-time" },
+      { value: "all", text: "All time" },
       { value: "today", text: "Today" }
     ].forEach((opt) => {
       const option = completionSelect.createEl("option", { value: opt.value, text: opt.text });
@@ -1999,9 +2016,7 @@ var TimelineView = class extends import_obsidian10.ItemView {
     });
   }
   onOpen() {
-    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
-    this.leafRootEl = leafRootEl instanceof HTMLElement ? leafRootEl : null;
-    this.tabContainer = tabContainer instanceof HTMLElement ? tabContainer : null;
+    ({ leafRootEl: this.leafRootEl, tabContainer: this.tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked));
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     void this.plugin.taskManager.loadTasks().then(() => {
@@ -2334,6 +2349,13 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
       }, 1e3);
     }
     this.addSettingTab(new SettingsTab(this.app, this));
+    this.app.workspace.onLayoutReady(() => {
+      ALL_VIEW_TYPES.forEach((type) => {
+        this.app.workspace.getLeavesOfType(type).forEach((leaf) => {
+          setupViewDOM(leaf.view.containerEl, this.isLayoutLocked);
+        });
+      });
+    });
   }
   setupRibbonIcon() {
     const ribbonIconEl = this.addRibbonIcon("tasklens-icon", "Tasklens", (evt) => {

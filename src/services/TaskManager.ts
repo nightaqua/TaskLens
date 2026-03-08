@@ -243,7 +243,7 @@ export class TaskManager extends Events {
     }
 
     getAllTasks(): Task[] { return [...this.tasks]; }
-    getFilteredTasks(): Task[] { return [...this.filteredTasks]; }
+    // COMMENTED OUT FOR NOW getFilteredTasks(): Task[] { return [...this.filteredTasks]; } #TODO
 
     /**
      * Collapses recurring clones into one TaskGroup per series.

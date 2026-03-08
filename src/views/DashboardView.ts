@@ -10,12 +10,15 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 export const VIEW_TYPE_DASHBOARD = 'tasklens-dashboard-view';
 
 // Applies chromeless styling to the leaf and optionally hides tabs when the layout is locked
-export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean) {
+export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean): { leafRootEl: HTMLElement | null; tabContainer: HTMLElement | null } {
     const leafRootEl = containerEl.closest('.workspace-leaf-content');
     if (leafRootEl) leafRootEl.classList.add('tasklens-chromeless');
     const tabContainer = containerEl.closest('.workspace-tabs');
     if (tabContainer && isLocked) tabContainer.classList.add('tasklens-hide-tabs');
-    return { leafRootEl, tabContainer };
+    return {
+        leafRootEl: leafRootEl instanceof HTMLElement ? leafRootEl : null,
+        tabContainer: tabContainer instanceof HTMLElement ? tabContainer : null,
+    };
 }
 
 // Reverses the DOM changes made by setupViewDOM on close
@@ -149,9 +152,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     onOpen(): Promise<void> {
         // Delegate chromeless styling and tab-hiding to the shared helper
         // so DashboardView, TimelineView etc. all behave identically.
-        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
-        this.leafRootEl = leafRootEl instanceof HTMLElement ? leafRootEl : null;
-        this.tabContainer = tabContainer instanceof HTMLElement ? tabContainer : null;
+        ({ leafRootEl: this.leafRootEl, tabContainer: this.tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked));
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
