@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - Upcoming (In Progress)
+### Added
+- **Clone & Bump Recurrence:** Implemented "Tasks-style" recurring logic. Tasks with `[repeat:: daily/weekly/Nd]` now automatically clone themselves to the next interval when completed.
+- **Completion Timestamps:** Added automatic metadata stamping for completed tasks: `[completion:: YYYY-MM-DD HH:mm]`.
+- **App-Wide Automation:** Recurrence and date stamping now trigger even when tasks are checked directly in the Markdown editor, not just via the Dashboard.
+- **Smart Urgency:** All incomplete recurring tasks are now automatically treated as "Urgent" to ensure they stay visible in the daily flow.
+- **Flexible Stats:** Added a toggle to switch the "Completed" stats box between all-time totals and "Done Today" productivity metrics.
+
+### Changed
+- Stats component now supports a 5-card layout to include Active, Urgent, Overdue, and Completion metrics simultaneously.
+- Refactored task status logic to prioritize recurrence over standard due dates.
+
 ## [1.1.0]
 ### Added
 - **Focus Mode:** Added native workspace layout saving. Instantly hide all widgets/sidebars to write, and restore them flawlessly.

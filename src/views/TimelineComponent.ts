@@ -1,48 +1,88 @@
-import { Task, getTaskStatus, TaskStatus } from '../models/Task';
-import { App, MarkdownView, TFile } from 'obsidian';
-import { SemesterSettings } from '../settings/Settings';
+import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
+import { App, setIcon } from 'obsidian';
+import { SemesterSettings, getTopicColor } from '../settings/Settings';
+import { openTaskInEditor } from './TaskListComponent';
 
 export class TimelineComponent {
     private readonly container: HTMLElement;
-    private readonly tasks: Task[];
+    private readonly groups: TaskGroup[];
     private readonly daysToShow: number;
     private readonly app: App;
     private readonly settings: SemesterSettings;
+    private readonly onViewportChange: ((newStart: Date) => void) | null;
 
+    private viewportStart: Date;
     private scrollContainer: HTMLElement | null = null;
     private tooltipEl: HTMLElement | null = null;
+
+    // Persists the nav ribbon panel's open state across re-renders triggered by viewport jumps
+    private ribbonNavOpen = false;
+    // Stored so it can be removed before re-render
+    private ribbonOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
     // Drag-to-scroll state
     private isDragging = false;
     private startX = 0;
     private scrollLeftPos = 0;
 
+    // The viewport always renders exactly MAX_DAYS columns — the DOM size stays constant
+    private static readonly MAX_DAYS = 365;
+
+    // Jump buttons shift the viewport by this many months
+    private static readonly JUMP_MONTHS = 6;
+
     constructor(
         container: HTMLElement,
         app: App,
-        tasks: Task[],
+        groups: TaskGroup[],
         daysToShow: number = 10,
-        settings: SemesterSettings
+        settings: SemesterSettings,
+        viewportStart?: Date,
+        onViewportChange?: (newStart: Date) => void
     ) {
         this.container = container;
         this.app = app;
-        this.tasks = tasks;
+        this.groups = groups;
         this.daysToShow = daysToShow;
         this.settings = settings;
+        this.onViewportChange = onViewportChange ?? null;
+
+        // Default: start 3 months before today so today is always comfortably in view
+        if (viewportStart) {
+            this.viewportStart = new Date(viewportStart);
+        } else {
+            const defaultStart = new Date();
+            defaultStart.setMonth(defaultStart.getMonth() - 3);
+            defaultStart.setHours(0, 0, 0, 0);
+            this.viewportStart = defaultStart;
+        }
     }
 
-    // Cycles through a fixed palette by index — used as a fallback colour
-    private getPaletteColor(index: number): string {
-        const palette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
-        return palette[index % palette.length];
+    public getViewportStart(): Date {
+        return new Date(this.viewportStart);
     }
 
-    // Returns a deterministic colour per topic: uses explicit setting if defined, otherwise hashes the name
-    private getTopicColor(topic: string): string {
-        if (this.settings.topicColors[topic]) return this.settings.topicColors[topic];
-        let hash = 0;
-        for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
-        return this.getPaletteColor(Math.abs(hash));
+    // Commits a new viewport start date, fires the change callback, re-renders, and resets pan
+    private applyViewportJump(newStart: Date): void {
+        this.viewportStart = newStart;
+        if (this.onViewportChange) this.onViewportChange(new Date(newStart));
+        this.render();
+        this.scrollContainer?.scrollTo({ left: 0, behavior: 'auto' });
+    }
+
+    // Shifts the viewport by the given number of months and re-renders
+    private jumpViewport(monthDelta: number): void {
+        const next = new Date(this.viewportStart);
+        next.setMonth(next.getMonth() + monthDelta);
+        this.applyViewportJump(next);
+    }
+
+    // Jumps the viewport so the given date sits near the left edge, then re-renders
+    private jumpToDate(date: Date): void {
+        const target = new Date(date);
+        target.setDate(target.getDate() - 14); // 2-week lead-in
+        target.setHours(0, 0, 0, 0);
+        this.applyViewportJump(target);
     }
 
     // Renders a single month label cell in the month header row
@@ -62,53 +102,196 @@ export class TimelineComponent {
         });
     }
 
+    // Builds the fixed-width day array for the current viewport
+    private buildViewportDays(): Date[] {
+        const days: Date[] = [];
+        const curr = new Date(this.viewportStart);
+        curr.setHours(0, 0, 0, 0);
+        for (let i = 0; i < TimelineComponent.MAX_DAYS; i++) {
+            days.push(new Date(curr));
+            curr.setDate(curr.getDate() + 1);
+        }
+        return days;
+    }
+
+    private createSideRibbon(allDays: Date[], validTasks: Task[]): void {
+        const ribbon = this.container.createDiv('timeline-ribbon');
+
+        // ── Nav section ───────────────────────────────────────────────────────────
+        const navSection = ribbon.createDiv('ribbon-section ribbon-section--nav');
+
+        const navHandle = navSection.createDiv('ribbon-handle ribbon-handle--nav');
+        navHandle.setAttribute('aria-label', 'Navigate timeline');
+        const navIconWrap = navHandle.createDiv('ribbon-handle-icon');
+        setIcon(navIconWrap, 'calendar-range');
+
+        const navHoverLabel = navSection.createDiv('ribbon-hover-label');
+        navHoverLabel.setText('Navigate');
+
+        const navPanel = navSection.createDiv('ribbon-panel');
+
+        // Define open/close before anything that might call them ──────────────────
+        const openNav = (): void => {
+            this.ribbonNavOpen = true;
+            navSection.addClass('is-open');
+            // Guard: don't double-register
+            if (this.ribbonOutsideHandler) {
+                document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                this.ribbonOutsideHandler = null;
+            }
+            const handler = (e: MouseEvent): void => {
+                const target = e.target;
+                if (!(target instanceof Node)) return;
+                if (!navSection.contains(target)) {
+                    this.ribbonNavOpen = false;
+                    navSection.removeClass('is-open');
+                    document.removeEventListener('mousedown', handler);
+                    this.ribbonOutsideHandler = null;
+                }
+            };
+            this.ribbonOutsideHandler = handler;
+            document.addEventListener('mousedown', handler);
+        };
+
+        const closeNav = (): void => {
+            this.ribbonNavOpen = false;
+            navSection.removeClass('is-open');
+            if (this.ribbonOutsideHandler) {
+                document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                this.ribbonOutsideHandler = null;
+            }
+        };
+
+        // Restore open state after a viewport-jump re-render — also re-attaches handler
+        if (this.ribbonNavOpen) openNav();
+
+        const viewportEnd = new Date(this.viewportStart);
+        viewportEnd.setDate(viewportEnd.getDate() + TimelineComponent.MAX_DAYS - 1);
+        const startLabel = this.viewportStart.toLocaleString('default', { month: 'short', year: '2-digit' });
+        const endLabel = viewportEnd.toLocaleString('default', { month: 'short', year: '2-digit' });
+
+        const navControls = navPanel.createDiv('ribbon-nav-controls');
+
+        const prevBtn = navControls.createEl('button', { cls: 'vp-jump' });
+        prevBtn.setText('‹‹');
+        prevBtn.setAttribute('aria-label', 'Jump back 6 months');
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.ribbonNavOpen = true;
+            this.jumpViewport(-TimelineComponent.JUMP_MONTHS);
+        });
+
+        const rangeEl = navControls.createDiv('vp-range');
+        rangeEl.createSpan().setText(startLabel);
+        rangeEl.createEl('em').setText('/');
+        rangeEl.createSpan().setText(endLabel);
+
+        const nextBtn = navControls.createEl('button', { cls: 'vp-jump' });
+        nextBtn.setText('››');
+        nextBtn.setAttribute('aria-label', 'Jump forward 6 months');
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.ribbonNavOpen = true;
+            this.jumpViewport(TimelineComponent.JUMP_MONTHS);
+        });
+
+        const windowStart = allDays[0];
+        const windowEnd = allDays[allDays.length - 1];
+        const outOfRange = validTasks.filter(t => {
+            if (!t.dueDate) return false;
+            return t.dueDate < windowStart || t.dueDate > windowEnd;
+        });
+
+        if (outOfRange.length > 0) {
+            const byMonth = new Map<string, { label: string; date: Date; count: number }>();
+            outOfRange.forEach(t => {
+                if (!t.dueDate) return;
+                const key = t.dueDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+                const existing = byMonth.get(key);
+                if (existing) {
+                    existing.count += 1;
+                } else {
+                    byMonth.set(key, { label: key, date: new Date(t.dueDate), count: 1 });
+                }
+            });
+
+            const chipsEl = navPanel.createDiv('ribbon-chips');
+            byMonth.forEach(({ label, date, count }) => {
+                const isPast = date < windowStart;
+                const chip = chipsEl.createEl('button', { cls: `chip ${isPast ? 'chip--past' : 'chip--future'}` });
+                const countSuffix = count > 1 ? ` \xd7${String(count)}` : '';
+                chip.setText(isPast ? `\u2190 ${label}${countSuffix}` : `${label}${countSuffix} \u2192`);
+                chip.setAttribute('aria-label', `Jump to ${label}`);
+                chip.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.ribbonNavOpen = true;
+                    this.jumpToDate(date);
+                });
+            });
+        }
+
+        navHandle.addEventListener('click', () => {
+            if (navSection.hasClass('is-open')) {
+                closeNav();
+            } else {
+                openNav();
+            }
+        });
+
+        // ── Sync section ──────────────────────────────────────────────────────────
+        // No panel, no toggle. Hover reveals a floating expand (rightward absolute overlay).
+        // Clicking either the handle or the expand fires scrollToToday.
+        const syncSection = ribbon.createDiv('ribbon-section ribbon-section--sync');
+
+        const syncHandle = syncSection.createDiv('ribbon-handle ribbon-handle--sync');
+        syncHandle.setAttribute('aria-label', 'Scroll to today');
+        const syncIconWrap = syncHandle.createDiv('ribbon-handle-icon');
+        setIcon(syncIconWrap, 'rotate-ccw');
+
+        // Floating expand — shown on section hover via CSS, positioned rightward
+        const syncExpand = syncSection.createDiv('ribbon-sync-expand');
+        const syncExpandIcon = syncExpand.createDiv('ribbon-sync-expand-icon');
+        setIcon(syncExpandIcon, 'rotate-ccw');
+        syncExpand.createSpan({ cls: 'ribbon-sync-expand-label' }).setText('Today');
+
+        syncHandle.addEventListener('click', () => { this.scrollToToday(); });
+        syncExpand.addEventListener('click', () => { this.scrollToToday(); });
+    }
+
     public render(): void {
+        if (this.ribbonOutsideHandler) {
+            document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            this.ribbonOutsideHandler = null;
+        }
         this.container.empty();
         this.container.addClass('timeline-wrapper');
 
-        const validTasks = this.tasks.filter(t => t.dueDate && !isNaN(t.dueDate.getTime()));
-        if (validTasks.length === 0) {
+        // Extract representative tasks from groups. Each group renders as one bar.
+        // Completed-only groups (openCount === 0) are included so completed recurring
+        // tasks still appear on the timeline.
+        const validGroups = this.groups.filter(g => {
+            const t = g.representative;
+            return t.dueDate && !isNaN(t.dueDate.getTime());
+        });
+
+        if (validGroups.length === 0) {
             const empty = this.container.createDiv('dashboard-empty-state');
             empty.createEl('p', { text: 'No dated tasks to display.' });
             return;
         }
 
-        // Build the date range: from the earliest task date to the latest, with padding
-        // Ensure the current date is ALWAYS in the pool of dates
-        const dates = validTasks
-            .map(t => t.dueDate)
-            .filter((d): d is Date => d instanceof Date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        dates.push(today);
+        // Build the fixed-width viewport — always MAX_DAYS columns, no matter what dates exist
+        const allDays = this.buildViewportDays();
 
-        let minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-        let maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        // Ribbon is appended to the outer container so it anchors to the pane's left wall,
+        // outside the chart entirely. The chart wrapper gets a left margin to match.
+        this.createSideRibbon(allDays, validGroups.map(g => g.representative));
 
-        // Limit the view to 3 months before today and 6 months after today
-        const threeMonthsAgo = new Date();
-        threeMonthsAgo.setMonth(today.getMonth() - 3);
-        const sixMonthsAhead = new Date();
-        sixMonthsAhead.setMonth(today.getMonth() + 6);
-
-        if (minDate < threeMonthsAgo) minDate = threeMonthsAgo;
-        if (maxDate > sixMonthsAhead) maxDate = sixMonthsAhead;
-
-        minDate.setDate(minDate.getDate() - 2);
-        maxDate.setDate(maxDate.getDate() + this.daysToShow + 2);
-
-        const allDays: Date[] = [];
-        const curr = new Date(minDate);
-        while (curr <= maxDate) {
-            allDays.push(new Date(curr));
-            curr.setDate(curr.getDate() + 1);
-        }
-
-        // Left/right hover-overlay arrows for scrolling
+        // Left/right hover-overlay arrows for panning within the window — untouched
         this.createNavigationOverlay('left');
         this.createNavigationOverlay('right');
 
-        // Outer scroll container; inner content scaled to represent all days proportionally
+        // Outer scroll container
         this.scrollContainer = this.container.createDiv('timeline-container');
         const scrollContent = this.scrollContainer.createDiv('timeline-scroll-content');
         scrollContent.setCssProps({ width: `${String((allDays.length / this.daysToShow) * 100)}%` });
@@ -167,16 +350,33 @@ export class TimelineComponent {
         // Tracks the latest end time per row to find the first available slot for each task.
         const rowEndTimes: number[] = [];
 
-        const sortedTasks = [...validTasks].sort((a, b) => {
-            if (a.fileName !== b.fileName) {
-                return (a.fileName || '').localeCompare(b.fileName || '');
+        const windowStart = allDays[0];
+        const windowEnd = allDays[allDays.length - 1];
+
+        const sortedGroups = [...validGroups].sort((a, b) => {
+            const ta = a.representative;
+            const tb = b.representative;
+            if (ta.fileName !== tb.fileName) {
+                return (ta.fileName || '').localeCompare(tb.fileName || '');
             }
-            const aStart = a.startDate?.getTime() || a.dueDate?.getTime() || 0;
-            const bStart = b.startDate?.getTime() || b.dueDate?.getTime() || 0;
+            const aStart = ta.startDate?.getTime() ?? ta.dueDate?.getTime() ?? 0;
+            const bStart = tb.startDate?.getTime() ?? tb.dueDate?.getTime() ?? 0;
             return aStart - bStart;
         });
 
-        sortedTasks.forEach((task) => {
+        const windowStartMs = windowStart.getTime();
+        const windowEndMs = windowEnd.getTime() + 86399999;
+        const visibleGroups = sortedGroups.filter(group => {
+            const task = group.representative;
+            if (!task.dueDate) return false;
+            const dueMs = new Date(task.dueDate).setHours(23, 59, 59, 999);
+            const startDate = task.startDate ?? task.dueDate;
+            const startMs = new Date(startDate).setHours(0, 0, 0, 0);
+            return dueMs >= windowStartMs && startMs <= windowEndMs;
+        });
+
+        visibleGroups.forEach((group) => {
+            const task = group.representative;
             if (!task.dueDate) return;
 
             const taskStart = new Date(task.startDate ?? task.dueDate);
@@ -196,7 +396,6 @@ export class TimelineComponent {
             // Find the first row whose last task has already ended before this one starts
             let rowIndex = rowEndTimes.findIndex(endTime => endTime < taskStart.getTime());
             if (rowIndex === -1) {
-                // All rows occupied — open a new one with a background stripe
                 rowIndex = rowEndTimes.length;
                 rowEndTimes.push(taskEnd.getTime());
 
@@ -206,8 +405,12 @@ export class TimelineComponent {
                 rowEndTimes[rowIndex] = taskEnd.getTime();
             }
 
+            const barLabel = group.isRecurring && group.openCount > 1
+                ? `${task.title} \u00d7${String(group.openCount)}`
+                : task.title;
+
             const bar = grid.createDiv('timeline-task-bar');
-            bar.setText(task.title);
+            bar.setText(barLabel);
             bar.setCssProps({
                 'grid-column-start': String(startIdx + 1),
                 'grid-column-end': `span ${String((dueIdx - startIdx) + 1)}`,
@@ -219,7 +422,7 @@ export class TimelineComponent {
 
             // Colour by course/topic or by urgency status depending on settings
             if (this.settings.colorMode === 'course' && task.fileName) {
-                bar.setCssProps({ 'background-color': this.getTopicColor(task.fileName) });
+                bar.setCssProps({ 'background-color': getTopicColor(task.fileName, this.settings) });
             } else {
                 const statusClass: Record<string, string> = {
                     [TaskStatus.Overdue]: 'status-overdue',
@@ -231,12 +434,12 @@ export class TimelineComponent {
                 if (cls) bar.addClass(cls);
             }
 
-            bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task); });
+            bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task, group.openCount); });
             bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
             bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
             bar.addEventListener('click', (e) => {
                 e.stopPropagation();
-                void this.openTaskFile(task);
+                void openTaskInEditor(this.app, task);
             });
         });
 
@@ -251,8 +454,24 @@ export class TimelineComponent {
         this.scrollContainer?.scrollTo({ left: pos, behavior: 'auto' });
     }
 
-    // Smoothly centers the viewport on today's column
+    // Smoothly centres the viewport on today's column.
+    // If today is outside the current window, jumps the viewport to bring it in first.
     public scrollToToday(): void {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const windowEnd = new Date(this.viewportStart);
+        windowEnd.setDate(windowEnd.getDate() + TimelineComponent.MAX_DAYS - 1);
+
+        if (today < this.viewportStart || today > windowEnd) {
+            const newStart = new Date(today);
+            newStart.setMonth(newStart.getMonth() - 3);
+            newStart.setHours(0, 0, 0, 0);
+            // applyViewportJump re-renders, so we return — the new render will have today in range
+            this.applyViewportJump(newStart);
+            return;
+        }
+
         if (!this.scrollContainer) return;
         const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today');
         if (todayCell instanceof HTMLElement) {
@@ -307,7 +526,7 @@ export class TimelineComponent {
         });
     }
 
-    private showTooltip(e: MouseEvent, task: Task): void {
+    private showTooltip(e: MouseEvent, task: Task, openCount: number): void {
         if (!this.tooltipEl) {
             this.tooltipEl = document.body.createDiv('dashboard-tooltip');
         }
@@ -316,6 +535,9 @@ export class TimelineComponent {
         this.tooltipEl.createDiv('tooltip-meta').setText(`📂 ${task.fileName}`);
         if (task.dueDate) {
             this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${task.dueDate.toDateString()}`);
+        }
+        if (openCount > 1) {
+            this.tooltipEl.createDiv('tooltip-recurrence').setText(`🔁 ${String(openCount)} pending`);
         }
         this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
@@ -334,19 +556,4 @@ export class TimelineComponent {
         this.tooltipEl?.setCssProps({ display: 'none' });
     }
 
-    private async openTaskFile(task: Task): Promise<void> {
-        const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (!(file instanceof TFile)) return;
-
-        const leaf = this.app.workspace.getLeaf(false);
-        await leaf.openFile(file);
-
-        // Move the editor cursor to the exact line of the task
-        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-            const pos = { line: task.lineNumber, ch: 0 };
-            view.editor.setCursor(pos);
-            view.editor.scrollIntoView({ from: pos, to: pos }, true);
-        }
-    }
 }

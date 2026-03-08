@@ -1,9 +1,9 @@
-import { Plugin, Notice, Menu, addIcon } from 'obsidian';
+import { Plugin, Notice, Menu, addIcon, TFile } from 'obsidian';
 import { TaskManager } from './services/TaskManager';
 import { TaskParser } from './services/TaskParser';
 import { SemesterSettings, DEFAULT_SETTINGS } from './settings/Settings';
 import { SettingsTab } from './settings/SettingsTab';
-import { DashboardView, VIEW_TYPE_DASHBOARD } from './views/DashboardView';
+import { DashboardView, VIEW_TYPE_DASHBOARD, setupViewDOM } from './views/DashboardView';
 import { TimelineView, VIEW_TYPE_TIMELINE } from './views/TimelineView';
 import { TaskListView, VIEW_TYPE_LIST } from './views/TaskListView';
 import { StatsView, VIEW_TYPE_STATS } from './views/StatsView';
@@ -49,6 +49,19 @@ export default class TaskLensPlugin extends Plugin {
         const parser = new TaskParser(this.app, this.settings);
         this.taskManager = new TaskManager(parser, this.app);
 
+        this.registerEvent(
+            this.app.vault.on('modify', async (file) => {
+                if (!(file instanceof TFile)) return;
+
+                const isInternal = this.taskManager.getIsInternalChange();
+                if (!this.settings.appWideAutomation || !file.path.endsWith('.md') || isInternal) {
+                    return;
+                }
+
+                await this.taskManager.processManualUpdate(file);
+            })
+        );
+
         this.registerView(VIEW_TYPE_DASHBOARD, (leaf) => new DashboardView(leaf, this));
         this.registerView(VIEW_TYPE_TIMELINE, (leaf) => new TimelineView(leaf, this));
         this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
@@ -64,6 +77,19 @@ export default class TaskLensPlugin extends Plugin {
         }
 
         this.addSettingTab(new SettingsTab(this.app, this));
+
+        // Eliminate the startup flash: when Obsidian restores the saved workspace layout
+        // it renders the full chrome first, then calls onOpen() — there is one visible frame
+        // between those two steps where tabs and headers are shown before we can hide them.
+        // onLayoutReady fires after the layout is fully settled but before the first paint
+        // the user interacts with, so applying chromeless here closes that window.
+        this.app.workspace.onLayoutReady(() => {
+            ALL_VIEW_TYPES.forEach(type => {
+                this.app.workspace.getLeavesOfType(type).forEach(leaf => {
+                    setupViewDOM(leaf.view.containerEl, this.isLayoutLocked);
+                });
+            });
+        });
     }
 
     private setupRibbonIcon(): void {

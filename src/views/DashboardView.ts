@@ -38,6 +38,10 @@ export class DashboardView extends ItemView implements RefreshableView {
     private showList: boolean = true;
     private showStats: boolean = true;
 
+    // Per-view stats display preference — persisted via getState/setState
+    // Removed from global Settings so each dashboard widget can have its own value.
+    private statsCompletionFormat: 'all' | 'today' = 'all';
+
     private timelineDaysToShow: number = 10;
     private renderTimer: NodeJS.Timeout | null = null;
 
@@ -46,7 +50,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private lastTimelineScroll: number | null = null;
     private forceScrollToToday: boolean = false;
 
-    constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
+    constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
         this.taskManager = this.plugin.taskManager;
 
@@ -72,10 +76,13 @@ export class DashboardView extends ItemView implements RefreshableView {
             }, 500);
         });
 
-        // Refresh tasks whenever a Markdown file is saved
+        // Refresh tasks when a Markdown file is saved externally.
+        // The isInternalChange guard prevents this from racing with processManualUpdate:
+        // when TaskManager is mid-write (adding completion metadata), we must not
+        // trigger a refreshFileTask that would reload a half-written state.
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
-                if (file.path.endsWith('.md')) {
+                if (file.path.endsWith('.md') && !this.taskManager.getIsInternalChange()) {
                     void this.taskManager.refreshFileTask(file.path);
                 }
             })
@@ -108,6 +115,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             if (Object.prototype.hasOwnProperty.call(s, 'showList')) this.showList = s.showList as boolean;
             if (Object.prototype.hasOwnProperty.call(s, 'showStats')) this.showStats = s.showStats as boolean;
             if (Object.prototype.hasOwnProperty.call(s, 'zoomLevel')) this.timelineDaysToShow = s.zoomLevel as number;
+            if (Object.prototype.hasOwnProperty.call(s, 'statsCompletionFormat')) this.statsCompletionFormat = s.statsCompletionFormat as 'all' | 'today';
 
             if (s.statusFilter) this.taskManager.setStatusFilter(s.statusFilter as TaskStatus);
             if (s.courseFilter) this.taskManager.setCourseFilter(s.courseFilter as string);
@@ -131,6 +139,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             showList: this.showList,
             showStats: this.showStats,
             zoomLevel: this.timelineDaysToShow,
+            statsCompletionFormat: this.statsCompletionFormat,
             statusFilter: filters.status,
             courseFilter: filters.course,
             headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState,
@@ -138,17 +147,11 @@ export class DashboardView extends ItemView implements RefreshableView {
     }
 
     onOpen(): Promise<void> {
-        // Apply chromeless styling and conditionally hide tabs
-        const parent = this.containerEl.closest('.workspace-leaf-content');
-        if (parent) parent.classList.add('tasklens-chromeless');
-
-        this.tabContainer = this.containerEl.closest('.workspace-tabs');
-        if (this.plugin.isLayoutLocked && this.tabContainer) {
-            this.tabContainer.classList.add('tasklens-hide-tabs');
-        }
-
-        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content');
-        if (this.leafRootEl) this.leafRootEl.classList.add('tasklens-chromeless');
+        // Delegate chromeless styling and tab-hiding to the shared helper
+        // so DashboardView, TimelineView etc. all behave identically.
+        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+        this.leafRootEl = leafRootEl instanceof HTMLElement ? leafRootEl : null;
+        this.tabContainer = tabContainer instanceof HTMLElement ? tabContainer : null;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
@@ -168,8 +171,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     }
 
     onClose(): Promise<void> {
-        if (this.tabContainer) this.tabContainer.classList.remove('tasklens-hide-tabs');
-        if (this.leafRootEl) this.leafRootEl.classList.remove('tasklens-chromeless');
+        cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
 
@@ -268,6 +270,22 @@ export class DashboardView extends ItemView implements RefreshableView {
             this.taskManager.setCourseFilter(courseSelect.value || null);
         });
 
+        const completionGroup = filtersDiv.createDiv('control-group');
+        completionGroup.createEl('label', { text: 'Completed:' });
+        const completionSelect = completionGroup.createEl('select');
+        [
+            { value: 'all',   text: 'All time' },
+            { value: 'today', text: 'Today' },
+        ].forEach(opt => {
+            const option = completionSelect.createEl('option', { value: opt.value, text: opt.text });
+            if (opt.value === this.statsCompletionFormat) option.selected = true;
+        });
+        completionSelect.addEventListener('change', () => {
+            this.statsCompletionFormat = completionSelect.value as 'all' | 'today';
+            this.app.workspace.requestSaveLayout();
+            this.render();
+        });
+
         // Right side: section visibility toggles
         const actionsDiv = controls.createDiv('actions-wrapper');
         actionsDiv.setCssProps({ display: 'flex', gap: '12px', 'align-items': 'center' });
@@ -295,18 +313,21 @@ export class DashboardView extends ItemView implements RefreshableView {
         const stats = this.taskManager.getStatistics();
         const container = this.contentEl.createDiv('dashboard-stats');
 
+        // Determine which value to show based on user settings
+        const showToday = this.statsCompletionFormat === 'today';
+        const completionValue = showToday ? stats.completedToday : stats.completed;
+        const completionLabel = showToday ? 'Done Today' : 'Completed';
+
         const statCards = [
-            { label: 'Total',     value: stats.total,     cls: 'stat-total',     filter: TaskStatus.All },
-            { label: 'Active',    value: stats.upcoming,  cls: 'stat-active',    filter: TaskStatus.UpcomingWeek },
-            { label: 'Urgent',    value: stats.urgent,    cls: 'stat-urgent',    filter: TaskStatus.Urgent },
-            { label: 'Overdue',   value: stats.overdue,   cls: 'stat-overdue',   filter: TaskStatus.Overdue },
-            { label: 'Completed', value: stats.completed, cls: 'stat-completed', filter: TaskStatus.Completed },
+            { label: 'Total',     value: stats.total,      cls: 'stat-total',     filter: TaskStatus.All },
+            { label: 'Upcoming',  value: stats.upcoming,   cls: 'stat-upcoming',  filter: TaskStatus.UpcomingWeek },
+            { label: 'Urgent',    value: stats.urgent,     cls: 'stat-urgent',    filter: TaskStatus.Urgent },
+            { label: 'Overdue',   value: stats.overdue,    cls: 'stat-overdue',   filter: TaskStatus.Overdue },
+            { label: completionLabel, value: completionValue, cls: 'stat-completed', filter: TaskStatus.Completed },
         ];
 
-        // Each card acts as a filter shortcut — clicking it filters the list to that status
         statCards.forEach(stat => {
-            const card = container.createDiv({ cls: ['stat-card', stat.cls] });
-            card.addClass('is-clickable');
+            const card = container.createDiv({ cls: ['stat-card', stat.cls, 'is-clickable'] });
             card.addEventListener('click', () => { this.taskManager.setStatusFilter(stat.filter); });
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
@@ -322,7 +343,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             onDelete: (t) => { void this.taskManager.deleteTask(t); },
         }, this.plugin.settings);
 
-        list.render(this.taskManager.getFilteredTasks());
+        list.render(this.taskManager.getGroupedFilteredTasks());
     }
 
     public applyColorTheme(): void {
@@ -354,7 +375,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
             this.render();
         });
-        zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} Days ` });
+        zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} days ` });
         const zoomIn = zoomControls.createEl('button', { text: '+', cls: 'view-toggle-btn' });
         zoomIn.addEventListener('click', () => {
             this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);
@@ -371,7 +392,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.timelineComponent = new TimelineComponent(
             container,
             this.app,
-            this.taskManager.getFilteredTasks(),
+            this.taskManager.getAllGroupedTasks(),
             this.timelineDaysToShow,
             this.plugin.settings
         );

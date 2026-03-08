@@ -12,7 +12,7 @@ export interface SemesterSettings {
     colorScheme: 'inherit' | 'custom';
     colorMode: ColorMode;
 
-    // Status Colors
+    // Status Colours
     colors: {
         overdue: string;
         urgent: string;
@@ -20,10 +20,19 @@ export interface SemesterSettings {
         completed: string;
     };
 
+    appWideAutomation: boolean;
+
     topicColors: Record<string, string>;
 
     hasSeenWelcome: boolean;
     hasClickedRibbonIcon: boolean;
+
+    /** Persists which settings accordion sections were open when the tab was last closed. */
+    settingsTabState: {
+        scanOpen: boolean;
+        parserOpen: boolean;
+        uiOpen: boolean;
+    };
 
     savedFocusLayout?: unknown;
 }
@@ -47,8 +56,17 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
 
     topicColors: {},
 
+    appWideAutomation: true,
+
     hasSeenWelcome: false,
     hasClickedRibbonIcon: false,
+
+    settingsTabState: {
+        scanOpen: true,
+        parserOpen: false,
+        uiOpen: true,
+    },
+
     savedFocusLayout: null
 };
 

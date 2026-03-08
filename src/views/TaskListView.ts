@@ -20,7 +20,7 @@ export class TaskListView extends ItemView {
         this.render();
     };
 
-    constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
+    constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
         this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
     }
@@ -113,6 +113,6 @@ export class TaskListView extends ItemView {
                 void this.plugin.taskManager.deleteTask(t);
             }
         }, this.plugin.settings);
-        list.render(this.plugin.taskManager.getFilteredTasks());
+        list.render(this.plugin.taskManager.getGroupedFilteredTasks());
     }
 }

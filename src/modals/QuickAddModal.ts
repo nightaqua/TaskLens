@@ -23,6 +23,8 @@ export class QuickAddModal extends Modal {
     /** ISO date string (YYYY-MM-DD) from the date picker, or empty string. */
     private date: string = '';
 
+    private recurrence: string = '';
+
     /**
      * Path of the chosen destination file, or the sentinel value
      * `'__CURSOR__'` when the user wants to insert at the cursor position.
@@ -125,6 +127,15 @@ export class QuickAddModal extends Modal {
                 text.onChange(value => { this.date = value; });
             });
 
+        // --- 3.5 Recurrence input ---
+        new Setting(contentEl)
+            .setName('Repeat')
+            .setDesc('Example: daily, weekly, every two days')
+            .addText(text => {
+                text.setPlaceholder('Optional...');
+                text.onChange(value => { this.recurrence = value; });
+            });
+
         // --- 4. Submit button -----------------------------------------------
         new Setting(contentEl)
             .addButton(btn => btn
@@ -144,7 +155,8 @@ export class QuickAddModal extends Modal {
                             // a setTimeout) risks losing the editor reference or
                             // landing at a stale cursor position.
                             const dateStr = this.date ? ` [due:: ${this.date}]` : '';
-                            const taskLine = `- [ ] ${this.title}${dateStr}\n`;
+                            const repeatStr = this.recurrence ? ` [repeat:: ${this.recurrence}]` : '';
+                            const taskLine = `- [ ] ${this.title}${dateStr}${repeatStr}\n`;
 
                             this.activeViewAtOpen.editor.replaceSelection(taskLine);
 
@@ -171,7 +183,7 @@ export class QuickAddModal extends Modal {
                         // formatting and writing to the end of the chosen file.
                         // -----------------------------------------------------
                         const dateObj = this.date ? new Date(this.date) : null;
-                        await this.taskManager.addTask(this.title, dateObj, this.selectedFile);
+                        await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
                     }
 
                     this.close();

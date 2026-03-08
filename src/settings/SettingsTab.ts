@@ -4,7 +4,7 @@ import { WelcomeModal } from '../modals/WelcomeModal';
 import { getTopicColor } from './Settings';
 
 export class SettingsTab extends PluginSettingTab {
-    plugin: TaskLensPlugin;
+    readonly plugin: TaskLensPlugin;
 
     constructor(app: App, plugin: TaskLensPlugin) {
         super(app, plugin);
@@ -29,8 +29,12 @@ export class SettingsTab extends PluginSettingTab {
             );
 
         const scanDetails = containerEl.createEl('details');
-        scanDetails.open = true;
+        scanDetails.open = this.plugin.settings.settingsTabState.scanOpen;
         scanDetails.createEl('summary', { text: 'Vault scanning' });
+        scanDetails.addEventListener('toggle', () => {
+            this.plugin.settings.settingsTabState.scanOpen = scanDetails.open;
+            void this.plugin.saveSettings();
+        });
 
         const scanPathsSetting = new Setting(scanDetails)
             .setName('Scan paths')
@@ -55,7 +59,20 @@ export class SettingsTab extends PluginSettingTab {
             }));
 
         const parserDetails = containerEl.createEl('details');
-        parserDetails.createEl('summary', { text: 'Task parsing' });
+        parserDetails.open = this.plugin.settings.settingsTabState.parserOpen;
+        parserDetails.createEl('summary', { text: 'Task parsing & automation' });
+        parserDetails.addEventListener('toggle', () => {
+            this.plugin.settings.settingsTabState.parserOpen = parserDetails.open;
+            void this.plugin.saveSettings();
+        });
+
+        new Setting(parserDetails)
+            .setName('App-wide automation')
+            .setDesc('Apply date stamping and recurrence even when editing notes directly.')
+            .addToggle(t => t.setValue(this.plugin.settings.appWideAutomation).onChange(v => {
+                this.plugin.settings.appWideAutomation = v;
+                void this.plugin.saveSettings();
+            }));
 
         new Setting(parserDetails)
             .setName('Start key')
@@ -74,8 +91,12 @@ export class SettingsTab extends PluginSettingTab {
             }));
 
         const uiDetails = containerEl.createEl('details');
-        uiDetails.open = true;
+        uiDetails.open = this.plugin.settings.settingsTabState.uiOpen;
         uiDetails.createEl('summary', { text: 'Appearance & colors' });
+        uiDetails.addEventListener('toggle', () => {
+            this.plugin.settings.settingsTabState.uiOpen = uiDetails.open;
+            void this.plugin.saveSettings();
+        });
 
         new Setting(uiDetails)
             .setName('Color mode')

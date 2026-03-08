@@ -13,8 +13,11 @@ export class TimelineView extends ItemView implements RefreshableView {
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
     private timelineDaysToShow = 10;
+    private viewportStart: Date | null = null;
+    private savedScrollLeft = 0;
+    private hasOpenedOnce = false;
 
-    constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
+    constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
         this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
     }
@@ -35,31 +38,56 @@ export class TimelineView extends ItemView implements RefreshableView {
             const s = state as Record<string, unknown>;
             if (Object.prototype.hasOwnProperty.call(s, 'headerState')) this.headerState = s.headerState as HeaderState;
             if (Object.prototype.hasOwnProperty.call(s, 'zoomLevel')) this.timelineDaysToShow = s.zoomLevel as number;
+            if (Object.prototype.hasOwnProperty.call(s, 'viewportStart')) {
+                const raw = s.viewportStart;
+                if (typeof raw === 'string') {
+                    const parsed = new Date(raw);
+                    if (!isNaN(parsed.getTime())) this.viewportStart = parsed;
+                }
+            }
         }
 
         this.render();
-        setTimeout(() => { this.timelineComponent?.scrollToToday(); }, 300);
+        // Restore persisted scroll position; only jump to today on a genuine cold open
+        const rendered = this.timelineComponent;
+        if (!rendered) return;
+        if (this.hasOpenedOnce) {
+            setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+        } else {
+            setTimeout(() => { rendered.scrollToToday(); }, 300);
+        }
     }
 
     getState(): Record<string, unknown> {
+        // Grab the live viewport position from the component so it survives layout saves
+        const liveViewportStart = this.timelineComponent?.getViewportStart() ?? this.viewportStart;
+
         return Object.assign(super.getState(), {
             headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState,
-            zoomLevel: this.timelineDaysToShow
+            zoomLevel: this.timelineDaysToShow,
+            viewportStart: liveViewportStart?.toISOString() ?? null,
         });
     }
 
     onOpen(): Promise<void> {
         // Use shared utility for UI consistency
         const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
-        this.leafRootEl = leafRootEl as HTMLElement;
-        this.tabContainer = tabContainer as HTMLElement;
+        this.leafRootEl = leafRootEl instanceof HTMLElement ? leafRootEl : null;
+        this.tabContainer = tabContainer instanceof HTMLElement ? tabContainer : null;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
 
         void this.plugin.taskManager.loadTasks().then(() => {
             this.render();
-            setTimeout(() => { this.timelineComponent?.scrollToToday(); }, 500);
+            const rendered = this.timelineComponent;
+            if (!rendered) return;
+            if (!this.hasOpenedOnce) {
+                this.hasOpenedOnce = true;
+                setTimeout(() => { rendered.scrollToToday(); }, 500);
+            } else {
+                setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+            }
         });
 
         return Promise.resolve();
@@ -67,15 +95,19 @@ export class TimelineView extends ItemView implements RefreshableView {
 
     onClose(): Promise<void> {
         this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
-        this.performCleanUp();
+        this.performCleanup();
         return Promise.resolve();
     }
 
-    private performCleanUp(): void {
+    private performCleanup(): void {
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
     }
 
     public render(): void {
+        // Preserve pan position across re-renders so collapsing the header / task refreshes
+        // don't snap the user back to the start of the chart
+        this.savedScrollLeft = this.timelineComponent?.getScrollPosition() ?? this.savedScrollLeft;
+
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -97,11 +129,24 @@ export class TimelineView extends ItemView implements RefreshableView {
         this.timelineComponent = new TimelineComponent(
             container,
             this.app,
-            this.plugin.taskManager.getFilteredTasks(),
+            this.plugin.taskManager.getAllGroupedTasks(),
             this.timelineDaysToShow,
-            this.plugin.settings
+            this.plugin.settings,
+            this.viewportStart ?? undefined,
+            // When the user jumps the viewport, persist it immediately so layout saves reflect it
+            (newStart: Date) => {
+                this.viewportStart = newStart;
+                this.app.workspace.requestSaveLayout();
+            }
         );
         this.timelineComponent.render();
+
+        // Restore pan position after DOM rebuild — setTimeout lets layout settle first.
+        // Captured in a local const so the closure holds a guaranteed non-null reference.
+        const rendered = this.timelineComponent;
+        if (this.savedScrollLeft > 0) {
+            setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+        }
     }
 
     public refreshFromSettings(): void {

@@ -35,6 +35,7 @@ var import_obsidian = require("obsidian");
 // src/models/Task.ts
 function getTaskStatus(task) {
   if (task.completed) return "completed" /* Completed */;
+  if (task.recurrence) return "urgent" /* Urgent */;
   if (task.dueDate) {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -49,6 +50,20 @@ function getTaskStatus(task) {
   return "no_date" /* NoDate */;
 }
 
+// src/services/TaskSanitizer.ts
+function hasCompletionMetadata(line) {
+  return /\u2705\s*\d{4}-\d{2}-\d{2}/.test(line) || /completion::/i.test(line);
+}
+function hasRecurrenceMetadata(line) {
+  return /[\u{1F501}\u{1F3C1}]/u.test(line) || /repeat::/i.test(line);
+}
+function stripCompletionMetadata(line) {
+  let result = line;
+  result = result.replace(/\s*\[?\(?\s*completion::\s*[^\])]+[\])]?/gi, "");
+  result = result.replace(/\s*\u2705\s*\d{4}-\d{2}-\d{2}/g, "");
+  return result.replace(/\s+/g, " ").trim();
+}
+
 // src/services/TaskManager.ts
 var TaskManager = class extends import_obsidian.Events {
   constructor(parser, app) {
@@ -57,6 +72,7 @@ var TaskManager = class extends import_obsidian.Events {
     this.app = app;
     this.tasks = [];
     this.filteredTasks = [];
+    this.isInternalChange = false;
     this.currentStatusFilter = "open" /* Open */;
     this.currentCourseFilter = null;
     this.currentSortBy = "due-date" /* DueDate */;
@@ -66,20 +82,124 @@ var TaskManager = class extends import_obsidian.Events {
     this.applyFiltersAndSort();
     this.trigger("tasks-updated");
   }
+  getIsInternalChange() {
+    return this.isInternalChange;
+  }
+  /**
+   * Identifies manual state changes in a file and applies automation (adds metadata).
+   *
+   * The lock is set BEFORE the first await so no second modify event can slip
+   * through while we are reading the file. We call addCompletionMetadata instead
+   * of toggleTaskCompletion because the task is already [x] in the file at this
+   * point — calling a toggle would un-check it, causing the flicker.
+   */
+  async processManualUpdate(file) {
+    if (this.isInternalChange) return;
+    const cachedTasks = this.tasks.filter((t) => t.filePath === file.path);
+    this.isInternalChange = true;
+    try {
+      const freshTasks = await this.parser.getTasksFromFile(file.path);
+      for (const fresh of freshTasks) {
+        const cached = cachedTasks.find((c) => c.lineNumber === fresh.lineNumber);
+        if (cached && !cached.completed && fresh.completed) {
+          await this.addCompletionMetadata(fresh);
+          return;
+        }
+        if (cached && cached.completed && !fresh.completed) {
+          await this.removeCompletionMetadata(fresh);
+          return;
+        }
+      }
+    } finally {
+      this.isInternalChange = false;
+    }
+  }
+  /**
+   * Adds completion metadata and handles recurrence for a task that was
+   * already checked [x] by the user directly in the editor.
+   * Unlike toggleTaskCompletion, this method never changes the checkbox state.
+   */
+  async addCompletionMetadata(task) {
+    const file = this.app.vault.getAbstractFileByPath(task.filePath);
+    if (!(file instanceof import_obsidian.TFile)) return;
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    const originalLine = lines[task.lineNumber];
+    if (!/\[[xX]]/.test(originalLine)) return;
+    if (hasCompletionMetadata(originalLine)) return;
+    const completionDate = /* @__PURE__ */ new Date();
+    const compStr = this.formatCompletionDate(completionDate);
+    lines[task.lineNumber] = originalLine + ` [completion:: ${compStr}]`;
+    if (task.recurrence) {
+      const nextDate = this.calculateNextDueDate(task.dueDate || null, task.recurrence, completionDate);
+      let clonedLine = originalLine;
+      const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([)\]]?)/i;
+      const dateStr = this.formatDate(nextDate);
+      clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
+      clonedLine = clonedLine.replace(/\[[xX]]/, "[ ]");
+      if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
+        clonedLine += ` [repeat:: ${task.recurrence}]`;
+      }
+      lines.splice(task.lineNumber + 1, 0, clonedLine);
+    }
+    await this.app.vault.modify(file, lines.join("\n"));
+    await this.refreshFileTask(task.filePath);
+  }
+  /**
+   * Strips completion metadata from a task that was unchecked directly in the editor.
+   * Mirrors addCompletionMetadata: never touches the checkbox state, only the metadata.
+   */
+  async removeCompletionMetadata(task) {
+    const file = this.app.vault.getAbstractFileByPath(task.filePath);
+    if (!(file instanceof import_obsidian.TFile)) return;
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    const originalLine = lines[task.lineNumber];
+    if (/\[[xX]]/.test(originalLine)) return;
+    const cleaned = stripCompletionMetadata(originalLine);
+    if (cleaned === originalLine) return;
+    lines[task.lineNumber] = cleaned;
+    await this.app.vault.modify(file, lines.join("\n"));
+    await this.refreshFileTask(task.filePath);
+  }
   /**
    * Toggle a task's completion state in its file
    */
   async toggleTaskCompletion(task) {
     const file = this.app.vault.getAbstractFileByPath(task.filePath);
-    if (file instanceof import_obsidian.TFile) {
-      const content = await this.app.vault.read(file);
-      const lines = content.split("\n");
-      if (lines[task.lineNumber]) {
-        lines[task.lineNumber] = lines[task.lineNumber].includes("[x]") ? lines[task.lineNumber].replace("[x]", "[ ]") : lines[task.lineNumber].replace("[ ]", "[x]");
-        await this.app.vault.modify(file, lines.join("\n"));
-        await this.refreshFileTask(task.filePath);
+    if (!(file instanceof import_obsidian.TFile)) return;
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    const originalLine = lines[task.lineNumber];
+    const isCurrentlyCompleted = /\[[xX]]/.test(originalLine);
+    if (isCurrentlyCompleted) {
+      let newLine = originalLine.replace(/\[[xX]]/, "[ ]");
+      newLine = stripCompletionMetadata(newLine);
+      lines[task.lineNumber] = newLine;
+    } else {
+      if (!hasCompletionMetadata(originalLine)) {
+        const completionDate = /* @__PURE__ */ new Date();
+        const compStr = this.formatCompletionDate(completionDate);
+        let newLine = originalLine.replace(/\[ ]/, "[x]");
+        newLine += ` [completion:: ${compStr}]`;
+        lines[task.lineNumber] = newLine;
+        if (task.recurrence) {
+          const nextDate = this.calculateNextDueDate(task.dueDate || null, task.recurrence, completionDate);
+          let clonedLine = originalLine;
+          const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([)\]]?)/i;
+          const dateStr = this.formatDate(nextDate);
+          clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
+          if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
+            clonedLine += ` [repeat:: ${task.recurrence}]`;
+          }
+          lines.splice(task.lineNumber + 1, 0, clonedLine);
+        }
+      } else {
+        lines[task.lineNumber] = originalLine.replace(/\[ ]/, "[x]");
       }
     }
+    await this.app.vault.modify(file, lines.join("\n"));
+    await this.refreshFileTask(task.filePath);
   }
   /**
    * Delete a task from its file
@@ -108,7 +228,7 @@ var TaskManager = class extends import_obsidian.Events {
       const lines = content.split("\n");
       if (lines[task.lineNumber]) {
         const originalLine = lines[task.lineNumber];
-        const match = originalLine.match(/^(\s*-\s\[.\]\s)(.*)$/);
+        const match = originalLine.match(/^(\s*-\s\[.]\s)(.*)$/);
         if (match) {
           const prefix = match[1];
           let newLine = `${prefix}${newTitle}`;
@@ -136,17 +256,68 @@ var TaskManager = class extends import_obsidian.Events {
   getFilteredTasks() {
     return [...this.filteredTasks];
   }
+  /**
+   * Collapses recurring clones into one TaskGroup per series.
+   * Non-recurring tasks each become their own group (openCount: 1, isRecurring: false).
+   * The representative is the earliest-due open clone, falling back to the latest
+   * completed task when all clones in a series are done.
+   */
+  groupTasks(tasks) {
+    const seriesMap = /* @__PURE__ */ new Map();
+    const insertionOrder = [];
+    for (const task of tasks) {
+      const key = task.recurrence ? `${task.filePath}::${task.title}::${task.recurrence}` : task.id;
+      let series = seriesMap.get(key);
+      if (series === void 0) {
+        series = [];
+        seriesMap.set(key, series);
+        insertionOrder.push(key);
+      }
+      series.push(task);
+    }
+    return insertionOrder.map((key) => {
+      var _a;
+      const clones = (_a = seriesMap.get(key)) != null ? _a : [];
+      const open = clones.filter((t) => !t.completed);
+      const pool = open.length > 0 ? open : clones;
+      const representative = pool.reduce((earliest, t) => {
+        var _a2, _b, _c, _d;
+        const eTime = (_b = (_a2 = earliest.dueDate) == null ? void 0 : _a2.getTime()) != null ? _b : Infinity;
+        const tTime = (_d = (_c = t.dueDate) == null ? void 0 : _c.getTime()) != null ? _d : Infinity;
+        return tTime < eTime ? t : earliest;
+      });
+      return {
+        representative,
+        openCount: open.length,
+        isRecurring: !!clones[0].recurrence && clones.length > 1
+      };
+    });
+  }
+  /** For the task list view: filtered tasks collapsed into recurring groups. */
+  getGroupedFilteredTasks() {
+    return this.groupTasks(this.filteredTasks);
+  }
+  /** For the timeline: all tasks (no status filter) collapsed into recurring groups. */
+  getAllGroupedTasks() {
+    return this.groupTasks(this.tasks);
+  }
   getScannedFiles() {
     return this.parser.getFilesToScan().map((file) => file.path);
   }
   getStatistics() {
-    const total = this.tasks.length;
-    const completed = this.tasks.filter((t) => t.completed).length;
-    const overdue = this.tasks.filter((t) => getTaskStatus(t) === "overdue" /* Overdue */).length;
-    const upcoming = this.tasks.filter((t) => getTaskStatus(t) === "upcoming_week" /* UpcomingWeek */).length;
-    const urgent = this.tasks.filter((t) => getTaskStatus(t) === "urgent" /* Urgent */).length;
-    const courses = new Set(this.tasks.map((t) => t.fileName)).size;
-    return { total, completed, overdue, upcoming, urgent, courses };
+    const groups = this.groupTasks(this.tasks);
+    const todayStr = this.formatDate(/* @__PURE__ */ new Date());
+    return {
+      total: groups.length,
+      completed: groups.filter((g) => g.representative.completed).length,
+      completedToday: this.tasks.filter(
+        (t) => t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr
+      ).length,
+      overdue: groups.filter((g) => getTaskStatus(g.representative) === "overdue" /* Overdue */).length,
+      upcoming: groups.filter((g) => getTaskStatus(g.representative) === "upcoming_week" /* UpcomingWeek */).length,
+      urgent: groups.filter((g) => getTaskStatus(g.representative) === "urgent" /* Urgent */).length,
+      courses: new Set(this.tasks.map((t) => t.fileName)).size
+    };
   }
   getCourseNames() {
     return Array.from(new Set(this.tasks.map((t) => t.fileName))).sort();
@@ -161,11 +332,12 @@ var TaskManager = class extends import_obsidian.Events {
     this.applyFiltersAndSort();
     this.trigger("tasks-updated");
   }
-  setSortBy(sortBy) {
-    this.currentSortBy = sortBy;
-    this.applyFiltersAndSort();
-    this.trigger("tasks-updated");
-  }
+  // UNUSED for now
+  // setSortBy(sortBy: TaskSortBy) {
+  //        this.currentSortBy = sortBy;
+  //        this.applyFiltersAndSort();
+  //        this.trigger('tasks-updated');
+  //    }
   getCurrentFilters() {
     return {
       status: this.currentStatusFilter,
@@ -173,16 +345,14 @@ var TaskManager = class extends import_obsidian.Events {
       sortBy: this.currentSortBy
     };
   }
-  async addTask(title, date, filePath) {
+  async addTask(title, date, filePath, recurrence) {
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (file instanceof import_obsidian.TFile) {
       const content = await this.app.vault.read(file);
       let taskLine = `
 - [ ] ${title}`;
-      if (date) {
-        const dateStr = this.formatDate(date);
-        taskLine += ` [due:: ${dateStr}]`;
-      }
+      if (date) taskLine += ` [due:: ${this.formatDate(date)}]`;
+      if (recurrence) taskLine += ` [repeat:: ${recurrence}]`;
       await this.app.vault.modify(file, content + taskLine);
       await this.refreshFileTask(filePath);
     }
@@ -193,17 +363,70 @@ var TaskManager = class extends import_obsidian.Events {
     const d = String(date.getDate()).padStart(2, "0");
     return `${String(y)}-${m}-${d}`;
   }
+  formatCompletionDate(date) {
+    const pad = (n) => n.toString().padStart(2, "0");
+    const yyyy = date.getFullYear();
+    const mm = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const min = pad(date.getMinutes());
+    return `${String(yyyy)}-${mm}-${dd} ${hh}:${min}`;
+  }
+  /** Helper to calculate the bumped due date for recurring tasks */
+  calculateNextDueDate(dueDate, recurrence, completionDate) {
+    const isFlexible = recurrence.endsWith("+");
+    const rule = recurrence.replace("+", "").trim().toLowerCase();
+    const baseDate = new Date(isFlexible || !dueDate ? completionDate : dueDate);
+    const nextDate = new Date(baseDate);
+    let amount = 1;
+    let unit = "d";
+    if (rule === "daily" || rule === "d") {
+      unit = "d";
+    } else if (rule === "weekly" || rule === "w") {
+      unit = "w";
+    } else if (rule === "monthly" || rule === "m") {
+      unit = "m";
+    } else if (rule === "yearly" || rule === "y") {
+      unit = "y";
+    } else {
+      const match = rule.match(/^(\d+)([dwmy])$/);
+      if (match) {
+        amount = parseInt(match[1], 10);
+        unit = match[2];
+      }
+    }
+    switch (unit) {
+      case "d":
+        nextDate.setDate(nextDate.getDate() + amount);
+        break;
+      case "w":
+        nextDate.setDate(nextDate.getDate() + amount * 7);
+        break;
+      case "m": {
+        const originalDay = nextDate.getDate();
+        nextDate.setDate(1);
+        nextDate.setMonth(nextDate.getMonth() + amount);
+        const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+        nextDate.setDate(Math.min(originalDay, lastDayOfMonth));
+        break;
+      }
+      case "y": {
+        const originalDay = nextDate.getDate();
+        nextDate.setDate(1);
+        nextDate.setFullYear(nextDate.getFullYear() + amount);
+        const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+        nextDate.setDate(Math.min(originalDay, lastDayOfMonth));
+        break;
+      }
+    }
+    return nextDate;
+  }
   applyFiltersAndSort() {
     this.filteredTasks = this.tasks.filter((task) => {
-      if (this.currentStatusFilter !== "all" /* All */) {
-        if (this.currentStatusFilter === "open" /* Open */) {
-          if (task.completed) return false;
-        } else {
-          if (getTaskStatus(task) !== this.currentStatusFilter) return false;
-        }
-      }
       if (this.currentCourseFilter && task.fileName !== this.currentCourseFilter) return false;
-      return true;
+      if (this.currentStatusFilter === "all" /* All */) return true;
+      if (this.currentStatusFilter === "open" /* Open */) return !task.completed;
+      return getTaskStatus(task) === this.currentStatusFilter;
     });
     this.filteredTasks.sort((a, b) => {
       const weightA = this.getStatusWeight(a);
@@ -294,11 +517,11 @@ var TaskParser = class {
     const courseName = this.getCourseName(file, cache);
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const taskMatch = line.match(/^(\s*)-\s\[([ xX])\]\s(.+)$/);
+      const taskMatch = line.match(/^(\s*)-\s\[([ xX])]\s(.+)$/);
       if (taskMatch) {
         const completed = taskMatch[2].toLowerCase() === "x";
         const taskText = taskMatch[3];
-        const { title, startDate, dueDate } = this.parseTaskMetadata(taskText);
+        const { title, startDate, dueDate, completionDate, recurrence } = this.parseTaskMetadata(taskText);
         const task = {
           id: `${file.path}:${String(i)}`,
           title,
@@ -308,6 +531,10 @@ var TaskParser = class {
           lineNumber: i,
           startDate,
           dueDate,
+          completionDate,
+          // Added
+          recurrence,
+          // Added
           originalText: line
         };
         tasks.push(task);
@@ -336,6 +563,8 @@ var TaskParser = class {
     let title = taskText;
     let startDate;
     let dueDate;
+    let completionDate;
+    let recurrence;
     const startRegex = /\[?\(?start::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
     const startMatch = startRegex.exec(taskText);
     if (startMatch) {
@@ -348,6 +577,18 @@ var TaskParser = class {
       dueDate = new Date(dueMatch[1]);
       title = title.replace(dueRegex, "");
     }
+    const compRegex = /\[?\(?completion::\s*(\d{4}-\d{2}-\d{2}(?:\s\d{2}:\d{2})?)[\])]?/gi;
+    const compMatch = compRegex.exec(taskText);
+    if (compMatch) {
+      completionDate = new Date(compMatch[1]);
+      title = title.replace(compRegex, "");
+    }
+    const repeatRegex = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
+    const repeatMatch = repeatRegex.exec(taskText);
+    if (repeatMatch) {
+      recurrence = repeatMatch[1].trim().toLowerCase();
+      title = title.replace(repeatRegex, "");
+    }
     if (!dueDate) {
       const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/u);
       if (emojiMatch) {
@@ -356,7 +597,7 @@ var TaskParser = class {
       }
     }
     title = title.replace(/\s+/g, " ").trim();
-    return { title, startDate, dueDate };
+    return { title, startDate, dueDate, completionDate, recurrence };
   }
 };
 
@@ -377,6 +618,7 @@ var DEFAULT_SETTINGS = {
     completed: "#457b9d"
   },
   topicColors: {},
+  appWideAutomation: true,
   hasSeenWelcome: false,
   hasClickedRibbonIcon: false,
   savedFocusLayout: null
@@ -478,7 +720,11 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
       void this.plugin.saveSettings();
     }));
     const parserDetails = containerEl.createEl("details");
-    parserDetails.createEl("summary", { text: "Task parsing" });
+    parserDetails.createEl("summary", { text: "Task parsing & automation" });
+    new import_obsidian4.Setting(parserDetails).setName("App-wide automation").setDesc("Apply date stamping and recurrence even when editing notes directly.").addToggle((t) => t.setValue(this.plugin.settings.appWideAutomation).onChange((v) => {
+      this.plugin.settings.appWideAutomation = v;
+      void this.plugin.saveSettings();
+    }));
     new import_obsidian4.Setting(parserDetails).setName("Start key").setDesc("Inline text used to find the start date. Example: [start:: 2026-02-02]").addText((t) => t.setValue(this.plugin.settings.startDateKey).onChange((v) => {
       this.plugin.settings.startDateKey = v;
       void this.plugin.saveSettings();
@@ -580,32 +826,134 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
 var import_obsidian9 = require("obsidian");
 
 // src/views/TimelineComponent.ts
+var import_obsidian6 = require("obsidian");
+
+// src/views/TaskListComponent.ts
 var import_obsidian5 = require("obsidian");
-var TimelineComponent = class {
-  constructor(container, app, tasks, daysToShow = 10, settings) {
+async function openTaskInEditor(app, task) {
+  const file = app.vault.getAbstractFileByPath(task.filePath);
+  if (!(file instanceof import_obsidian5.TFile)) return;
+  const leaf = app.workspace.getLeaf(false);
+  await leaf.openFile(file);
+  const view = app.workspace.getActiveViewOfType(import_obsidian5.MarkdownView);
+  if (view) {
+    const pos = { line: task.lineNumber, ch: 0 };
+    view.editor.setCursor(pos);
+    view.editor.scrollIntoView({ from: pos, to: pos }, true);
+  }
+}
+var TaskListComponent = class {
+  constructor(container, app, callbacks, settings) {
+    this.container = container;
+    this.app = app;
+    this.callbacks = callbacks;
+    this.settings = settings;
+  }
+  render(groups) {
+    this.container.empty();
+    if (groups.length === 0) {
+      const empty = this.container.createDiv("dashboard-empty-state");
+      empty.createEl("p", { text: "No tasks found." });
+      return;
+    }
+    const listContainer = this.container.createDiv("dashboard-task-list");
+    groups.forEach((group) => {
+      this.renderTaskItem(listContainer, group);
+    });
+  }
+  renderTaskItem(container, group) {
+    const task = group.representative;
+    const taskEl = container.createDiv({ cls: ["task-item"] });
+    if (this.settings.colorMode === "course" && task.fileName) {
+      taskEl.setCssProps({ "border-left-color": getTopicColor(task.fileName, this.settings) });
+    } else {
+      const status = getTaskStatus(task);
+      if (status === "overdue" /* Overdue */) taskEl.addClass("status-overdue");
+      if (status === "urgent" /* Urgent */) taskEl.addClass("status-urgent");
+      if (status === "completed" /* Completed */) taskEl.addClass("status-completed");
+      if (status === "upcoming_week" /* UpcomingWeek */) taskEl.addClass("status-active");
+    }
+    const checkbox = taskEl.createEl("input", { type: "checkbox", cls: "task-checkbox" });
+    checkbox.checked = task.completed;
+    checkbox.addEventListener("change", () => {
+      this.callbacks.onToggle(task);
+    });
+    const content = taskEl.createDiv("task-content");
+    const viewMode = content.createDiv("task-view-mode");
+    const titleRow = viewMode.createDiv("task-title-row");
+    const titleEl = titleRow.createDiv("task-title");
+    titleEl.setText(task.title);
+    if (group.isRecurring && group.openCount > 1) {
+      const badge = titleRow.createEl("span", { cls: "task-recurrence-badge" });
+      badge.setText(`\xD7${String(group.openCount)}`);
+      badge.setAttribute("aria-label", `${String(group.openCount)} pending recurrences`);
+    }
+    const meta = viewMode.createDiv("task-meta");
+    if (task.fileName) {
+      const courseLabel = meta.createDiv("task-course");
+      courseLabel.setText(task.fileName);
+    }
+    if (task.dueDate) {
+      const dateLabel = meta.createDiv("task-date");
+      dateLabel.setText(task.dueDate.toDateString());
+    }
+    titleEl.addEventListener("click", () => {
+      void openTaskInEditor(this.app, task);
+    });
+  }
+};
+
+// src/views/TimelineComponent.ts
+var _TimelineComponent = class _TimelineComponent {
+  constructor(container, app, groups, daysToShow = 10, settings, viewportStart, onViewportChange) {
     this.scrollContainer = null;
     this.tooltipEl = null;
+    // Persists the nav ribbon panel's open state across re-renders triggered by viewport jumps
+    this.ribbonNavOpen = false;
+    // Stored so it can be removed before re-render
+    this.ribbonOutsideHandler = null;
     // Drag-to-scroll state
     this.isDragging = false;
     this.startX = 0;
     this.scrollLeftPos = 0;
     this.container = container;
     this.app = app;
-    this.tasks = tasks;
+    this.groups = groups;
     this.daysToShow = daysToShow;
     this.settings = settings;
+    this.onViewportChange = onViewportChange != null ? onViewportChange : null;
+    if (viewportStart) {
+      this.viewportStart = new Date(viewportStart);
+    } else {
+      const defaultStart = /* @__PURE__ */ new Date();
+      defaultStart.setMonth(defaultStart.getMonth() - 3);
+      defaultStart.setHours(0, 0, 0, 0);
+      this.viewportStart = defaultStart;
+    }
   }
-  // Cycles through a fixed palette by index — used as a fallback colour
-  getPaletteColor(index) {
-    const palette = ["#4cc9f0", "#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4caf50"];
-    return palette[index % palette.length];
+  getViewportStart() {
+    return new Date(this.viewportStart);
   }
-  // Returns a deterministic colour per topic: uses explicit setting if defined, otherwise hashes the name
-  getTopicColor(topic) {
-    if (this.settings.topicColors[topic]) return this.settings.topicColors[topic];
-    let hash = 0;
-    for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
-    return this.getPaletteColor(Math.abs(hash));
+  // Commits a new viewport start date, fires the change callback, re-renders, and resets pan
+  applyViewportJump(newStart) {
+    var _a;
+    this.viewportStart = newStart;
+    if (this.onViewportChange) this.onViewportChange(new Date(newStart));
+    this.render();
+    (_a = this.scrollContainer) == null ? void 0 : _a.scrollTo({ left: 0, behavior: "auto" });
+  }
+  // Shifts the viewport by the given number of months and re-renders
+  jumpViewport(monthDelta) {
+    const next = new Date(this.viewportStart);
+    next.setMonth(next.getMonth() + monthDelta);
+    this.applyViewportJump(next);
+  }
+  // Jumps the viewport so the given date sits near the left edge, then re-renders
+  jumpToDate(date) {
+    const target = new Date(date);
+    target.setDate(target.getDate() - 14);
+    target.setHours(0, 0, 0, 0);
+    this.applyViewportJump(target);
   }
   // Renders a single month label cell in the month header row
   renderMonthCell(headerRow, day, span, colWidth, startIdx) {
@@ -617,35 +965,154 @@ var TimelineComponent = class {
       left: `${String(startIdx * colWidth)}%`
     });
   }
+  // Builds the fixed-width day array for the current viewport
+  buildViewportDays() {
+    const days = [];
+    const curr = new Date(this.viewportStart);
+    curr.setHours(0, 0, 0, 0);
+    for (let i = 0; i < _TimelineComponent.MAX_DAYS; i++) {
+      days.push(new Date(curr));
+      curr.setDate(curr.getDate() + 1);
+    }
+    return days;
+  }
+  createSideRibbon(allDays, validTasks) {
+    const ribbon = this.container.createDiv("timeline-ribbon");
+    const navSection = ribbon.createDiv("ribbon-section ribbon-section--nav");
+    const navHandle = navSection.createDiv("ribbon-handle ribbon-handle--nav");
+    navHandle.setAttribute("aria-label", "Navigate timeline");
+    const navIconWrap = navHandle.createDiv("ribbon-handle-icon");
+    (0, import_obsidian6.setIcon)(navIconWrap, "calendar-range");
+    const navHoverLabel = navSection.createDiv("ribbon-hover-label");
+    navHoverLabel.setText("Navigate");
+    const navPanel = navSection.createDiv("ribbon-panel");
+    const openNav = () => {
+      this.ribbonNavOpen = true;
+      navSection.addClass("is-open");
+      if (this.ribbonOutsideHandler) {
+        document.removeEventListener("mousedown", this.ribbonOutsideHandler);
+        this.ribbonOutsideHandler = null;
+      }
+      const handler = (e) => {
+        const target = e.target;
+        if (!(target instanceof Node)) return;
+        if (!navSection.contains(target)) {
+          this.ribbonNavOpen = false;
+          navSection.removeClass("is-open");
+          document.removeEventListener("mousedown", handler);
+          this.ribbonOutsideHandler = null;
+        }
+      };
+      this.ribbonOutsideHandler = handler;
+      document.addEventListener("mousedown", handler);
+    };
+    const closeNav = () => {
+      this.ribbonNavOpen = false;
+      navSection.removeClass("is-open");
+      if (this.ribbonOutsideHandler) {
+        document.removeEventListener("mousedown", this.ribbonOutsideHandler);
+        this.ribbonOutsideHandler = null;
+      }
+    };
+    if (this.ribbonNavOpen) openNav();
+    const viewportEnd = new Date(this.viewportStart);
+    viewportEnd.setDate(viewportEnd.getDate() + _TimelineComponent.MAX_DAYS - 1);
+    const startLabel = this.viewportStart.toLocaleString("default", { month: "short", year: "2-digit" });
+    const endLabel = viewportEnd.toLocaleString("default", { month: "short", year: "2-digit" });
+    const navControls = navPanel.createDiv("ribbon-nav-controls");
+    const prevBtn = navControls.createEl("button", { cls: "vp-jump" });
+    prevBtn.setText("\u2039\u2039");
+    prevBtn.setAttribute("aria-label", "Jump back 6 months");
+    prevBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.ribbonNavOpen = true;
+      this.jumpViewport(-_TimelineComponent.JUMP_MONTHS);
+    });
+    const rangeEl = navControls.createDiv("vp-range");
+    rangeEl.createSpan().setText(startLabel);
+    rangeEl.createEl("em").setText("/");
+    rangeEl.createSpan().setText(endLabel);
+    const nextBtn = navControls.createEl("button", { cls: "vp-jump" });
+    nextBtn.setText("\u203A\u203A");
+    nextBtn.setAttribute("aria-label", "Jump forward 6 months");
+    nextBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.ribbonNavOpen = true;
+      this.jumpViewport(_TimelineComponent.JUMP_MONTHS);
+    });
+    const windowStart = allDays[0];
+    const windowEnd = allDays[allDays.length - 1];
+    const outOfRange = validTasks.filter((t) => {
+      if (!t.dueDate) return false;
+      return t.dueDate < windowStart || t.dueDate > windowEnd;
+    });
+    if (outOfRange.length > 0) {
+      const byMonth = /* @__PURE__ */ new Map();
+      outOfRange.forEach((t) => {
+        if (!t.dueDate) return;
+        const key = t.dueDate.toLocaleString("default", { month: "short", year: "numeric" });
+        const existing = byMonth.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          byMonth.set(key, { label: key, date: new Date(t.dueDate), count: 1 });
+        }
+      });
+      const chipsEl = navPanel.createDiv("ribbon-chips");
+      byMonth.forEach(({ label, date, count }) => {
+        const isPast = date < windowStart;
+        const chip = chipsEl.createEl("button", { cls: `chip ${isPast ? "chip--past" : "chip--future"}` });
+        const countSuffix = count > 1 ? ` \xD7${String(count)}` : "";
+        chip.setText(isPast ? `\u2190 ${label}${countSuffix}` : `${label}${countSuffix} \u2192`);
+        chip.setAttribute("aria-label", `Jump to ${label}`);
+        chip.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.ribbonNavOpen = true;
+          this.jumpToDate(date);
+        });
+      });
+    }
+    navHandle.addEventListener("click", () => {
+      if (navSection.hasClass("is-open")) {
+        closeNav();
+      } else {
+        openNav();
+      }
+    });
+    const syncSection = ribbon.createDiv("ribbon-section ribbon-section--sync");
+    const syncHandle = syncSection.createDiv("ribbon-handle ribbon-handle--sync");
+    syncHandle.setAttribute("aria-label", "Scroll to today");
+    const syncIconWrap = syncHandle.createDiv("ribbon-handle-icon");
+    (0, import_obsidian6.setIcon)(syncIconWrap, "rotate-ccw");
+    const syncExpand = syncSection.createDiv("ribbon-sync-expand");
+    const syncExpandIcon = syncExpand.createDiv("ribbon-sync-expand-icon");
+    (0, import_obsidian6.setIcon)(syncExpandIcon, "rotate-ccw");
+    syncExpand.createSpan({ cls: "ribbon-sync-expand-label" }).setText("Today");
+    syncHandle.addEventListener("click", () => {
+      this.scrollToToday();
+    });
+    syncExpand.addEventListener("click", () => {
+      this.scrollToToday();
+    });
+  }
   render() {
+    if (this.ribbonOutsideHandler) {
+      document.removeEventListener("mousedown", this.ribbonOutsideHandler);
+      this.ribbonOutsideHandler = null;
+    }
     this.container.empty();
     this.container.addClass("timeline-wrapper");
-    const validTasks = this.tasks.filter((t) => t.dueDate && !isNaN(t.dueDate.getTime()));
-    if (validTasks.length === 0) {
+    const validGroups = this.groups.filter((g) => {
+      const t = g.representative;
+      return t.dueDate && !isNaN(t.dueDate.getTime());
+    });
+    if (validGroups.length === 0) {
       const empty = this.container.createDiv("dashboard-empty-state");
       empty.createEl("p", { text: "No dated tasks to display." });
       return;
     }
-    const dates = validTasks.map((t) => t.dueDate).filter((d) => d instanceof Date);
-    const today = /* @__PURE__ */ new Date();
-    today.setHours(0, 0, 0, 0);
-    dates.push(today);
-    let minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
-    let maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
-    const threeMonthsAgo = /* @__PURE__ */ new Date();
-    threeMonthsAgo.setMonth(today.getMonth() - 3);
-    const sixMonthsAhead = /* @__PURE__ */ new Date();
-    sixMonthsAhead.setMonth(today.getMonth() + 6);
-    if (minDate < threeMonthsAgo) minDate = threeMonthsAgo;
-    if (maxDate > sixMonthsAhead) maxDate = sixMonthsAhead;
-    minDate.setDate(minDate.getDate() - 2);
-    maxDate.setDate(maxDate.getDate() + this.daysToShow + 2);
-    const allDays = [];
-    const curr = new Date(minDate);
-    while (curr <= maxDate) {
-      allDays.push(new Date(curr));
-      curr.setDate(curr.getDate() + 1);
-    }
+    const allDays = this.buildViewportDays();
+    this.createSideRibbon(allDays, validGroups.map((g) => g.representative));
     this.createNavigationOverlay("left");
     this.createNavigationOverlay("right");
     this.scrollContainer = this.container.createDiv("timeline-container");
@@ -687,17 +1154,33 @@ var TimelineComponent = class {
       }
     });
     const rowEndTimes = [];
-    const sortedTasks = [...validTasks].sort((a, b) => {
-      var _a, _b, _c, _d;
-      if (a.fileName !== b.fileName) {
-        return (a.fileName || "").localeCompare(b.fileName || "");
+    const windowStart = allDays[0];
+    const windowEnd = allDays[allDays.length - 1];
+    const sortedGroups = [...validGroups].sort((a, b) => {
+      var _a, _b, _c, _d, _e, _f, _g, _h;
+      const ta = a.representative;
+      const tb = b.representative;
+      if (ta.fileName !== tb.fileName) {
+        return (ta.fileName || "").localeCompare(tb.fileName || "");
       }
-      const aStart = ((_a = a.startDate) == null ? void 0 : _a.getTime()) || ((_b = a.dueDate) == null ? void 0 : _b.getTime()) || 0;
-      const bStart = ((_c = b.startDate) == null ? void 0 : _c.getTime()) || ((_d = b.dueDate) == null ? void 0 : _d.getTime()) || 0;
+      const aStart = (_d = (_c = (_a = ta.startDate) == null ? void 0 : _a.getTime()) != null ? _c : (_b = ta.dueDate) == null ? void 0 : _b.getTime()) != null ? _d : 0;
+      const bStart = (_h = (_g = (_e = tb.startDate) == null ? void 0 : _e.getTime()) != null ? _g : (_f = tb.dueDate) == null ? void 0 : _f.getTime()) != null ? _h : 0;
       return aStart - bStart;
     });
-    sortedTasks.forEach((task) => {
+    const windowStartMs = windowStart.getTime();
+    const windowEndMs = windowEnd.getTime() + 86399999;
+    const visibleGroups = sortedGroups.filter((group) => {
       var _a;
+      const task = group.representative;
+      if (!task.dueDate) return false;
+      const dueMs = new Date(task.dueDate).setHours(23, 59, 59, 999);
+      const startDate = (_a = task.startDate) != null ? _a : task.dueDate;
+      const startMs = new Date(startDate).setHours(0, 0, 0, 0);
+      return dueMs >= windowStartMs && startMs <= windowEndMs;
+    });
+    visibleGroups.forEach((group) => {
+      var _a;
+      const task = group.representative;
       if (!task.dueDate) return;
       const taskStart = new Date((_a = task.startDate) != null ? _a : task.dueDate);
       const taskEnd = new Date(task.dueDate);
@@ -717,8 +1200,9 @@ var TimelineComponent = class {
       } else {
         rowEndTimes[rowIndex] = taskEnd.getTime();
       }
+      const barLabel = group.isRecurring && group.openCount > 1 ? `${task.title} \xD7${String(group.openCount)}` : task.title;
       const bar = grid.createDiv("timeline-task-bar");
-      bar.setText(task.title);
+      bar.setText(barLabel);
       bar.setCssProps({
         "grid-column-start": String(startIdx + 1),
         "grid-column-end": `span ${String(dueIdx - startIdx + 1)}`,
@@ -727,7 +1211,7 @@ var TimelineComponent = class {
       if (taskStart < allDays[0]) bar.addClass("is-clamped-left");
       if (taskEnd > allDays[allDays.length - 1]) bar.addClass("is-clamped-right");
       if (this.settings.colorMode === "course" && task.fileName) {
-        bar.setCssProps({ "background-color": this.getTopicColor(task.fileName) });
+        bar.setCssProps({ "background-color": getTopicColor(task.fileName, this.settings) });
       } else {
         const statusClass = {
           ["overdue" /* Overdue */]: "status-overdue",
@@ -739,7 +1223,7 @@ var TimelineComponent = class {
         if (cls) bar.addClass(cls);
       }
       bar.addEventListener("mouseenter", (e) => {
-        this.showTooltip(e, task);
+        this.showTooltip(e, task, group.openCount);
       });
       bar.addEventListener("mouseleave", () => {
         this.hideTooltip();
@@ -749,7 +1233,7 @@ var TimelineComponent = class {
       });
       bar.addEventListener("click", (e) => {
         e.stopPropagation();
-        void this.openTaskFile(task);
+        void openTaskInEditor(this.app, task);
       });
     });
     this.setupEventListeners(this.scrollContainer);
@@ -762,8 +1246,20 @@ var TimelineComponent = class {
     var _a;
     (_a = this.scrollContainer) == null ? void 0 : _a.scrollTo({ left: pos, behavior: "auto" });
   }
-  // Smoothly centers the viewport on today's column
+  // Smoothly centres the viewport on today's column.
+  // If today is outside the current window, jumps the viewport to bring it in first.
   scrollToToday() {
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const windowEnd = new Date(this.viewportStart);
+    windowEnd.setDate(windowEnd.getDate() + _TimelineComponent.MAX_DAYS - 1);
+    if (today < this.viewportStart || today > windowEnd) {
+      const newStart = new Date(today);
+      newStart.setMonth(newStart.getMonth() - 3);
+      newStart.setHours(0, 0, 0, 0);
+      this.applyViewportJump(newStart);
+      return;
+    }
     if (!this.scrollContainer) return;
     const todayCell = this.scrollContainer.querySelector(".timeline-header-cell.is-today");
     if (todayCell instanceof HTMLElement) {
@@ -809,7 +1305,7 @@ var TimelineComponent = class {
       container.scrollLeft = this.scrollLeftPos - (x - this.startX) * 1.5;
     });
   }
-  showTooltip(e, task) {
+  showTooltip(e, task, openCount) {
     if (!this.tooltipEl) {
       this.tooltipEl = document.body.createDiv("dashboard-tooltip");
     }
@@ -818,6 +1314,9 @@ var TimelineComponent = class {
     this.tooltipEl.createDiv("tooltip-meta").setText(`\u{1F4C2} ${task.fileName}`);
     if (task.dueDate) {
       this.tooltipEl.createDiv("tooltip-date").setText(`\u{1F4C5} ${task.dueDate.toDateString()}`);
+    }
+    if (openCount > 1) {
+      this.tooltipEl.createDiv("tooltip-recurrence").setText(`\u{1F501} ${String(openCount)} pending`);
     }
     this.tooltipEl.setCssProps({ display: "block" });
     this.moveTooltip(e);
@@ -834,87 +1333,12 @@ var TimelineComponent = class {
     var _a;
     (_a = this.tooltipEl) == null ? void 0 : _a.setCssProps({ display: "none" });
   }
-  async openTaskFile(task) {
-    const file = this.app.vault.getAbstractFileByPath(task.filePath);
-    if (!(file instanceof import_obsidian5.TFile)) return;
-    const leaf = this.app.workspace.getLeaf(false);
-    await leaf.openFile(file);
-    const view = this.app.workspace.getActiveViewOfType(import_obsidian5.MarkdownView);
-    if (view) {
-      const pos = { line: task.lineNumber, ch: 0 };
-      view.editor.setCursor(pos);
-      view.editor.scrollIntoView({ from: pos, to: pos }, true);
-    }
-  }
 };
-
-// src/views/TaskListComponent.ts
-var import_obsidian6 = require("obsidian");
-var TaskListComponent = class {
-  constructor(container, app, callbacks, settings) {
-    this.container = container;
-    this.app = app;
-    this.callbacks = callbacks;
-    this.settings = settings;
-  }
-  render(tasks) {
-    this.container.empty();
-    if (tasks.length === 0) {
-      const empty = this.container.createDiv("dashboard-empty-state");
-      empty.createEl("p", { text: "No tasks found." });
-      return;
-    }
-    const listContainer = this.container.createDiv("dashboard-task-list");
-    tasks.forEach((task) => {
-      this.renderTaskItem(listContainer, task);
-    });
-  }
-  renderTaskItem(container, task) {
-    const taskEl = container.createDiv({ cls: ["task-item"] });
-    if (this.settings.colorMode === "course" && task.fileName) {
-      taskEl.setCssProps({ "border-left-color": getTopicColor(task.fileName, this.settings) });
-    } else {
-      const status = getTaskStatus(task);
-      if (status === "overdue" /* Overdue */) taskEl.addClass("status-overdue");
-      if (status === "urgent" /* Urgent */) taskEl.addClass("status-urgent");
-      if (status === "completed" /* Completed */) taskEl.addClass("status-completed");
-      if (status === "upcoming_week" /* UpcomingWeek */) taskEl.addClass("status-active");
-    }
-    const checkbox = taskEl.createEl("input", { type: "checkbox", cls: "task-checkbox" });
-    checkbox.checked = task.completed;
-    checkbox.addEventListener("change", () => {
-      this.callbacks.onToggle(task);
-    });
-    const content = taskEl.createDiv("task-content");
-    const viewMode = content.createDiv("task-view-mode");
-    const titleEl = viewMode.createDiv("task-title");
-    titleEl.setText(task.title);
-    const meta = viewMode.createDiv("task-meta");
-    if (task.fileName) {
-      const courseLabel = meta.createDiv("task-course");
-      courseLabel.setText(task.fileName);
-    }
-    if (task.dueDate) {
-      const dateLabel = meta.createDiv("task-date");
-      dateLabel.setText(task.dueDate.toDateString());
-    }
-    titleEl.addEventListener("click", () => {
-      void this.openTaskInEditor(task);
-    });
-  }
-  async openTaskInEditor(task) {
-    const file = this.app.vault.getAbstractFileByPath(task.filePath);
-    if (file instanceof import_obsidian6.TFile) {
-      const leaf = this.app.workspace.getLeaf(false);
-      await leaf.openFile(file);
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView);
-      if (view) {
-        view.editor.setCursor({ line: task.lineNumber, ch: 0 });
-        view.editor.scrollIntoView({ from: { line: task.lineNumber, ch: 0 }, to: { line: task.lineNumber, ch: 0 } }, true);
-      }
-    }
-  }
-};
+// The viewport always renders exactly MAX_DAYS columns — the DOM size stays constant
+_TimelineComponent.MAX_DAYS = 365;
+// Jump buttons shift the viewport by this many months
+_TimelineComponent.JUMP_MONTHS = 6;
+var TimelineComponent = _TimelineComponent;
 
 // src/views/HeaderComponent.ts
 var import_obsidian7 = require("obsidian");
@@ -1063,6 +1487,7 @@ var QuickAddModal = class extends import_obsidian8.Modal {
     this.title = "";
     /** ISO date string (YYYY-MM-DD) from the date picker, or empty string. */
     this.date = "";
+    this.recurrence = "";
     /**
      * Path of the chosen destination file, or the sentinel value
      * `'__CURSOR__'` when the user wants to insert at the cursor position.
@@ -1119,13 +1544,20 @@ var QuickAddModal = class extends import_obsidian8.Modal {
         this.date = value;
       });
     });
+    new import_obsidian8.Setting(contentEl).setName("Repeat").setDesc("Example: daily, weekly, every two days").addText((text) => {
+      text.setPlaceholder("Optional...");
+      text.onChange((value) => {
+        this.recurrence = value;
+      });
+    });
     new import_obsidian8.Setting(contentEl).addButton(
       (btn) => btn.setButtonText("Add task").setCta().onClick(async () => {
         if (!this.title || !this.selectedFile) return;
         if (this.selectedFile === "__CURSOR__") {
           if (this.activeViewAtOpen) {
             const dateStr = this.date ? ` [due:: ${this.date}]` : "";
-            const taskLine = `- [ ] ${this.title}${dateStr}
+            const repeatStr = this.recurrence ? ` [repeat:: ${this.recurrence}]` : "";
+            const taskLine = `- [ ] ${this.title}${dateStr}${repeatStr}
 `;
             this.activeViewAtOpen.editor.replaceSelection(taskLine);
             if (this.activeViewAtOpen.file) {
@@ -1140,7 +1572,7 @@ var QuickAddModal = class extends import_obsidian8.Modal {
           }
         } else {
           const dateObj = this.date ? new Date(this.date) : null;
-          await this.taskManager.addTask(this.title, dateObj, this.selectedFile);
+          await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
         }
         this.close();
       })
@@ -1179,6 +1611,9 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.showTimeline = true;
     this.showList = true;
     this.showStats = true;
+    // Per-view stats display preference — persisted via getState/setState
+    // Removed from global Settings so each dashboard widget can have its own value.
+    this.statsCompletionFormat = "all";
     this.timelineDaysToShow = 10;
     this.renderTimer = null;
     // Tracks scroll position so re-renders don't jump the timeline,
@@ -1205,7 +1640,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     });
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (file.path.endsWith(".md")) {
+        if (file.path.endsWith(".md") && !this.taskManager.getIsInternalChange()) {
           void this.taskManager.refreshFileTask(file.path);
         }
       })
@@ -1237,6 +1672,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
       if (Object.prototype.hasOwnProperty.call(s, "showList")) this.showList = s.showList;
       if (Object.prototype.hasOwnProperty.call(s, "showStats")) this.showStats = s.showStats;
       if (Object.prototype.hasOwnProperty.call(s, "zoomLevel")) this.timelineDaysToShow = s.zoomLevel;
+      if (Object.prototype.hasOwnProperty.call(s, "statsCompletionFormat")) this.statsCompletionFormat = s.statsCompletionFormat;
       if (s.statusFilter) this.taskManager.setStatusFilter(s.statusFilter);
       if (s.courseFilter) this.taskManager.setCourseFilter(s.courseFilter);
       if (s.headerState) this.headerState = s.headerState;
@@ -1254,20 +1690,16 @@ var DashboardView = class extends import_obsidian9.ItemView {
       showList: this.showList,
       showStats: this.showStats,
       zoomLevel: this.timelineDaysToShow,
+      statsCompletionFormat: this.statsCompletionFormat,
       statusFilter: filters.status,
       courseFilter: filters.course,
       headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState
     });
   }
   onOpen() {
-    const parent = this.containerEl.closest(".workspace-leaf-content");
-    if (parent) parent.classList.add("tasklens-chromeless");
-    this.tabContainer = this.containerEl.closest(".workspace-tabs");
-    if (this.plugin.isLayoutLocked && this.tabContainer) {
-      this.tabContainer.classList.add("tasklens-hide-tabs");
-    }
-    this.leafRootEl = this.containerEl.closest(".workspace-leaf-content");
-    if (this.leafRootEl) this.leafRootEl.classList.add("tasklens-chromeless");
+    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+    this.leafRootEl = leafRootEl instanceof HTMLElement ? leafRootEl : null;
+    this.tabContainer = tabContainer instanceof HTMLElement ? tabContainer : null;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.applyColorTheme();
@@ -1283,8 +1715,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     return Promise.resolve();
   }
   onClose() {
-    if (this.tabContainer) this.tabContainer.classList.remove("tasklens-hide-tabs");
-    if (this.leafRootEl) this.leafRootEl.classList.remove("tasklens-chromeless");
+    cleanUpViewDOM(this.leafRootEl, this.tabContainer);
     return Promise.resolve();
   }
   render() {
@@ -1369,6 +1800,21 @@ var DashboardView = class extends import_obsidian9.ItemView {
     courseSelect.addEventListener("change", () => {
       this.taskManager.setCourseFilter(courseSelect.value || null);
     });
+    const completionGroup = filtersDiv.createDiv("control-group");
+    completionGroup.createEl("label", { text: "Completed:" });
+    const completionSelect = completionGroup.createEl("select");
+    [
+      { value: "all", text: "All-time" },
+      { value: "today", text: "Today" }
+    ].forEach((opt) => {
+      const option = completionSelect.createEl("option", { value: opt.value, text: opt.text });
+      if (opt.value === this.statsCompletionFormat) option.selected = true;
+    });
+    completionSelect.addEventListener("change", () => {
+      this.statsCompletionFormat = completionSelect.value;
+      this.app.workspace.requestSaveLayout();
+      this.render();
+    });
     const actionsDiv = controls.createDiv("actions-wrapper");
     actionsDiv.setCssProps({ display: "flex", gap: "12px", "align-items": "center" });
     const toggles = [
@@ -1397,16 +1843,18 @@ var DashboardView = class extends import_obsidian9.ItemView {
   renderStatistics() {
     const stats = this.taskManager.getStatistics();
     const container = this.contentEl.createDiv("dashboard-stats");
+    const showToday = this.statsCompletionFormat === "today";
+    const completionValue = showToday ? stats.completedToday : stats.completed;
+    const completionLabel = showToday ? "Done Today" : "Completed";
     const statCards = [
       { label: "Total", value: stats.total, cls: "stat-total", filter: "all" /* All */ },
-      { label: "Active", value: stats.upcoming, cls: "stat-active", filter: "upcoming_week" /* UpcomingWeek */ },
+      { label: "Upcoming", value: stats.upcoming, cls: "stat-upcoming", filter: "upcoming_week" /* UpcomingWeek */ },
       { label: "Urgent", value: stats.urgent, cls: "stat-urgent", filter: "urgent" /* Urgent */ },
       { label: "Overdue", value: stats.overdue, cls: "stat-overdue", filter: "overdue" /* Overdue */ },
-      { label: "Completed", value: stats.completed, cls: "stat-completed", filter: "completed" /* Completed */ }
+      { label: completionLabel, value: completionValue, cls: "stat-completed", filter: "completed" /* Completed */ }
     ];
     statCards.forEach((stat) => {
-      const card = container.createDiv({ cls: ["stat-card", stat.cls] });
-      card.addClass("is-clickable");
+      const card = container.createDiv({ cls: ["stat-card", stat.cls, "is-clickable"] });
       card.addEventListener("click", () => {
         this.taskManager.setStatusFilter(stat.filter);
       });
@@ -1427,7 +1875,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
         void this.taskManager.deleteTask(t);
       }
     }, this.plugin.settings);
-    list.render(this.taskManager.getFilteredTasks());
+    list.render(this.taskManager.getGroupedFilteredTasks());
   }
   applyColorTheme() {
     const cols = this.plugin.settings.colors;
@@ -1453,7 +1901,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
       this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
       this.render();
     });
-    zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} Days ` });
+    zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} days ` });
     const zoomIn = zoomControls.createEl("button", { text: "+", cls: "view-toggle-btn" });
     zoomIn.addEventListener("click", () => {
       this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);
@@ -1467,7 +1915,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.timelineComponent = new TimelineComponent(
       container,
       this.app,
-      this.taskManager.getFilteredTasks(),
+      this.taskManager.getAllGroupedTasks(),
       this.timelineDaysToShow,
       this.plugin.settings
     );
@@ -1496,6 +1944,9 @@ var TimelineView = class extends import_obsidian10.ItemView {
     this.headerComponent = null;
     this.headerState = { title: null, isCollapsed: false };
     this.timelineDaysToShow = 10;
+    this.viewportStart = null;
+    this.savedScrollLeft = 0;
+    this.hasOpenedOnce = false;
     // Named event handler to prevent listener stacking
     this.onTasksUpdated = () => {
       this.render();
@@ -1517,43 +1968,70 @@ var TimelineView = class extends import_obsidian10.ItemView {
       const s = state;
       if (Object.prototype.hasOwnProperty.call(s, "headerState")) this.headerState = s.headerState;
       if (Object.prototype.hasOwnProperty.call(s, "zoomLevel")) this.timelineDaysToShow = s.zoomLevel;
+      if (Object.prototype.hasOwnProperty.call(s, "viewportStart")) {
+        const raw = s.viewportStart;
+        if (typeof raw === "string") {
+          const parsed = new Date(raw);
+          if (!isNaN(parsed.getTime())) this.viewportStart = parsed;
+        }
+      }
     }
     this.render();
-    setTimeout(() => {
-      var _a;
-      (_a = this.timelineComponent) == null ? void 0 : _a.scrollToToday();
-    }, 300);
+    const rendered = this.timelineComponent;
+    if (!rendered) return;
+    if (this.hasOpenedOnce) {
+      setTimeout(() => {
+        rendered.setScrollPosition(this.savedScrollLeft);
+      }, 50);
+    } else {
+      setTimeout(() => {
+        rendered.scrollToToday();
+      }, 300);
+    }
   }
   getState() {
+    var _a, _b, _c;
+    const liveViewportStart = (_b = (_a = this.timelineComponent) == null ? void 0 : _a.getViewportStart()) != null ? _b : this.viewportStart;
     return Object.assign(super.getState(), {
       headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState,
-      zoomLevel: this.timelineDaysToShow
+      zoomLevel: this.timelineDaysToShow,
+      viewportStart: (_c = liveViewportStart == null ? void 0 : liveViewportStart.toISOString()) != null ? _c : null
     });
   }
   onOpen() {
     const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
-    this.leafRootEl = leafRootEl;
-    this.tabContainer = tabContainer;
+    this.leafRootEl = leafRootEl instanceof HTMLElement ? leafRootEl : null;
+    this.tabContainer = tabContainer instanceof HTMLElement ? tabContainer : null;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     void this.plugin.taskManager.loadTasks().then(() => {
       this.render();
-      setTimeout(() => {
-        var _a;
-        (_a = this.timelineComponent) == null ? void 0 : _a.scrollToToday();
-      }, 500);
+      const rendered = this.timelineComponent;
+      if (!rendered) return;
+      if (!this.hasOpenedOnce) {
+        this.hasOpenedOnce = true;
+        setTimeout(() => {
+          rendered.scrollToToday();
+        }, 500);
+      } else {
+        setTimeout(() => {
+          rendered.setScrollPosition(this.savedScrollLeft);
+        }, 50);
+      }
     });
     return Promise.resolve();
   }
   onClose() {
     this.plugin.taskManager.off("tasks-updated", this.onTasksUpdated);
-    this.performCleanUp();
+    this.performCleanup();
     return Promise.resolve();
   }
-  performCleanUp() {
+  performCleanup() {
     cleanUpViewDOM(this.leafRootEl, this.tabContainer);
   }
   render() {
+    var _a, _b, _c;
+    this.savedScrollLeft = (_b = (_a = this.timelineComponent) == null ? void 0 : _a.getScrollPosition()) != null ? _b : this.savedScrollLeft;
     this.contentEl.empty();
     this.headerComponent = new HeaderComponent(
       this.contentEl,
@@ -1575,11 +2053,23 @@ var TimelineView = class extends import_obsidian10.ItemView {
     this.timelineComponent = new TimelineComponent(
       container,
       this.app,
-      this.plugin.taskManager.getFilteredTasks(),
+      this.plugin.taskManager.getAllGroupedTasks(),
       this.timelineDaysToShow,
-      this.plugin.settings
+      this.plugin.settings,
+      (_c = this.viewportStart) != null ? _c : void 0,
+      // When the user jumps the viewport, persist it immediately so layout saves reflect it
+      (newStart) => {
+        this.viewportStart = newStart;
+        this.app.workspace.requestSaveLayout();
+      }
     );
     this.timelineComponent.render();
+    const rendered = this.timelineComponent;
+    if (this.savedScrollLeft > 0) {
+      setTimeout(() => {
+        rendered.setScrollPosition(this.savedScrollLeft);
+      }, 50);
+    }
   }
   refreshFromSettings() {
     this.render();
@@ -1691,7 +2181,7 @@ var TaskListView = class extends import_obsidian11.ItemView {
         void this.plugin.taskManager.deleteTask(t);
       }
     }, this.plugin.settings);
-    list.render(this.plugin.taskManager.getFilteredTasks());
+    list.render(this.plugin.taskManager.getGroupedFilteredTasks());
   }
 };
 
@@ -1706,13 +2196,11 @@ var StatsComponent = class {
   render(taskManager) {
     this.container.empty();
     const stats = taskManager.getStatistics();
-    const tasks = taskManager.getAllTasks();
-    const urgentCount = tasks.filter((t) => !t.completed && getTaskStatus(t) === "urgent" /* Urgent */).length;
     const containerDiv = this.container.createDiv("dashboard-stats");
     const statCards = [
       { label: "Total", value: stats.total, cls: "stat-total" },
       { label: "Active", value: stats.upcoming, cls: "stat-active" },
-      { label: "Urgent", value: urgentCount, cls: "stat-urgent" },
+      { label: "Urgent", value: stats.urgent, cls: "stat-urgent" },
       { label: "Overdue", value: stats.overdue, cls: "stat-overdue" },
       { label: "Completed", value: stats.completed, cls: "stat-completed" }
     ];
@@ -1823,6 +2311,16 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     }
     const parser = new TaskParser(this.app, this.settings);
     this.taskManager = new TaskManager(parser, this.app);
+    this.registerEvent(
+      this.app.vault.on("modify", async (file) => {
+        if (!(file instanceof import_obsidian13.TFile)) return;
+        const isInternal = this.taskManager.getIsInternalChange();
+        if (!this.settings.appWideAutomation || !file.path.endsWith(".md") || isInternal) {
+          return;
+        }
+        await this.taskManager.processManualUpdate(file);
+      })
+    );
     this.registerView(VIEW_TYPE_DASHBOARD, (leaf) => new DashboardView(leaf, this));
     this.registerView(VIEW_TYPE_TIMELINE, (leaf) => new TimelineView(leaf, this));
     this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
