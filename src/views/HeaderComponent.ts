@@ -179,5 +179,3 @@ export class HeaderComponent {
         };
     }
 }
-
-/* #TODO change dashboard to widget */

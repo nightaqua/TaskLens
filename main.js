@@ -113,6 +113,58 @@ var TaskManager = class extends import_obsidian.Events {
     } finally {
       this.isInternalChange = false;
     }
+    await this.refreshFileTask(file.path);
+  }
+  /**
+   * Builds the cloned line for a recurring task after completion.
+   * Handles three date configurations:
+   *  - due:: only → advance due:: to next occurrence.
+   *  - due:: + start:: → advance both, preserving the original start-to-due window.
+   *  - start:: only → use start:: as the scheduling anchor, advance it to next occurrence.
+   *    (A recurring task with no due date is ambiguous; start:: is the best available anchor.)
+   * In all cases the checkbox is reset to [ ] and the completion metadata is NOT copied.
+   */
+  buildClonedLine(originalLine, task, completionDate) {
+    var _a, _b, _c;
+    const anchor = (_b = (_a = task.dueDate) != null ? _a : task.startDate) != null ? _b : null;
+    const nextDate = this.calculateNextDueDate(anchor, (_c = task.recurrence) != null ? _c : "", completionDate);
+    const dateStr = this.formatDate(nextDate);
+    let clonedLine = originalLine;
+    if (task.dueDate) {
+      const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+      clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
+      if (task.startDate) {
+        const windowMs = task.dueDate.getTime() - task.startDate.getTime();
+        const nextStart = new Date(nextDate.getTime() - windowMs);
+        const startRegex = /(\[?start::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+        clonedLine = clonedLine.replace(startRegex, `$1${this.formatDate(nextStart)}$3`);
+      }
+    } else if (task.startDate) {
+      const startRegex = /(\[?start::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+      clonedLine = clonedLine.replace(startRegex, `$1${dateStr}$3`);
+    }
+    clonedLine = clonedLine.replace(/\[[xX]]/, "[ ]");
+    clonedLine = stripCompletionMetadata(clonedLine);
+    if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
+      clonedLine += ` [repeat:: ${task.recurrence}]`;
+    }
+    return clonedLine;
+  }
+  /**
+   * Inserts a cloned recurring task line immediately after the completed one,
+   * unless an open clone of the same task already exists on the next line.
+   * Extracted because addCompletionMetadata and toggleTaskCompletion both need
+   * exactly this logic.
+   */
+  spliceCloneIfNeeded(lines, task, clonedLine) {
+    var _a;
+    const nextLine = (_a = lines[task.lineNumber + 1]) != null ? _a : "";
+    const nextIsOpenTask = /\[ ]/.test(nextLine);
+    const normalise = (l) => l.replace(/\[(?:completion|repeat|due|start)::[^\]]*]/gi, "").replace(/\s+/g, " ").trim();
+    const alreadyCloned = nextIsOpenTask && normalise(nextLine).includes(normalise(task.title));
+    if (!alreadyCloned) {
+      lines.splice(task.lineNumber + 1, 0, clonedLine);
+    }
   }
   /**
    * Adds completion metadata and handles recurrence for a task that was
@@ -131,16 +183,7 @@ var TaskManager = class extends import_obsidian.Events {
     const compStr = this.formatCompletionDate(completionDate);
     lines[task.lineNumber] = originalLine + ` [completion:: ${compStr}]`;
     if (task.recurrence) {
-      const nextDate = this.calculateNextDueDate(task.dueDate || null, task.recurrence, completionDate);
-      let clonedLine = originalLine;
-      const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([)\]]?)/i;
-      const dateStr = this.formatDate(nextDate);
-      clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
-      clonedLine = clonedLine.replace(/\[[xX]]/, "[ ]");
-      if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
-        clonedLine += ` [repeat:: ${task.recurrence}]`;
-      }
-      lines.splice(task.lineNumber + 1, 0, clonedLine);
+      this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
     }
     await this.app.vault.modify(file, lines.join("\n"));
     await this.refreshFileTask(task.filePath);
@@ -184,15 +227,7 @@ var TaskManager = class extends import_obsidian.Events {
         newLine += ` [completion:: ${compStr}]`;
         lines[task.lineNumber] = newLine;
         if (task.recurrence) {
-          const nextDate = this.calculateNextDueDate(task.dueDate || null, task.recurrence, completionDate);
-          let clonedLine = originalLine;
-          const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([)\]]?)/i;
-          const dateStr = this.formatDate(nextDate);
-          clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
-          if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
-            clonedLine += ` [repeat:: ${task.recurrence}]`;
-          }
-          lines.splice(task.lineNumber + 1, 0, clonedLine);
+          this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
         }
       } else {
         lines[task.lineNumber] = originalLine.replace(/\[ ]/, "[x]");
@@ -253,14 +288,17 @@ var TaskManager = class extends import_obsidian.Events {
   getAllTasks() {
     return [...this.tasks];
   }
-  // COMMENTED OUT FOR NOW getFilteredTasks(): Task[] { return [...this.filteredTasks]; } #TODO
   /**
    * Collapses recurring clones into one TaskGroup per series.
    * Non-recurring tasks each become their own group (openCount: 1, isRecurring: false).
    * The representative is the earliest-due open clone, falling back to the latest
    * completed task when all clones in a series are done.
+   *
+   * allTasks is the unfiltered task list — used to count completed cycles accurately
+   * even when the caller passes a filtered subset as `tasks`.
    */
-  groupTasks(tasks) {
+  groupTasks(tasks, allTasks = tasks) {
+    var _a;
     const seriesMap = /* @__PURE__ */ new Map();
     const insertionOrder = [];
     for (const task of tasks) {
@@ -273,27 +311,34 @@ var TaskManager = class extends import_obsidian.Events {
       }
       series.push(task);
     }
+    const doneMap = /* @__PURE__ */ new Map();
+    for (const task of allTasks) {
+      if (!task.completed || !task.recurrence) continue;
+      const key = `${task.filePath}::${task.title}::${task.recurrence}`;
+      doneMap.set(key, ((_a = doneMap.get(key)) != null ? _a : 0) + 1);
+    }
     return insertionOrder.map((key) => {
-      var _a;
-      const clones = (_a = seriesMap.get(key)) != null ? _a : [];
+      var _a2, _b, _c;
+      const clones = (_a2 = seriesMap.get(key)) != null ? _a2 : [];
       const open = clones.filter((t) => !t.completed);
       const pool = open.length > 0 ? open : clones;
       const representative = pool.reduce((earliest, t) => {
-        var _a2, _b, _c, _d;
-        const eTime = (_b = (_a2 = earliest.dueDate) == null ? void 0 : _a2.getTime()) != null ? _b : Infinity;
-        const tTime = (_d = (_c = t.dueDate) == null ? void 0 : _c.getTime()) != null ? _d : Infinity;
+        var _a3, _b2, _c2, _d;
+        const eTime = (_b2 = (_a3 = earliest.dueDate) == null ? void 0 : _a3.getTime()) != null ? _b2 : Infinity;
+        const tTime = (_d = (_c2 = t.dueDate) == null ? void 0 : _c2.getTime()) != null ? _d : Infinity;
         return tTime < eTime ? t : earliest;
       });
       return {
         representative,
         openCount: open.length,
-        isRecurring: !!clones[0].recurrence && clones.length > 1
+        doneCount: (_b = doneMap.get(key)) != null ? _b : 0,
+        isRecurring: !!((_c = clones[0]) == null ? void 0 : _c.recurrence)
       };
     });
   }
   /** For the task list view: filtered tasks collapsed into recurring groups. */
   getGroupedFilteredTasks() {
-    return this.groupTasks(this.filteredTasks);
+    return this.groupTasks(this.filteredTasks, this.tasks);
   }
   /** For the timeline: all tasks (no status filter) collapsed into recurring groups. */
   getAllGroupedTasks() {
@@ -361,14 +406,21 @@ var TaskManager = class extends import_obsidian.Events {
     const d = String(date.getDate()).padStart(2, "0");
     return `${String(y)}-${m}-${d}`;
   }
+  /** Display format: dd-mm-yyyy. Storage format (formatDate) stays yyyy-mm-dd. */
+  static formatDisplayDate(date) {
+    const d = String(date.getDate()).padStart(2, "0");
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const y = date.getFullYear();
+    return `${d}-${m}-${String(y)}`;
+  }
   formatCompletionDate(date) {
     const pad = (n) => n.toString().padStart(2, "0");
-    const yyyy = date.getFullYear();
-    const mm = pad(date.getMonth() + 1);
     const dd = pad(date.getDate());
+    const mm = pad(date.getMonth() + 1);
+    const yyyy = date.getFullYear();
     const hh = pad(date.getHours());
     const min = pad(date.getMinutes());
-    return `${String(yyyy)}-${mm}-${dd} ${hh}:${min}`;
+    return `${dd}-${mm}-${String(yyyy)} ${hh}:${min}`;
   }
   /** Helper to calculate the bumped due date for recurring tasks */
   calculateNextDueDate(dueDate, recurrence, completionDate) {
@@ -563,22 +615,28 @@ var TaskParser = class {
     let dueDate;
     let completionDate;
     let recurrence;
-    const startRegex = /\[?\(?start::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
+    const parseDate = (raw) => {
+      const dmy = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+      const iso = dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : raw;
+      return /* @__PURE__ */ new Date(`${iso}T00:00:00`);
+    };
+    const DATE_PAT = "(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})";
+    const startRegex = new RegExp(`\\[?\\(?start::\\s*${DATE_PAT}[\\])]?`, "gi");
     const startMatch = startRegex.exec(taskText);
     if (startMatch) {
-      startDate = new Date(startMatch[1]);
+      startDate = parseDate(startMatch[1]);
       title = title.replace(startRegex, "");
     }
-    const dueRegex = /\[?\(?due::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
+    const dueRegex = new RegExp(`\\[?\\(?due::\\s*${DATE_PAT}[\\])]?`, "gi");
     const dueMatch = dueRegex.exec(taskText);
     if (dueMatch) {
-      dueDate = new Date(dueMatch[1]);
+      dueDate = parseDate(dueMatch[1]);
       title = title.replace(dueRegex, "");
     }
-    const compRegex = /\[?\(?completion::\s*(\d{4}-\d{2}-\d{2}(?:\s\d{2}:\d{2})?)[\])]?/gi;
+    const compRegex = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, "gi");
     const compMatch = compRegex.exec(taskText);
     if (compMatch) {
-      completionDate = new Date(compMatch[1]);
+      completionDate = parseDate(compMatch[1]);
       title = title.replace(compRegex, "");
     }
     const repeatRegex = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
@@ -587,11 +645,18 @@ var TaskParser = class {
       recurrence = repeatMatch[1].trim().toLowerCase();
       title = title.replace(repeatRegex, "");
     }
+    if (!recurrence) {
+      const emojiRecurMatch = taskText.match(/[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u);
+      if (emojiRecurMatch) {
+        recurrence = emojiRecurMatch[1].trim().toLowerCase();
+        title = title.replace(/[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u, "").trim();
+      }
+    }
     if (!dueDate) {
-      const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/u);
+      const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u);
       if (emojiMatch) {
-        dueDate = new Date(emojiMatch[1]);
-        title = title.replace(/\u{1F4C5}\s*\d{4}-\d{2}-\d{2}\s*/gu, "");
+        dueDate = parseDate(emojiMatch[1]);
+        title = title.replace(/\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu, "");
       }
     }
     title = title.replace(/\s+/g, " ").trim();
@@ -718,13 +783,17 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     const scanPathsSetting = new import_obsidian4.Setting(scanDetails).setName("Scan paths").setDesc("Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.").addTextArea((text) => {
       text.setPlaceholder("Projects\nUni/History\nTo-Do.md").setValue(this.plugin.settings.scanFolders.join("\n")).onChange((value) => {
         this.plugin.settings.scanFolders = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
-        void this.plugin.saveSettings();
+        void this.plugin.saveSettings().then(() => {
+          void this.plugin.taskManager.loadTasks();
+        });
       });
     });
     scanPathsSetting.settingEl.addClass("scan-paths-setting");
     new import_obsidian4.Setting(scanDetails).setName("Recursive scan").setDesc("Scan all subfolders inside the folders specified above?").addToggle((t) => t.setValue(this.plugin.settings.scanRecursively).onChange((v) => {
       this.plugin.settings.scanRecursively = v;
-      void this.plugin.saveSettings();
+      void this.plugin.saveSettings().then(() => {
+        void this.plugin.taskManager.loadTasks();
+      });
     }));
     const parserDetails = containerEl.createEl("details");
     parserDetails.open = this.plugin.settings.settingsTabState.parserOpen;
@@ -739,11 +808,15 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     }));
     new import_obsidian4.Setting(parserDetails).setName("Start key").setDesc("Inline text used to find the start date. Example: [start:: 2026-02-02]").addText((t) => t.setValue(this.plugin.settings.startDateKey).onChange((v) => {
       this.plugin.settings.startDateKey = v;
-      void this.plugin.saveSettings();
+      void this.plugin.saveSettings().then(() => {
+        void this.plugin.taskManager.loadTasks();
+      });
     }));
     new import_obsidian4.Setting(parserDetails).setName("Due key").setDesc("Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]").addText((t) => t.setValue(this.plugin.settings.dueDateKey).onChange((v) => {
       this.plugin.settings.dueDateKey = v;
-      void this.plugin.saveSettings();
+      void this.plugin.saveSettings().then(() => {
+        void this.plugin.taskManager.loadTasks();
+      });
     }));
     const uiDetails = containerEl.createEl("details");
     uiDetails.open = this.plugin.settings.settingsTabState.uiOpen;
@@ -899,11 +972,6 @@ var TaskListComponent = class {
     const titleRow = viewMode.createDiv("task-title-row");
     const titleEl = titleRow.createDiv("task-title");
     titleEl.setText(task.title);
-    if (group.isRecurring && group.openCount > 1) {
-      const badge = titleRow.createEl("span", { cls: "task-recurrence-badge" });
-      badge.setText(`\xD7${String(group.openCount)}`);
-      badge.setAttribute("aria-label", `${String(group.openCount)} pending recurrences`);
-    }
     const meta = viewMode.createDiv("task-meta");
     if (task.fileName) {
       const courseLabel = meta.createDiv("task-course");
@@ -911,7 +979,19 @@ var TaskListComponent = class {
     }
     if (task.dueDate) {
       const dateLabel = meta.createDiv("task-date");
-      dateLabel.setText(task.dueDate.toDateString());
+      dateLabel.setText(TaskManager.formatDisplayDate(task.dueDate));
+    }
+    if (group.isRecurring) {
+      const recurringChip = meta.createDiv("task-recurring-chip");
+      const icon = recurringChip.createSpan({ cls: "task-recurring-icon" });
+      (0, import_obsidian5.setIcon)(icon, "repeat");
+      if (group.doneCount > 0) {
+        recurringChip.createSpan({
+          text: `\xD7${String(group.doneCount)}`,
+          cls: "task-recurrence-count",
+          attr: { "aria-label": `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? "" : "s"}` }
+        });
+      }
     }
     titleEl.addEventListener("click", () => {
       void openTaskInEditor(this.app, task);
@@ -1216,7 +1296,7 @@ var _TimelineComponent = class _TimelineComponent {
       } else {
         rowEndTimes[rowIndex] = taskEnd.getTime();
       }
-      const barLabel = group.isRecurring && group.openCount > 1 ? `${task.title} \xD7${String(group.openCount)}` : task.title;
+      const barLabel = task.title;
       const bar = grid.createDiv("timeline-task-bar");
       bar.setText(barLabel);
       bar.setCssProps({
@@ -1239,7 +1319,7 @@ var _TimelineComponent = class _TimelineComponent {
         if (cls) bar.addClass(cls);
       }
       bar.addEventListener("mouseenter", (e) => {
-        this.showTooltip(e, task, group.openCount);
+        this.showTooltip(e, task, group.isRecurring);
       });
       bar.addEventListener("mouseleave", () => {
         this.hideTooltip();
@@ -1321,7 +1401,7 @@ var _TimelineComponent = class _TimelineComponent {
       container.scrollLeft = this.scrollLeftPos - (x - this.startX) * 1.5;
     });
   }
-  showTooltip(e, task, openCount) {
+  showTooltip(e, task, isRecurring) {
     if (!this.tooltipEl) {
       this.tooltipEl = document.body.createDiv("dashboard-tooltip");
     }
@@ -1329,10 +1409,10 @@ var _TimelineComponent = class _TimelineComponent {
     this.tooltipEl.createDiv("tooltip-title").setText(task.title);
     this.tooltipEl.createDiv("tooltip-meta").setText(`\u{1F4C2} ${task.fileName}`);
     if (task.dueDate) {
-      this.tooltipEl.createDiv("tooltip-date").setText(`\u{1F4C5} ${task.dueDate.toDateString()}`);
+      this.tooltipEl.createDiv("tooltip-date").setText(`\u{1F4C5} ${TaskManager.formatDisplayDate(task.dueDate)}`);
     }
-    if (openCount > 1) {
-      this.tooltipEl.createDiv("tooltip-recurrence").setText(`\u{1F501} ${String(openCount)} pending`);
+    if (isRecurring) {
+      this.tooltipEl.createDiv("tooltip-recurrence").setText("\u{1F501} recurring");
     }
     this.tooltipEl.setCssProps({ display: "block" });
     this.moveTooltip(e);
@@ -1603,14 +1683,13 @@ var QuickAddModal = class extends import_obsidian8.Modal {
 // src/views/DashboardView.ts
 var VIEW_TYPE_DASHBOARD = "tasklens-dashboard-view";
 function setupViewDOM(containerEl, isLocked) {
-  const leafRootEl = containerEl.closest(".workspace-leaf-content");
+  const leafRootRaw = containerEl.closest(".workspace-leaf-content");
+  const tabContainerRaw = containerEl.closest(".workspace-tabs");
+  const leafRootEl = leafRootRaw instanceof HTMLElement ? leafRootRaw : null;
+  const tabContainer = tabContainerRaw instanceof HTMLElement ? tabContainerRaw : null;
   if (leafRootEl) leafRootEl.classList.add("tasklens-chromeless");
-  const tabContainer = containerEl.closest(".workspace-tabs");
   if (tabContainer && isLocked) tabContainer.classList.add("tasklens-hide-tabs");
-  return {
-    leafRootEl: leafRootEl instanceof HTMLElement ? leafRootEl : null,
-    tabContainer: tabContainer instanceof HTMLElement ? tabContainer : null
-  };
+  return { leafRootEl, tabContainer };
 }
 function cleanUpViewDOM(leafRootEl, tabContainer) {
   if (tabContainer instanceof HTMLElement) tabContainer.classList.remove("tasklens-hide-tabs");
@@ -1638,6 +1717,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     // Tracks scroll position so re-renders don't jump the timeline,
     // unless a forced scroll-to-today is requested
     this.lastTimelineScroll = null;
+    this.lastViewportStart = null;
     this.forceScrollToToday = false;
     this.taskManager = this.plugin.taskManager;
     this.taskManager.on("tasks-updated", () => {
@@ -1645,6 +1725,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
       this.renderTimer = setTimeout(() => {
         if (this.timelineComponent && !this.forceScrollToToday) {
           this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
+          this.lastViewportStart = this.timelineComponent.getViewportStart();
         }
         this.render();
         if (this.timelineComponent) {
@@ -1716,7 +1797,9 @@ var DashboardView = class extends import_obsidian9.ItemView {
     });
   }
   onOpen() {
-    ({ leafRootEl: this.leafRootEl, tabContainer: this.tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked));
+    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+    this.leafRootEl = leafRootEl;
+    this.tabContainer = tabContainer;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.applyColorTheme();
@@ -1736,6 +1819,10 @@ var DashboardView = class extends import_obsidian9.ItemView {
     return Promise.resolve();
   }
   render() {
+    if (this.timelineComponent && !this.forceScrollToToday) {
+      this.lastViewportStart = this.timelineComponent.getViewportStart();
+      this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
+    }
     this.contentEl.empty();
     this.headerComponent = new HeaderComponent(
       this.contentEl,
@@ -1821,7 +1908,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     completionGroup.createEl("label", { text: "Completed:" });
     const completionSelect = completionGroup.createEl("select");
     [
-      { value: "all", text: "All time" },
+      { value: "all", text: "All-time" },
       { value: "today", text: "Today" }
     ].forEach((opt) => {
       const option = completionSelect.createEl("option", { value: opt.value, text: opt.text });
@@ -1909,6 +1996,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.render();
   }
   renderTimeline() {
+    var _a;
     const container = this.contentEl.createDiv("dashboard-timeline-view");
     const controls = container.createDiv("timeline-controls");
     const zoomControls = controls.createDiv("zoom-controls");
@@ -1934,16 +2022,20 @@ var DashboardView = class extends import_obsidian9.ItemView {
       this.app,
       this.taskManager.getAllGroupedTasks(),
       this.timelineDaysToShow,
-      this.plugin.settings
+      this.plugin.settings,
+      (_a = this.lastViewportStart) != null ? _a : void 0,
+      (newStart) => {
+        this.lastViewportStart = newStart;
+      }
     );
     this.timelineComponent.render();
     scrollLeft.addEventListener("click", () => {
-      var _a;
-      (_a = this.timelineComponent) == null ? void 0 : _a.scroll("left");
+      var _a2;
+      (_a2 = this.timelineComponent) == null ? void 0 : _a2.scroll("left");
     });
     scrollRight.addEventListener("click", () => {
-      var _a;
-      (_a = this.timelineComponent) == null ? void 0 : _a.scroll("right");
+      var _a2;
+      (_a2 = this.timelineComponent) == null ? void 0 : _a2.scroll("right");
     });
   }
 };
@@ -2016,7 +2108,9 @@ var TimelineView = class extends import_obsidian10.ItemView {
     });
   }
   onOpen() {
-    ({ leafRootEl: this.leafRootEl, tabContainer: this.tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked));
+    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+    this.leafRootEl = leafRootEl;
+    this.tabContainer = tabContainer;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     void this.plugin.taskManager.loadTasks().then(() => {
@@ -2133,9 +2227,9 @@ var TaskListView = class extends import_obsidian11.ItemView {
     return { headerState: this.headerState };
   }
   onOpen() {
-    const dom = setupViewDOM(this.containerEl, true);
-    this.leafRootEl = dom.leafRootEl;
-    this.tabContainer = dom.tabContainer;
+    const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, true);
+    this.leafRootEl = leafRootEl;
+    this.tabContainer = tabContainer;
     this.contentEl.empty();
     this.contentEl.addClass("tasklens-dashboard-view");
     this.contentEl.addClass("is-single-view");
@@ -2146,9 +2240,7 @@ var TaskListView = class extends import_obsidian11.ItemView {
   onClose() {
     this.isOpen = false;
     this.plugin.taskManager.off("tasks-updated", this.onTasksUpdated);
-    const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
-    const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
-    cleanUpViewDOM(root, tabs);
+    cleanUpViewDOM(this.leafRootEl, this.tabContainer);
     return Promise.resolve();
   }
   render() {
@@ -2350,11 +2442,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     }
     this.addSettingTab(new SettingsTab(this.app, this));
     this.app.workspace.onLayoutReady(() => {
-      ALL_VIEW_TYPES.forEach((type) => {
-        this.app.workspace.getLeavesOfType(type).forEach((leaf) => {
-          setupViewDOM(leaf.view.containerEl, this.isLayoutLocked);
-        });
-      });
+      void this.taskManager.loadTasks();
     });
   }
   setupRibbonIcon() {
@@ -2486,7 +2574,6 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    await this.taskManager.loadTasks();
   }
   refreshViews() {
     ALL_VIEW_TYPES.forEach((type) => {

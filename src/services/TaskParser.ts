@@ -125,31 +125,47 @@ export class TaskParser {
         let completionDate: Date | undefined;
         let recurrence: string | undefined;
 
-        // 1. START DATE Parsing
-        const startRegex  = /\[?\(?start::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
+        /**
+         * Normalise a parsed date string to a local-midnight Date.
+         * Accepts both yyyy-mm-dd and dd-mm-yyyy.
+         * Using new Date('YYYY-MM-DD') gives UTC midnight which shifts the displayed
+         * day by ±1 in non-UTC timezones; appending T00:00:00 gives local midnight.
+         */
+        const parseDate = (raw: string): Date => {
+            // dd-mm-yyyy → rearrange to yyyy-mm-dd
+            const dmy = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+            const iso = dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : raw;
+            return new Date(`${iso}T00:00:00`);
+        };
+
+        // Matches both yyyy-mm-dd and dd-mm-yyyy after the key
+        const DATE_PAT = '(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})';
+
+        // 1. START DATE
+        const startRegex = new RegExp(`\\[?\\(?start::\\s*${DATE_PAT}[\\])]?`, 'gi');
         const startMatch = startRegex.exec(taskText);
         if (startMatch) {
-            startDate = new Date(startMatch[1]);
+            startDate = parseDate(startMatch[1]);
             title = title.replace(startRegex, '');
         }
 
-        // 2. DUE DATE Parsing
-        const dueRegex    = /\[?\(?due::\s*(\d{4}-\d{2}-\d{2})[\])]?/gi;
+        // 2. DUE DATE
+        const dueRegex = new RegExp(`\\[?\\(?due::\\s*${DATE_PAT}[\\])]?`, 'gi');
         const dueMatch = dueRegex.exec(taskText);
         if (dueMatch) {
-            dueDate = new Date(dueMatch[1]);
+            dueDate = parseDate(dueMatch[1]);
             title = title.replace(dueRegex, '');
         }
 
-        // 3. COMPLETION DATE Parsing (Supports YYYY-MM-DD and YYYY-MM-DD HH:mm)
-        const compRegex   = /\[?\(?completion::\s*(\d{4}-\d{2}-\d{2}(?:\s\d{2}:\d{2})?)[\])]?/gi;
+        // 3. COMPLETION DATE (also supports HH:mm suffix)
+        const compRegex = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, 'gi');
         const compMatch = compRegex.exec(taskText);
         if (compMatch) {
-            completionDate = new Date(compMatch[1]);
+            completionDate = parseDate(compMatch[1]);
             title = title.replace(compRegex, '');
         }
 
-        // 4. RECURRENCE Parsing
+        // 4. RECURRENCE — TaskLens format: [repeat:: weekly]
         const repeatRegex = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
         const repeatMatch = repeatRegex.exec(taskText);
         if (repeatMatch) {
@@ -157,12 +173,23 @@ export class TaskParser {
             title = title.replace(repeatRegex, '');
         }
 
-        // 5. Emoji Fallback (Calendar emoji: U+1F4C5)
+        // Tasks-plugin emoji recurrence: 🔁 / 🔄 followed by a rule string.
+        // Read-only — we recognise it so isRecurring is correct and the chip shows,
+        // but we never write back in this format (TaskLens writes [repeat:: ...]).
+        if (!recurrence) {
+            const emojiRecurMatch = taskText.match(/[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u);
+            if (emojiRecurMatch) {
+                recurrence = emojiRecurMatch[1].trim().toLowerCase();
+                title = title.replace(/[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u, '').trim();
+            }
+        }
+
+        // 5. Emoji fallback 📅 — accepts both date formats
         if (!dueDate) {
-            const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2})/u);
+            const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u);
             if (emojiMatch) {
-                dueDate = new Date(emojiMatch[1]);
-                title = title.replace(/\u{1F4C5}\s*\d{4}-\d{2}-\d{2}\s*/gu, '');
+                dueDate = parseDate(emojiMatch[1]);
+                title = title.replace(/\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu, '');
             }
         }
 

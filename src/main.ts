@@ -3,7 +3,7 @@ import { TaskManager } from './services/TaskManager';
 import { TaskParser } from './services/TaskParser';
 import { SemesterSettings, DEFAULT_SETTINGS } from './settings/Settings';
 import { SettingsTab } from './settings/SettingsTab';
-import { DashboardView, VIEW_TYPE_DASHBOARD, setupViewDOM } from './views/DashboardView';
+import { DashboardView, VIEW_TYPE_DASHBOARD } from './views/DashboardView';
 import { TimelineView, VIEW_TYPE_TIMELINE } from './views/TimelineView';
 import { TaskListView, VIEW_TYPE_LIST } from './views/TaskListView';
 import { StatsView, VIEW_TYPE_STATS } from './views/StatsView';
@@ -78,17 +78,11 @@ export default class TaskLensPlugin extends Plugin {
 
         this.addSettingTab(new SettingsTab(this.app, this));
 
-        // Eliminate the startup flash: when Obsidian restores the saved workspace layout
-        // it renders the full chrome first, then calls onOpen() — there is one visible frame
-        // between those two steps where tabs and headers are shown before we can hide them.
-        // onLayoutReady fires after the layout is fully settled but before the first paint
-        // the user interacts with, so applying chromeless here closes that window.
+        // Populate this.tasks unconditionally on every startup. Without this, if no
+        // TaskLens view is open (e.g. focus mode was active when Obsidian was closed),
+        // this.tasks stays empty and processManualUpdate can never detect any transition.
         this.app.workspace.onLayoutReady(() => {
-            ALL_VIEW_TYPES.forEach(type => {
-                this.app.workspace.getLeavesOfType(type).forEach(leaf => {
-                    setupViewDOM(leaf.view.containerEl, this.isLayoutLocked);
-                });
-            });
+            void this.taskManager.loadTasks();
         });
     }
 
@@ -250,7 +244,8 @@ export default class TaskLensPlugin extends Plugin {
 
     async saveSettings(): Promise<void> {
         await this.saveData(this.settings);
-        await this.taskManager.loadTasks();
+        // Note: callers that change settings affecting task parsing (e.g. scan folders,
+        // course detection) must call taskManager.loadTasks() explicitly after saveSettings().
     }
 
     refreshViews(): void {

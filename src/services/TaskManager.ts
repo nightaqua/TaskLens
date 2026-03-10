@@ -61,6 +61,77 @@ export class TaskManager extends Events {
         } finally {
             this.isInternalChange = false;
         }
+
+        // Refresh just this file's tasks so this.tasks stays in sync for the next
+        // processManualUpdate call on the same file. Using refreshFileTask instead
+        // of loadTasks avoids a full vault rescan on every plain-text markdown edit.
+        await this.refreshFileTask(file.path);
+    }
+
+    /**
+     * Builds the cloned line for a recurring task after completion.
+     * Handles three date configurations:
+     *  - due:: only → advance due:: to next occurrence.
+     *  - due:: + start:: → advance both, preserving the original start-to-due window.
+     *  - start:: only → use start:: as the scheduling anchor, advance it to next occurrence.
+     *    (A recurring task with no due date is ambiguous; start:: is the best available anchor.)
+     * In all cases the checkbox is reset to [ ] and the completion metadata is NOT copied.
+     */
+    private buildClonedLine(originalLine: string, task: Task, completionDate: Date): string {
+        const anchor = task.dueDate ?? task.startDate ?? null;
+        const nextDate = this.calculateNextDueDate(anchor, task.recurrence ?? '', completionDate);
+        const dateStr = this.formatDate(nextDate);
+
+        let clonedLine = originalLine;
+
+        if (task.dueDate) {
+            // Advance due:: to next occurrence
+            const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+            clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
+
+            // If start:: is also present, advance it by the same interval so the
+            // start-to-due window is preserved across every recurrence.
+            if (task.startDate) {
+                const windowMs = task.dueDate.getTime() - task.startDate.getTime();
+                const nextStart = new Date(nextDate.getTime() - windowMs);
+                const startRegex = /(\[?start::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+                clonedLine = clonedLine.replace(startRegex, `$1${this.formatDate(nextStart)}$3`);
+            }
+        } else if (task.startDate) {
+            // start:: is the only anchor — advance it to the next occurrence
+            const startRegex = /(\[?start::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+            clonedLine = clonedLine.replace(startRegex, `$1${dateStr}$3`);
+        }
+        // Neither date: clone is created with no date, identical to original body.
+        // This is unusual but not illegal — the task can still recur without scheduling.
+
+        // Reset to open and strip completion stamp from the clone
+        clonedLine = clonedLine.replace(/\[[xX]]/, '[ ]');
+        clonedLine = stripCompletionMetadata(clonedLine);
+
+        // Guard: don't write a TaskLens repeat:: tag if another plugin already owns recurrence
+        if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
+            clonedLine += ` [repeat:: ${task.recurrence}]`;
+        }
+
+        return clonedLine;
+    }
+
+    /**
+     * Inserts a cloned recurring task line immediately after the completed one,
+     * unless an open clone of the same task already exists on the next line.
+     * Extracted because addCompletionMetadata and toggleTaskCompletion both need
+     * exactly this logic.
+     */
+    private spliceCloneIfNeeded(lines: string[], task: Task, clonedLine: string): void {
+        const nextLine = lines[task.lineNumber + 1] ?? '';
+        const nextIsOpenTask = /\[ ]/.test(nextLine);
+        const normalise = (l: string) =>
+            l.replace(/\[(?:completion|repeat|due|start)::[^\]]*]/gi, '').replace(/\s+/g, ' ').trim();
+        const alreadyCloned = nextIsOpenTask && normalise(nextLine).includes(normalise(task.title));
+        if (!alreadyCloned) {
+            lines.splice(task.lineNumber + 1, 0, clonedLine);
+        }
     }
 
     /**
@@ -87,18 +158,7 @@ export class TaskManager extends Events {
         lines[task.lineNumber] = originalLine + ` [completion:: ${compStr}]`;
 
         if (task.recurrence) {
-            const nextDate = this.calculateNextDueDate(task.dueDate || null, task.recurrence, completionDate);
-            let clonedLine = originalLine;
-            const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([)\]]?)/i;
-            const dateStr = this.formatDate(nextDate);
-            clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
-            // The cloned recurrence line must start as an open task
-            clonedLine = clonedLine.replace(/\[[xX]]/, '[ ]');
-            // Guard: don't write a TaskLens repeat:: tag if another plugin already owns recurrence on this line
-            if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
-                clonedLine += ` [repeat:: ${task.recurrence}]`;
-            }
-            lines.splice(task.lineNumber + 1, 0, clonedLine);
+            this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
         }
 
         await this.app.vault.modify(file, lines.join('\n'));
@@ -156,16 +216,7 @@ export class TaskManager extends Events {
                 lines[task.lineNumber] = newLine;
 
                 if (task.recurrence) {
-                    const nextDate = this.calculateNextDueDate(task.dueDate || null, task.recurrence, completionDate);
-                    let clonedLine = originalLine;
-                    const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([)\]]?)/i;
-                    const dateStr = this.formatDate(nextDate);
-                    clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
-                    // Guard: don't write a TaskLens repeat:: tag if another plugin already owns recurrence on this line
-                    if (!hasRecurrenceMetadata(clonedLine) && task.recurrence) {
-                        clonedLine += ` [repeat:: ${task.recurrence}]`;
-                    }
-                    lines.splice(task.lineNumber + 1, 0, clonedLine);
+                    this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
                 }
             } else {
                 // Another plugin already has completion metadata — just flip the checkbox.
@@ -243,20 +294,21 @@ export class TaskManager extends Events {
     }
 
     getAllTasks(): Task[] { return [...this.tasks]; }
-    // COMMENTED OUT FOR NOW getFilteredTasks(): Task[] { return [...this.filteredTasks]; } #TODO
 
     /**
      * Collapses recurring clones into one TaskGroup per series.
      * Non-recurring tasks each become their own group (openCount: 1, isRecurring: false).
      * The representative is the earliest-due open clone, falling back to the latest
      * completed task when all clones in a series are done.
+     *
+     * allTasks is the unfiltered task list — used to count completed cycles accurately
+     * even when the caller passes a filtered subset as `tasks`.
      */
-    private groupTasks(tasks: Task[]): TaskGroup[] {
+    private groupTasks(tasks: Task[], allTasks: Task[] = tasks): TaskGroup[] {
         const seriesMap = new Map<string, Task[]>();
         const insertionOrder: string[] = [];
 
         for (const task of tasks) {
-            // Non-recurring: unique key per task so they never merge
             const key = task.recurrence
                 ? `${task.filePath}::${task.title}::${task.recurrence}`
                 : task.id;
@@ -270,9 +322,16 @@ export class TaskManager extends Events {
             series.push(task);
         }
 
+        // Build a done-count lookup from the FULL task list so completed cycles are
+        // visible even when the caller is passing filtered (e.g. open-only) tasks.
+        const doneMap = new Map<string, number>();
+        for (const task of allTasks) {
+            if (!task.completed || !task.recurrence) continue;
+            const key = `${task.filePath}::${task.title}::${task.recurrence}`;
+            doneMap.set(key, (doneMap.get(key) ?? 0) + 1);
+        }
+
         return insertionOrder.map(key => {
-            // We built this map ourselves — every key in insertionOrder has an entry.
-            // Fall back to an empty array to satisfy TypeScript without a non-null assertion.
             const clones = seriesMap.get(key) ?? [];
             const open = clones.filter(t => !t.completed);
             const pool = open.length > 0 ? open : clones;
@@ -286,14 +345,15 @@ export class TaskManager extends Events {
             return {
                 representative,
                 openCount: open.length,
-                isRecurring: !!clones[0].recurrence && clones.length > 1,
+                doneCount: doneMap.get(key) ?? 0,
+                isRecurring: !!clones[0]?.recurrence,
             };
         });
     }
 
     /** For the task list view: filtered tasks collapsed into recurring groups. */
     public getGroupedFilteredTasks(): TaskGroup[] {
-        return this.groupTasks(this.filteredTasks);
+        return this.groupTasks(this.filteredTasks, this.tasks);
     }
 
     /** For the timeline: all tasks (no status filter) collapsed into recurring groups. */
@@ -373,15 +433,22 @@ export class TaskManager extends Events {
         return `${String(y)}-${m}-${d}`;
     }
 
+    /** Display format: dd-mm-yyyy. Storage format (formatDate) stays yyyy-mm-dd. */
+    public static formatDisplayDate(date: Date): string {
+        const d = String(date.getDate()).padStart(2, '0');
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const y = date.getFullYear();
+        return `${d}-${m}-${String(y)}`;
+    }
+
     public formatCompletionDate(date: Date): string {
         const pad = (n: number) => n.toString().padStart(2, '0');
-        const yyyy = date.getFullYear();
-        const mm = pad(date.getMonth() + 1);
         const dd = pad(date.getDate());
+        const mm = pad(date.getMonth() + 1);
+        const yyyy = date.getFullYear();
         const hh = pad(date.getHours());
         const min = pad(date.getMinutes());
-
-        return `${String(yyyy)}-${mm}-${dd} ${hh}:${min}`;
+        return `${dd}-${mm}-${String(yyyy)} ${hh}:${min}`;
     }
 
     /** Helper to calculate the bumped due date for recurring tasks */

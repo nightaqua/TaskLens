@@ -1,6 +1,7 @@
 import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
-import { App, MarkdownView, TFile } from 'obsidian';
+import { App, MarkdownView, TFile, setIcon } from 'obsidian';
 import { SemesterSettings, getTopicColor } from '../settings/Settings';
+import { TaskManager } from '../services/TaskManager';
 
 /**
  * Opens the source file for a task and moves the editor cursor to its exact line.
@@ -76,13 +77,6 @@ export class TaskListComponent {
         const titleEl = titleRow.createDiv('task-title');
         titleEl.setText(task.title);
 
-        // Badge: show how many open clones exist for this recurring series
-        if (group.isRecurring && group.openCount > 1) {
-            const badge = titleRow.createEl('span', { cls: 'task-recurrence-badge' });
-            badge.setText(`\u00d7${String(group.openCount)}`);
-            badge.setAttribute('aria-label', `${String(group.openCount)} pending recurrences`);
-        }
-
         const meta = viewMode.createDiv('task-meta');
 
         if (task.fileName) {
@@ -92,7 +86,22 @@ export class TaskListComponent {
 
         if (task.dueDate) {
             const dateLabel = meta.createDiv('task-date');
-            dateLabel.setText(task.dueDate.toDateString());
+            dateLabel.setText(TaskManager.formatDisplayDate(task.dueDate));
+        }
+
+        // Recurring chip: icon always shown for recurring tasks.
+        // ×N badge shows completed cycle count when at least one cycle has been done.
+        if (group.isRecurring) {
+            const recurringChip = meta.createDiv('task-recurring-chip');
+            const icon = recurringChip.createSpan({ cls: 'task-recurring-icon' });
+            setIcon(icon, 'repeat');
+            if (group.doneCount > 0) {
+                recurringChip.createSpan({
+                    text: `×${String(group.doneCount)}`,
+                    cls: 'task-recurrence-count',
+                    attr: { 'aria-label': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}` }
+                });
+            }
         }
 
         titleEl.addEventListener('click', () => { void openTaskInEditor(this.app, task); });

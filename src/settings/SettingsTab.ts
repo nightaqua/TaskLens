@@ -44,7 +44,7 @@ export class SettingsTab extends PluginSettingTab {
                     .setValue(this.plugin.settings.scanFolders.join('\n'))
                     .onChange((value) => {
                         this.plugin.settings.scanFolders = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-                        void this.plugin.saveSettings();
+                        void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
                     });
             });
 
@@ -55,7 +55,7 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc('Scan all subfolders inside the folders specified above?')
             .addToggle(t => t.setValue(this.plugin.settings.scanRecursively).onChange(v => {
                 this.plugin.settings.scanRecursively = v;
-                void this.plugin.saveSettings();
+                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
             }));
 
         const parserDetails = containerEl.createEl('details');
@@ -79,7 +79,7 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc('Inline text used to find the start date. Example: [start:: 2026-02-02]')
             .addText(t => t.setValue(this.plugin.settings.startDateKey).onChange(v => {
                 this.plugin.settings.startDateKey = v;
-                void this.plugin.saveSettings();
+                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
             }));
 
         new Setting(parserDetails)
@@ -87,7 +87,7 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc('Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]')
             .addText(t => t.setValue(this.plugin.settings.dueDateKey).onChange(v => {
                 this.plugin.settings.dueDateKey = v;
-                void this.plugin.saveSettings();
+                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
             }));
 
         const uiDetails = containerEl.createEl('details');

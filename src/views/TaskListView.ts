@@ -9,8 +9,8 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 export const VIEW_TYPE_LIST = 'tasklens-list-view';
 
 export class TaskListView extends ItemView {
-    private leafRootEl: Element | null = null;
-    private tabContainer: Element | null = null;
+    private leafRootEl: HTMLElement | null = null;
+    private tabContainer: HTMLElement | null = null;
     private isOpen = false;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
@@ -46,9 +46,9 @@ export class TaskListView extends ItemView {
     }
 
     onOpen(): Promise<void> {
-        const dom = setupViewDOM(this.containerEl, true);
-        this.leafRootEl = dom.leafRootEl;
-        this.tabContainer = dom.tabContainer;
+        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, true);
+        this.leafRootEl = leafRootEl;
+        this.tabContainer = tabContainer;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
@@ -62,9 +62,7 @@ export class TaskListView extends ItemView {
     onClose(): Promise<void> {
         this.isOpen = false;
         this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
-        const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
-        const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
-        cleanUpViewDOM(root, tabs);
+        cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
 

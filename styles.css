@@ -763,6 +763,51 @@
 .workspace-tabs.tasklens-hide-tabs .workspace-tab-header-container { display: none !important; }
 .workspace-tabs.tasklens-hide-tabs .workspace-tab-header-container-inner { padding: 0 !important; margin: 0 !important; }
 .workspace-tabs.tasklens-hide-tabs .workspace-leaf { height: 100% !important; }
+/* Pre-paint chromeless: data-type is set by Obsidian synchronously on the
+   leaf content element before any plugin JS runs. These rules mirror the
+   .tasklens-chromeless block exactly so the chrome is never visible even
+   on the very first rendered frame at startup. */
+.workspace-leaf-content[data-type="tasklens-dashboard-view"] .workspace-leaf-header,
+.workspace-leaf-content[data-type="tasklens-dashboard-view"] .workspace-tab-header-container,
+.workspace-leaf-content[data-type="tasklens-dashboard-view"] .workspace-tab-header,
+.workspace-leaf-content[data-type="tasklens-dashboard-view"] .workspace-tab-header-inner,
+.workspace-leaf-content[data-type="tasklens-dashboard-view"] .view-header,
+.workspace-leaf-content[data-type="tasklens-timeline-view"] .workspace-leaf-header,
+.workspace-leaf-content[data-type="tasklens-timeline-view"] .workspace-tab-header-container,
+.workspace-leaf-content[data-type="tasklens-timeline-view"] .workspace-tab-header,
+.workspace-leaf-content[data-type="tasklens-timeline-view"] .workspace-tab-header-inner,
+.workspace-leaf-content[data-type="tasklens-timeline-view"] .view-header,
+.workspace-leaf-content[data-type="tasklens-list-view"] .workspace-leaf-header,
+.workspace-leaf-content[data-type="tasklens-list-view"] .workspace-tab-header-container,
+.workspace-leaf-content[data-type="tasklens-list-view"] .workspace-tab-header,
+.workspace-leaf-content[data-type="tasklens-list-view"] .workspace-tab-header-inner,
+.workspace-leaf-content[data-type="tasklens-list-view"] .view-header,
+.workspace-leaf-content[data-type="tasklens-stats-view"] .workspace-leaf-header,
+.workspace-leaf-content[data-type="tasklens-stats-view"] .workspace-tab-header-container,
+.workspace-leaf-content[data-type="tasklens-stats-view"] .workspace-tab-header,
+.workspace-leaf-content[data-type="tasklens-stats-view"] .workspace-tab-header-inner,
+.workspace-leaf-content[data-type="tasklens-stats-view"] .view-header {
+    display: none !important;
+}
+
+.workspace-leaf-content[data-type="tasklens-dashboard-view"],
+.workspace-leaf-content[data-type="tasklens-timeline-view"],
+.workspace-leaf-content[data-type="tasklens-list-view"],
+.workspace-leaf-content[data-type="tasklens-stats-view"] {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.workspace-leaf-content[data-type="tasklens-dashboard-view"] .view-content,
+.workspace-leaf-content[data-type="tasklens-timeline-view"] .view-content,
+.workspace-leaf-content[data-type="tasklens-list-view"] .view-content,
+.workspace-leaf-content[data-type="tasklens-stats-view"] .view-content {
+    height: 100% !important;
+    margin: 0 !important;
+    background-color: var(--background-primary);
+}
 
 /* --- Adaptive Padding Fixes --- */
 .tasklens-dashboard-view {
@@ -1254,4 +1299,35 @@
 }
 .ribbon-sync-expand:hover {
     background: rgba(76, 201, 240, 0.06);
+}
+/* Recurring task chip — lives in .task-meta alongside .task-course and .task-date */
+.task-recurring-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.75em;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.task-recurring-chip .task-recurring-icon {
+    display: flex;
+    align-items: center;
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+}
+
+.task-recurring-chip .task-recurring-icon svg {
+    width: 11px;
+    height: 11px;
+}
+
+.task-recurring-chip .task-recurrence-count {
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
 }

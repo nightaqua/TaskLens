@@ -10,15 +10,20 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 export const VIEW_TYPE_DASHBOARD = 'tasklens-dashboard-view';
 
 // Applies chromeless styling to the leaf and optionally hides tabs when the layout is locked
-export function setupViewDOM(containerEl: HTMLElement, isLocked: boolean): { leafRootEl: HTMLElement | null; tabContainer: HTMLElement | null } {
-    const leafRootEl = containerEl.closest('.workspace-leaf-content');
+export function setupViewDOM(
+    containerEl: HTMLElement,
+    isLocked: boolean
+): { leafRootEl: HTMLElement | null; tabContainer: HTMLElement | null } {
+    const leafRootRaw = containerEl.closest('.workspace-leaf-content');
+    const tabContainerRaw = containerEl.closest('.workspace-tabs');
+
+    const leafRootEl = leafRootRaw instanceof HTMLElement ? leafRootRaw : null;
+    const tabContainer = tabContainerRaw instanceof HTMLElement ? tabContainerRaw : null;
+
     if (leafRootEl) leafRootEl.classList.add('tasklens-chromeless');
-    const tabContainer = containerEl.closest('.workspace-tabs');
     if (tabContainer && isLocked) tabContainer.classList.add('tasklens-hide-tabs');
-    return {
-        leafRootEl: leafRootEl instanceof HTMLElement ? leafRootEl : null,
-        tabContainer: tabContainer instanceof HTMLElement ? tabContainer : null,
-    };
+
+    return { leafRootEl, tabContainer };
 }
 
 // Reverses the DOM changes made by setupViewDOM on close
@@ -51,6 +56,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     // Tracks scroll position so re-renders don't jump the timeline,
     // unless a forced scroll-to-today is requested
     private lastTimelineScroll: number | null = null;
+    private lastViewportStart: Date | null = null;
     private forceScrollToToday: boolean = false;
 
     constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
@@ -64,6 +70,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             this.renderTimer = setTimeout(() => {
                 if (this.timelineComponent && !this.forceScrollToToday) {
                     this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
+                    this.lastViewportStart = this.timelineComponent.getViewportStart();
                 }
 
                 this.render();
@@ -152,7 +159,9 @@ export class DashboardView extends ItemView implements RefreshableView {
     onOpen(): Promise<void> {
         // Delegate chromeless styling and tab-hiding to the shared helper
         // so DashboardView, TimelineView etc. all behave identically.
-        ({ leafRootEl: this.leafRootEl, tabContainer: this.tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked));
+        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+        this.leafRootEl = leafRootEl;
+        this.tabContainer = tabContainer;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');
@@ -177,6 +186,13 @@ export class DashboardView extends ItemView implements RefreshableView {
     }
 
     public render(): void {
+        // Snapshot viewport state before wiping the DOM — covers direct render() calls
+        // (header toggle, controls toggle) that bypass the tasks-updated debounce handler.
+        if (this.timelineComponent && !this.forceScrollToToday) {
+            this.lastViewportStart = this.timelineComponent.getViewportStart();
+            this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
+        }
+
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -275,7 +291,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         completionGroup.createEl('label', { text: 'Completed:' });
         const completionSelect = completionGroup.createEl('select');
         [
-            { value: 'all',   text: 'All time' },
+            { value: 'all',   text: 'All-time' },
             { value: 'today', text: 'Today' },
         ].forEach(opt => {
             const option = completionSelect.createEl('option', { value: opt.value, text: opt.text });
@@ -395,7 +411,9 @@ export class DashboardView extends ItemView implements RefreshableView {
             this.app,
             this.taskManager.getAllGroupedTasks(),
             this.timelineDaysToShow,
-            this.plugin.settings
+            this.plugin.settings,
+            this.lastViewportStart ?? undefined,
+            (newStart) => { this.lastViewportStart = newStart; }
         );
         this.timelineComponent.render();
 

@@ -45,7 +45,9 @@ export interface TaskGroup {
     representative: Task;
     /** Number of open (uncompleted) clones in this series. */
     openCount: number;
-    /** True when multiple open clones share the same file + title + recurrence rule. */
+    /** Number of completed clones in this series — how many cycles have been done. */
+    doneCount: number;
+    /** True when the task has a recurrence rule. */
     isRecurring: boolean;
 }
 

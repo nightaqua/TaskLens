@@ -71,7 +71,9 @@ export class TimelineView extends ItemView implements RefreshableView {
 
     onOpen(): Promise<void> {
         // Use shared utility for UI consistency
-        ({ leafRootEl: this.leafRootEl, tabContainer: this.tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked));
+        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+        this.leafRootEl = leafRootEl;
+        this.tabContainer = tabContainer;
 
         this.contentEl.empty();
         this.contentEl.addClass('tasklens-dashboard-view');

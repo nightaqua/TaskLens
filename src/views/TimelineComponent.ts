@@ -2,6 +2,7 @@ import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
 import { App, setIcon } from 'obsidian';
 import { SemesterSettings, getTopicColor } from '../settings/Settings';
 import { openTaskInEditor } from './TaskListComponent';
+import { TaskManager } from '../services/TaskManager';
 
 export class TimelineComponent {
     private readonly container: HTMLElement;
@@ -405,9 +406,7 @@ export class TimelineComponent {
                 rowEndTimes[rowIndex] = taskEnd.getTime();
             }
 
-            const barLabel = group.isRecurring && group.openCount > 1
-                ? `${task.title} \u00d7${String(group.openCount)}`
-                : task.title;
+            const barLabel = task.title;
 
             const bar = grid.createDiv('timeline-task-bar');
             bar.setText(barLabel);
@@ -434,7 +433,7 @@ export class TimelineComponent {
                 if (cls) bar.addClass(cls);
             }
 
-            bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task, group.openCount); });
+            bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task, group.isRecurring); });
             bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
             bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
             bar.addEventListener('click', (e) => {
@@ -526,7 +525,7 @@ export class TimelineComponent {
         });
     }
 
-    private showTooltip(e: MouseEvent, task: Task, openCount: number): void {
+    private showTooltip(e: MouseEvent, task: Task, isRecurring: boolean): void {
         if (!this.tooltipEl) {
             this.tooltipEl = document.body.createDiv('dashboard-tooltip');
         }
@@ -534,10 +533,10 @@ export class TimelineComponent {
         this.tooltipEl.createDiv('tooltip-title').setText(task.title);
         this.tooltipEl.createDiv('tooltip-meta').setText(`📂 ${task.fileName}`);
         if (task.dueDate) {
-            this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${task.dueDate.toDateString()}`);
+            this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${TaskManager.formatDisplayDate(task.dueDate)}`);
         }
-        if (openCount > 1) {
-            this.tooltipEl.createDiv('tooltip-recurrence').setText(`🔁 ${String(openCount)} pending`);
+        if (isRecurring) {
+            this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 recurring');
         }
         this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
