@@ -178,10 +178,10 @@ var TaskManager = class extends import_obsidian.Events {
     const lines = content.split("\n");
     const originalLine = lines[task.lineNumber];
     if (!/\[[xX]]/.test(originalLine)) return;
-    if (hasCompletionMetadata(originalLine)) return;
+    const stripped = hasCompletionMetadata(originalLine) ? stripCompletionMetadata(originalLine) : originalLine;
     const completionDate = /* @__PURE__ */ new Date();
     const compStr = this.formatCompletionDate(completionDate);
-    lines[task.lineNumber] = originalLine + ` [completion:: ${compStr}]`;
+    lines[task.lineNumber] = stripped + ` [completion:: ${compStr}]`;
     if (task.recurrence) {
       this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
     }
@@ -2020,7 +2020,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.timelineComponent = new TimelineComponent(
       container,
       this.app,
-      this.taskManager.getAllGroupedTasks(),
+      this.taskManager.getGroupedFilteredTasks(),
       this.timelineDaysToShow,
       this.plugin.settings,
       (_a = this.lastViewportStart) != null ? _a : void 0,
