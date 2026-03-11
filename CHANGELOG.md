@@ -9,38 +9,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Bug fixes
 
-- **Recurring task icon now shows on import.** Tasks written with the Tasks
-  plugin's `🔁`/`🔄` emoji recurrence notation are now recognised by the parser
-  — `isRecurring` is set correctly and the chip appears without needing a
-  completion cycle first.
+- **Completion stamp now overwrites stale format.** If a task already had a
+  `completion:: yyyy-mm-dd` stamp (written before the format change in 1.2.0),
+  checking it again would silently do nothing — `addCompletionMetadata` bailed
+  out the moment it saw any existing completion marker. It now strips the stale
+  stamp first and writes a fresh `dd-mm-yyyy HH:mm` one. Existing stamps from
+  other plugins (e.g. Tasks `✅`) are handled the same way.
 
-- **Timeline in dashboard no longer respects list filter.** The timeline widget
-  was passing the filtered task set to `TimelineComponent`, so tasks outside the
-  active status filter (e.g. upcoming tasks while viewing "Overdue") were
-  invisible. It now always uses the full unfiltered task set, matching the
-  behaviour of the standalone Timeline view.
+- **Dashboard timeline now respects the Show filter.** An earlier fix
+  incorrectly switched the dashboard timeline from `getGroupedFilteredTasks()`
+  to `getAllGroupedTasks()` to work around what looked like a filter problem,
+  but was actually a UTC date-parsing bug (fixed in the same session). The
+  revert restores the intended behaviour: Active/All/Completed in the Show
+  dropdown filters both the list and the timeline together.
 
-- **Date parsing accepts dd-mm-yyyy.** All date fields (`due::`, `start::`,
-  `completion::`, 📅 emoji) now accept both `yyyy-mm-dd` and `dd-mm-yyyy`.
-  Dates are parsed as local midnight (`T00:00:00`) to prevent off-by-one-day
-  errors in UTC-west timezones.
+- **Recurring icon now shows for Tasks-plugin emoji recurrence.** Tasks written
+  with `🔁`/`🔄` (Tasks-plugin format) now populate `task.recurrence` so the
+  chip appears without requiring a TaskLens completion cycle first.
 
-- **Completion stamp format corrected.** Completion timestamps are now written
-  as `dd-mm-yyyy HH:mm` to match the display format. Existing `yyyy-mm-dd`
-  stamps in files are still read correctly.
+- **Date parsing accepts dd-mm-yyyy.** All date fields accept both `yyyy-mm-dd`
+  and `dd-mm-yyyy`. Dates are parsed as local midnight to prevent off-by-one-day
+  errors in non-UTC timezones.
+
+- **Completion timestamps written as dd-mm-yyyy HH:mm** to match the display
+  format. Existing `yyyy-mm-dd` stamps still parse correctly.
 
 ### Improvements
 
-- **×N badge now counts completed cycles.** The recurring task chip shows `×N`
-  based on `doneCount` (how many clones of this series are already completed)
-  rather than `openCount` (how many are still open). The badge only appears
-  once at least one cycle has been done.
+- **×N badge counts completed cycles** (`doneCount`) rather than open backlog
+  (`openCount`). Badge only appears once at least one cycle has been done.
 
 - **Date display changed to dd-mm-yyyy** across the list view chip and timeline
   tooltip.
 
-- **ESLint clean.** Fixed two `restrict-template-expressions` warnings from
-  bare `number` variables in `formatDisplayDate` and `formatCompletionDate`.
+- **Timeline nav buttons more visible.** `.vp-jump`, `.ribbon-handle`, and
+  `.chip` now have a border, tinted background, and accent colour at rest (CSS
+  patch — add `styles-patch.css` contents to `styles.css`).
+
+- **Right-panel overlap fix.** When docked in the right split, Obsidian's window
+  control buttons no longer cover the section toggles (CSS patch).
 
 ---
 
