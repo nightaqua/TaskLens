@@ -17,7 +17,7 @@ TaskLens is a native, widget-based dashboard that turns Obsidian into a powerful
 TaskLens uses standard markdown checkboxes. It scans for inline dates, supporting both `YYYY-MM-DD` and `DD-MM-YYYY` formats. You can customize the `start` and `due` keys in the settings.
 
 ```markdown
-- [ ] Read Chapter 4 [due:: 2024-05-15]
+- [ ] Read Chapter 4 (due:: 2024-05-15)
 - [ ] Submit assignment [start:: 10-05-2024 due:: 15-05-2024]
 - [ ] Call mom 📅 2024-05-20
 ```
@@ -35,8 +35,11 @@ Create your own version of the TaskLens dashboard by each widget to your liking.
 
 ## Gallery
 
+
+![TaskLens Dark Preview](docs/assets/Demo.png)
+
 <details> 
-    <summary> 📸 Open Gallery / See White Theme </summary>
+    <summary> 📸 Open Gallery / See More </summary>
     <br>
  <p align="center">
   <img src="docs/assets/Layout1.png"/><br>
@@ -62,6 +65,13 @@ Create your own version of the TaskLens dashboard by each widget to your liking.
 </p>
 
 ## Installation
+
+### Install via BRAT (Quick Start)
+1. Install BRAT: Settings → Community Plugins → Browse → search for "BRAT" → Install and Enable.
+
+2. Add TaskLens: Open BRAT settings → Add Beta Plugin → paste the repository link: `https://github.com/nightaqua/TaskLens` and click Add Plugin.
+
+3. Enable: Go to Settings → Community Plugins → scroll to "TaskLens" → toggle on.
 
 ### Manual Installation
 
