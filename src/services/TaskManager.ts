@@ -150,12 +150,16 @@ export class TaskManager extends Events {
         // Guard: if the line isn't actually checked, do nothing to avoid data loss.
         if (!/\[[xX]]/.test(originalLine)) return;
 
-        // Guard: completion metadata already present from TaskLens or another plugin (e.g. Tasks ✅).
-        if (hasCompletionMetadata(originalLine)) return;
+        // Strip any stale completion stamp first (e.g. yyyy-mm-dd from before the
+        // format change, or a stamp left by another plugin). This ensures we always
+        // write a fresh, correctly-formatted stamp rather than silently bailing out.
+        const stripped = hasCompletionMetadata(originalLine)
+            ? stripCompletionMetadata(originalLine)
+            : originalLine;
 
         const completionDate = new Date();
         const compStr = this.formatCompletionDate(completionDate);
-        lines[task.lineNumber] = originalLine + ` [completion:: ${compStr}]`;
+        lines[task.lineNumber] = stripped + ` [completion:: ${compStr}]`;
 
         if (task.recurrence) {
             this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));

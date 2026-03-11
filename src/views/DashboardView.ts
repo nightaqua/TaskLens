@@ -409,7 +409,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.timelineComponent = new TimelineComponent(
             container,
             this.app,
-            this.taskManager.getAllGroupedTasks(),
+            this.taskManager.getGroupedFilteredTasks(),
             this.timelineDaysToShow,
             this.plugin.settings,
             this.lastViewportStart ?? undefined,
