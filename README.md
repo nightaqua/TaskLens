@@ -68,9 +68,7 @@ Create your own version of the TaskLens dashboard by each widget to your liking.
 
 ### Install via BRAT (Quick Start)
 1. Install BRAT: Settings → Community Plugins → Browse → search for "BRAT" → Install and Enable.
-
 2. Add TaskLens: Open BRAT settings → Add Beta Plugin → paste the repository link: `https://github.com/nightaqua/TaskLens` and click Add Plugin.
-
 3. Enable: Go to Settings → Community Plugins → scroll to "TaskLens" → toggle on.
 
 ### Manual Installation
