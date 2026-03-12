@@ -7,6 +7,8 @@ vi.mock('obsidian', () => ({
     private readonly dummy = 'dummy';
   },
   Events: class {
-    private readonly dummy = 'dummy';
+    on = vi.fn();
+    off = vi.fn();
+    trigger = vi.fn();
   },
 }));

@@ -456,7 +456,7 @@ export class TaskManager extends Events {
     }
 
     /** Helper to calculate the bumped due date for recurring tasks */
-    public calculateNextDueDate(dueDate: Date | null, recurrence: string, completionDate: Date): Date {
+    private calculateNextDueDate(dueDate: Date | null, recurrence: string, completionDate: Date): Date {
         const isFlexible = recurrence.endsWith('+');
         const rule = recurrence.replace('+', '').trim().toLowerCase();
 
