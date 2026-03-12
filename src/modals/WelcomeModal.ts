@@ -1,5 +1,6 @@
 import { App, Modal, Setting } from 'obsidian';
 import TaskLensPlugin from '../main';
+import { CLASS_WELCOME_MODAL } from '../constants';
 
 export class WelcomeModal extends Modal {
     constructor(app: App, private plugin: TaskLensPlugin) {
@@ -9,7 +10,7 @@ export class WelcomeModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.addClass('tasklens-welcome-modal');
+        contentEl.addClass(CLASS_WELCOME_MODAL);
 
         const header = contentEl.createDiv('welcome-header');
         header.setCssProps({ 'text-align': 'center', 'margin-bottom': '20px' });

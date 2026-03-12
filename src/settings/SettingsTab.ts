@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { WelcomeModal } from '../modals/WelcomeModal';
 import { getTopicColor } from './Settings';
+import { CLASS_SETTINGS } from '../constants';
 
 export class SettingsTab extends PluginSettingTab {
     readonly plugin: TaskLensPlugin;
@@ -14,7 +15,7 @@ export class SettingsTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.addClass('tasklens-settings');
+        containerEl.addClass(CLASS_SETTINGS);
 
         // --- NATIVE HEADER WITH HELP BUTTON ---
         new Setting(containerEl)

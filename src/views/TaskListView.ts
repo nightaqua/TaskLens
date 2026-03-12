@@ -5,8 +5,8 @@ import { Task } from '../models/Task';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
 import { QuickAddModal } from '../modals/QuickAddModal';
+import { VIEW_TYPE_LIST, CLASS_DASHBOARD_VIEW } from '../constants';
 
-export const VIEW_TYPE_LIST = 'tasklens-list-view';
 
 export class TaskListView extends ItemView {
     private leafRootEl: HTMLElement | null = null;
@@ -51,7 +51,7 @@ export class TaskListView extends ItemView {
         this.tabContainer = tabContainer;
 
         this.contentEl.empty();
-        this.contentEl.addClass('tasklens-dashboard-view');
+        this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
         this.contentEl.addClass('is-single-view');
         this.isOpen = true;
         this.render();
