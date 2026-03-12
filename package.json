@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "version": "node version-bump.mjs && git add manifest.json versions.json"
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "Selim",
@@ -24,6 +25,10 @@
     "tslib": "2.4.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vitest": "^2.0.0"
+
+
+
+    "vitest": "^4.1.0"
+
   }
 }
