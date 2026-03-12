@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { getTopicColor, SemesterSettings } from './Settings';
 
 describe('getTopicColor', () => {
