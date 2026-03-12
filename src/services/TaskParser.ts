@@ -12,15 +12,11 @@ export class TaskParser {
      * RENAMED: Matches TaskManager.loadTasks()
      */
     async findAllTasks(): Promise<Task[]> {
-        const tasks: Task[] = [];
         const filesToScan = this.getFilesToScan();
+        const taskPromises = filesToScan.map(file => this.parseTasksFromFile(file));
+        const allFileTasks = await Promise.all(taskPromises);
 
-        for (const file of filesToScan) {
-            const fileTasks = await this.parseTasksFromFile(file);
-            tasks.push(...fileTasks);
-        }
-
-        return tasks;
+        return allFileTasks.flat();
     }
 
     /**
