@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TaskManager } from './TaskManager';
+import { TaskManager } from '../TaskManager';
 
 describe('TaskManager', () => {
     describe('formatDisplayDate', () => {
