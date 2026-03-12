@@ -13,6 +13,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.4",
+    "@eslint/json": "^1.1.0",
     "@types/node": "^16.11.6",
     "@types/react": "^16.9.0",
     "@types/react-dom": "^16.9.0",
@@ -22,6 +23,7 @@
     "obsidian": "^1.7.2",
     "tslib": "2.4.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^2.0.0"
   }
 }
