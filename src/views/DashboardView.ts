@@ -6,8 +6,8 @@ import { TimelineComponent } from './TimelineComponent';
 import { TaskListComponent } from './TaskListComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { QuickAddModal } from '../modals/QuickAddModal';
+import { VIEW_TYPE_DASHBOARD, CLASS_CHROMELESS, CLASS_HIDE_TABS, CLASS_DASHBOARD_VIEW } from '../constants';
 
-export const VIEW_TYPE_DASHBOARD = 'tasklens-dashboard-view';
 
 // Applies chromeless styling to the leaf and optionally hides tabs when the layout is locked
 export function setupViewDOM(
@@ -20,16 +20,16 @@ export function setupViewDOM(
     const leafRootEl = leafRootRaw instanceof HTMLElement ? leafRootRaw : null;
     const tabContainer = tabContainerRaw instanceof HTMLElement ? tabContainerRaw : null;
 
-    if (leafRootEl) leafRootEl.classList.add('tasklens-chromeless');
-    if (tabContainer && isLocked) tabContainer.classList.add('tasklens-hide-tabs');
+    if (leafRootEl) leafRootEl.classList.add(CLASS_CHROMELESS);
+    if (tabContainer && isLocked) tabContainer.classList.add(CLASS_HIDE_TABS);
 
     return { leafRootEl, tabContainer };
 }
 
 // Reverses the DOM changes made by setupViewDOM on close
 export function cleanUpViewDOM(leafRootEl: HTMLElement | null, tabContainer: HTMLElement | null): void {
-    if (tabContainer instanceof HTMLElement) tabContainer.classList.remove('tasklens-hide-tabs');
-    if (leafRootEl instanceof HTMLElement) leafRootEl.classList.remove('tasklens-chromeless');
+    if (tabContainer instanceof HTMLElement) tabContainer.classList.remove(CLASS_HIDE_TABS);
+    if (leafRootEl instanceof HTMLElement) leafRootEl.classList.remove(CLASS_CHROMELESS);
 }
 
 export class DashboardView extends ItemView implements RefreshableView {
@@ -164,7 +164,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.tabContainer = tabContainer;
 
         this.contentEl.empty();
-        this.contentEl.addClass('tasklens-dashboard-view');
+        this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
         this.applyColorTheme();
 
         void this.taskManager.loadTasks().then(() => {

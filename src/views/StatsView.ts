@@ -3,8 +3,8 @@ import TaskLensPlugin from '../main';
 import { StatsComponent } from './StatsComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
+import { VIEW_TYPE_STATS, CLASS_DASHBOARD_VIEW } from '../constants';
 
-export const VIEW_TYPE_STATS = 'tasklens-stats-view';
 
 export class StatsView extends ItemView {
     private leafRootEl: Element | null = null;
@@ -44,7 +44,7 @@ export class StatsView extends ItemView {
         this.tabContainer = tabContainer;
 
         this.contentEl.empty();
-        this.contentEl.addClass('tasklens-dashboard-view');
+        this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
         this.render();
 
         return Promise.resolve();

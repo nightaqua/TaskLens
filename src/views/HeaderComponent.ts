@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { CLASS_FEATURE_HIGHLIGHT } from '../constants';
 
 export interface HeaderState {
     title: string | null;
@@ -97,13 +98,13 @@ export class HeaderComponent {
 
         if (this.onAdd) {
             const addBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
-            if (this.highlightAddButton) addBtn.addClass('feature-highlight');
+            if (this.highlightAddButton) addBtn.addClass(CLASS_FEATURE_HIGHLIGHT);
             setIcon(addBtn, 'plus');
             addBtn.setAttribute('aria-label', 'Quick add task');
             addBtn.addEventListener('click', () => {
                 if (this.highlightAddButton) {
                     this.highlightAddButton = false;
-                    addBtn.removeClass('feature-highlight');
+                    addBtn.removeClass(CLASS_FEATURE_HIGHLIGHT);
                     if (this.onHighlightDismiss) this.onHighlightDismiss();
                 }
                 this.onAdd?.();

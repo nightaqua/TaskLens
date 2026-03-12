@@ -3,11 +3,22 @@ import { TaskManager } from './services/TaskManager';
 import { TaskParser } from './services/TaskParser';
 import { SemesterSettings, DEFAULT_SETTINGS } from './settings/Settings';
 import { SettingsTab } from './settings/SettingsTab';
-import { DashboardView, VIEW_TYPE_DASHBOARD } from './views/DashboardView';
-import { TimelineView, VIEW_TYPE_TIMELINE } from './views/TimelineView';
-import { TaskListView, VIEW_TYPE_LIST } from './views/TaskListView';
-import { StatsView, VIEW_TYPE_STATS } from './views/StatsView';
+import { DashboardView } from './views/DashboardView';
+import { TimelineView } from './views/TimelineView';
+import { TaskListView } from './views/TaskListView';
+import { StatsView } from './views/StatsView';
 import { QuickAddModal } from './modals/QuickAddModal';
+import {
+    VIEW_TYPE_DASHBOARD,
+    VIEW_TYPE_TIMELINE,
+    VIEW_TYPE_LIST,
+    VIEW_TYPE_STATS,
+    ICON_NAME,
+    ICON_SVG,
+    ALL_VIEW_TYPES,
+    CLASS_HIDE_TABS,
+    CLASS_FEATURE_HIGHLIGHT
+} from './constants';
 import { WelcomeModal } from './modals/WelcomeModal';
 
 export interface RefreshableView {
@@ -16,14 +27,6 @@ export interface RefreshableView {
     applyColorTheme?(): void;
 }
 
-// All view types in one place — used repeatedly for bulk operations
-const ALL_VIEW_TYPES = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
-
-const TASKLENS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="11" cy="11" r="8"></circle>
-  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-  <path d="M8 11.5L10 13.5L14 8.5"></path>
-</svg>`;
 
 // Obsidian doesn't expose split types on WorkspaceRoot, so we cast where needed
 type WorkspaceWithSplits = {
@@ -67,7 +70,7 @@ export default class TaskLensPlugin extends Plugin {
         this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
         this.registerView(VIEW_TYPE_STATS, (leaf) => new StatsView(leaf, this));
 
-        addIcon('tasklens-icon', TASKLENS_ICON);
+        addIcon(ICON_NAME, ICON_SVG);
         this.setupRibbonIcon();
         this.setupCommands();
 
@@ -87,8 +90,8 @@ export default class TaskLensPlugin extends Plugin {
     }
 
     private setupRibbonIcon(): void {
-        const ribbonIconEl = this.addRibbonIcon('tasklens-icon', 'Tasklens', (evt: MouseEvent) => {
-            ribbonIconEl.removeClass('feature-highlight');
+        const ribbonIconEl = this.addRibbonIcon(ICON_NAME, 'Tasklens', (evt: MouseEvent) => {
+            ribbonIconEl.removeClass(CLASS_FEATURE_HIGHLIGHT);
 
             if (!this.settings.hasClickedRibbonIcon) {
                 this.settings.hasClickedRibbonIcon = true;
@@ -130,7 +133,7 @@ export default class TaskLensPlugin extends Plugin {
 
         // Highlight the ribbon icon until the user has seen the welcome screen and clicked it
         if (!this.settings.hasSeenWelcome || !this.settings.hasClickedRibbonIcon) {
-            ribbonIconEl.addClass('feature-highlight');
+            ribbonIconEl.addClass(CLASS_FEATURE_HIGHLIGHT);
         }
     }
 
@@ -167,7 +170,7 @@ export default class TaskLensPlugin extends Plugin {
             this.app.workspace.getLeavesOfType(type).forEach(leaf => {
                 const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
                 if (tabContainer) {
-                    tabContainer.classList.toggle('tasklens-hide-tabs', this.isLayoutLocked);
+                    tabContainer.classList.toggle(CLASS_HIDE_TABS, this.isLayoutLocked);
                 }
             });
         });
@@ -232,7 +235,7 @@ export default class TaskLensPlugin extends Plugin {
         } else {
             const tabContainer = leaf.view.containerEl.closest('.workspace-tabs');
             if (tabContainer instanceof HTMLElement) {
-                tabContainer.classList.remove('tasklens-hide-tabs');
+                tabContainer.classList.remove(CLASS_HIDE_TABS);
             }
         }
     }
@@ -262,5 +265,3 @@ export default class TaskLensPlugin extends Plugin {
         });
     }
 }
-
-/* #TODO constants file*/

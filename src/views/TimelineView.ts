@@ -3,8 +3,8 @@ import TaskLensPlugin, { RefreshableView } from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
+import { VIEW_TYPE_TIMELINE, CLASS_DASHBOARD_VIEW } from '../constants';
 
-export const VIEW_TYPE_TIMELINE = 'tasklens-timeline-view';
 
 export class TimelineView extends ItemView implements RefreshableView {
     private leafRootEl: HTMLElement | null = null;
@@ -76,7 +76,7 @@ export class TimelineView extends ItemView implements RefreshableView {
         this.tabContainer = tabContainer;
 
         this.contentEl.empty();
-        this.contentEl.addClass('tasklens-dashboard-view');
+        this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
 
         void this.plugin.taskManager.loadTasks().then(() => {
             this.render();
