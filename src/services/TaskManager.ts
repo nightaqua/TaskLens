@@ -7,6 +7,7 @@ export class TaskManager extends Events {
     private tasks: Task[] = [];
     private filteredTasks: Task[] = [];
     private isInternalChange = false;
+    private doneMap = new Map<string, number>();
 
     private currentStatusFilter: TaskStatus = TaskStatus.Open;
     private currentCourseFilter: string | null = null;
@@ -18,6 +19,7 @@ export class TaskManager extends Events {
 
     async loadTasks(): Promise<void> {
         this.tasks = await this.parser.findAllTasks();
+        this.rebuildDoneMap();
         this.applyFiltersAndSort();
         this.trigger('tasks-updated');
     }
@@ -293,11 +295,21 @@ export class TaskManager extends Events {
         const fileTasks = await this.parser.getTasksFromFile(filePath);
         this.tasks = this.tasks.filter(t => t.filePath !== filePath);
         this.tasks.push(...fileTasks);
+        this.rebuildDoneMap();
         this.applyFiltersAndSort();
         this.trigger('tasks-updated');
     }
 
     getAllTasks(): Task[] { return [...this.tasks]; }
+
+    private rebuildDoneMap(): void {
+        this.doneMap.clear();
+        for (const task of this.tasks) {
+            if (!task.completed || !task.recurrence) continue;
+            const key = `${task.filePath}::${task.title}::${task.recurrence}`;
+            this.doneMap.set(key, (this.doneMap.get(key) ?? 0) + 1);
+        }
+    }
 
     /**
      * Collapses recurring clones into one TaskGroup per series.
@@ -308,7 +320,7 @@ export class TaskManager extends Events {
      * allTasks is the unfiltered task list — used to count completed cycles accurately
      * even when the caller passes a filtered subset as `tasks`.
      */
-    private groupTasks(tasks: Task[], allTasks: Task[] = tasks): TaskGroup[] {
+    private groupTasks(tasks: Task[]): TaskGroup[] {
         const seriesMap = new Map<string, Task[]>();
         const insertionOrder: string[] = [];
 
@@ -326,15 +338,6 @@ export class TaskManager extends Events {
             series.push(task);
         }
 
-        // Build a done-count lookup from the FULL task list so completed cycles are
-        // visible even when the caller is passing filtered (e.g. open-only) tasks.
-        const doneMap = new Map<string, number>();
-        for (const task of allTasks) {
-            if (!task.completed || !task.recurrence) continue;
-            const key = `${task.filePath}::${task.title}::${task.recurrence}`;
-            doneMap.set(key, (doneMap.get(key) ?? 0) + 1);
-        }
-
         return insertionOrder.map(key => {
             const clones = seriesMap.get(key) ?? [];
             const open = clones.filter(t => !t.completed);
@@ -349,7 +352,7 @@ export class TaskManager extends Events {
             return {
                 representative,
                 openCount: open.length,
-                doneCount: doneMap.get(key) ?? 0,
+                doneCount: this.doneMap.get(key) ?? 0,
                 isRecurring: !!clones[0]?.recurrence,
             };
         });
@@ -357,7 +360,7 @@ export class TaskManager extends Events {
 
     /** For the task list view: filtered tasks collapsed into recurring groups. */
     public getGroupedFilteredTasks(): TaskGroup[] {
-        return this.groupTasks(this.filteredTasks, this.tasks);
+        return this.groupTasks(this.filteredTasks);
     }
 
     /** For the timeline: all tasks (no status filter) collapsed into recurring groups. */

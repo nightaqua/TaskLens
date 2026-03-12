@@ -73,12 +73,14 @@ var TaskManager = class extends import_obsidian.Events {
     this.tasks = [];
     this.filteredTasks = [];
     this.isInternalChange = false;
+    this.doneMap = /* @__PURE__ */ new Map();
     this.currentStatusFilter = "open" /* Open */;
     this.currentCourseFilter = null;
     this.currentSortBy = "due-date" /* DueDate */;
   }
   async loadTasks() {
     this.tasks = await this.parser.findAllTasks();
+    this.rebuildDoneMap();
     this.applyFiltersAndSort();
     this.trigger("tasks-updated");
   }
@@ -282,11 +284,21 @@ var TaskManager = class extends import_obsidian.Events {
     const fileTasks = await this.parser.getTasksFromFile(filePath);
     this.tasks = this.tasks.filter((t) => t.filePath !== filePath);
     this.tasks.push(...fileTasks);
+    this.rebuildDoneMap();
     this.applyFiltersAndSort();
     this.trigger("tasks-updated");
   }
   getAllTasks() {
     return [...this.tasks];
+  }
+  rebuildDoneMap() {
+    var _a;
+    this.doneMap.clear();
+    for (const task of this.tasks) {
+      if (!task.completed || !task.recurrence) continue;
+      const key = `${task.filePath}::${task.title}::${task.recurrence}`;
+      this.doneMap.set(key, ((_a = this.doneMap.get(key)) != null ? _a : 0) + 1);
+    }
   }
   /**
    * Collapses recurring clones into one TaskGroup per series.
@@ -297,8 +309,7 @@ var TaskManager = class extends import_obsidian.Events {
    * allTasks is the unfiltered task list — used to count completed cycles accurately
    * even when the caller passes a filtered subset as `tasks`.
    */
-  groupTasks(tasks, allTasks = tasks) {
-    var _a;
+  groupTasks(tasks) {
     const seriesMap = /* @__PURE__ */ new Map();
     const insertionOrder = [];
     for (const task of tasks) {
@@ -311,34 +322,28 @@ var TaskManager = class extends import_obsidian.Events {
       }
       series.push(task);
     }
-    const doneMap = /* @__PURE__ */ new Map();
-    for (const task of allTasks) {
-      if (!task.completed || !task.recurrence) continue;
-      const key = `${task.filePath}::${task.title}::${task.recurrence}`;
-      doneMap.set(key, ((_a = doneMap.get(key)) != null ? _a : 0) + 1);
-    }
     return insertionOrder.map((key) => {
-      var _a2, _b, _c;
-      const clones = (_a2 = seriesMap.get(key)) != null ? _a2 : [];
+      var _a, _b, _c;
+      const clones = (_a = seriesMap.get(key)) != null ? _a : [];
       const open = clones.filter((t) => !t.completed);
       const pool = open.length > 0 ? open : clones;
       const representative = pool.reduce((earliest, t) => {
-        var _a3, _b2, _c2, _d;
-        const eTime = (_b2 = (_a3 = earliest.dueDate) == null ? void 0 : _a3.getTime()) != null ? _b2 : Infinity;
+        var _a2, _b2, _c2, _d;
+        const eTime = (_b2 = (_a2 = earliest.dueDate) == null ? void 0 : _a2.getTime()) != null ? _b2 : Infinity;
         const tTime = (_d = (_c2 = t.dueDate) == null ? void 0 : _c2.getTime()) != null ? _d : Infinity;
         return tTime < eTime ? t : earliest;
       });
       return {
         representative,
         openCount: open.length,
-        doneCount: (_b = doneMap.get(key)) != null ? _b : 0,
+        doneCount: (_b = this.doneMap.get(key)) != null ? _b : 0,
         isRecurring: !!((_c = clones[0]) == null ? void 0 : _c.recurrence)
       };
     });
   }
   /** For the task list view: filtered tasks collapsed into recurring groups. */
   getGroupedFilteredTasks() {
-    return this.groupTasks(this.filteredTasks, this.tasks);
+    return this.groupTasks(this.filteredTasks);
   }
   /** For the timeline: all tasks (no status filter) collapsed into recurring groups. */
   getAllGroupedTasks() {
@@ -518,13 +523,10 @@ var TaskParser = class {
    * RENAMED: Matches TaskManager.loadTasks()
    */
   async findAllTasks() {
-    const tasks = [];
     const filesToScan = this.getFilesToScan();
-    for (const file of filesToScan) {
-      const fileTasks = await this.parseTasksFromFile(file);
-      tasks.push(...fileTasks);
-    }
-    return tasks;
+    const taskPromises = filesToScan.map((file) => this.parseTasksFromFile(file));
+    const allFileTasks = await Promise.all(taskPromises);
+    return allFileTasks.flat();
   }
   /**
    * RENAMED: Matches TaskManager.refreshFileTask()
@@ -706,6 +708,32 @@ var import_obsidian4 = require("obsidian");
 
 // src/modals/WelcomeModal.ts
 var import_obsidian3 = require("obsidian");
+
+// src/constants.ts
+var VIEW_TYPE_DASHBOARD = "tasklens-dashboard-view";
+var VIEW_TYPE_TIMELINE = "tasklens-timeline-view";
+var VIEW_TYPE_LIST = "tasklens-list-view";
+var VIEW_TYPE_STATS = "tasklens-stats-view";
+var ICON_NAME = "tasklens-icon";
+var ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="11" cy="11" r="8"></circle>
+  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  <path d="M8 11.5L10 13.5L14 8.5"></path>
+</svg>`;
+var CLASS_HIDE_TABS = "tasklens-hide-tabs";
+var CLASS_CHROMELESS = "tasklens-chromeless";
+var CLASS_DASHBOARD_VIEW = "tasklens-dashboard-view";
+var CLASS_SETTINGS = "tasklens-settings";
+var CLASS_WELCOME_MODAL = "tasklens-welcome-modal";
+var CLASS_FEATURE_HIGHLIGHT = "feature-highlight";
+var ALL_VIEW_TYPES = [
+  VIEW_TYPE_DASHBOARD,
+  VIEW_TYPE_TIMELINE,
+  VIEW_TYPE_LIST,
+  VIEW_TYPE_STATS
+];
+
+// src/modals/WelcomeModal.ts
 var WelcomeModal = class extends import_obsidian3.Modal {
   constructor(app, plugin) {
     super(app);
@@ -714,7 +742,7 @@ var WelcomeModal = class extends import_obsidian3.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("tasklens-welcome-modal");
+    contentEl.addClass(CLASS_WELCOME_MODAL);
     const header = contentEl.createDiv("welcome-header");
     header.setCssProps({ "text-align": "center", "margin-bottom": "20px" });
     header.createEl("h1", { text: "Welcome to tasklens \u{1F680}" });
@@ -767,7 +795,7 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.addClass("tasklens-settings");
+    containerEl.addClass(CLASS_SETTINGS);
     new import_obsidian4.Setting(containerEl).setName("Configuration").setHeading().addExtraButton(
       (btn) => btn.setIcon("help-circle").setTooltip("Show tutorial").onClick(() => {
         new WelcomeModal(this.app, this.plugin).open();
@@ -1494,14 +1522,14 @@ var HeaderComponent = class {
     const rightGroup = this.headerEl.createDiv("header-actions-right");
     if (this.onAdd) {
       const addBtn = rightGroup.createEl("button", { cls: "header-icon-btn" });
-      if (this.highlightAddButton) addBtn.addClass("feature-highlight");
+      if (this.highlightAddButton) addBtn.addClass(CLASS_FEATURE_HIGHLIGHT);
       (0, import_obsidian7.setIcon)(addBtn, "plus");
       addBtn.setAttribute("aria-label", "Quick add task");
       addBtn.addEventListener("click", () => {
         var _a;
         if (this.highlightAddButton) {
           this.highlightAddButton = false;
-          addBtn.removeClass("feature-highlight");
+          addBtn.removeClass(CLASS_FEATURE_HIGHLIGHT);
           if (this.onHighlightDismiss) this.onHighlightDismiss();
         }
         (_a = this.onAdd) == null ? void 0 : _a.call(this);
@@ -1681,19 +1709,18 @@ var QuickAddModal = class extends import_obsidian8.Modal {
 };
 
 // src/views/DashboardView.ts
-var VIEW_TYPE_DASHBOARD = "tasklens-dashboard-view";
 function setupViewDOM(containerEl, isLocked) {
   const leafRootRaw = containerEl.closest(".workspace-leaf-content");
   const tabContainerRaw = containerEl.closest(".workspace-tabs");
   const leafRootEl = leafRootRaw instanceof HTMLElement ? leafRootRaw : null;
   const tabContainer = tabContainerRaw instanceof HTMLElement ? tabContainerRaw : null;
-  if (leafRootEl) leafRootEl.classList.add("tasklens-chromeless");
-  if (tabContainer && isLocked) tabContainer.classList.add("tasklens-hide-tabs");
+  if (leafRootEl) leafRootEl.classList.add(CLASS_CHROMELESS);
+  if (tabContainer && isLocked) tabContainer.classList.add(CLASS_HIDE_TABS);
   return { leafRootEl, tabContainer };
 }
 function cleanUpViewDOM(leafRootEl, tabContainer) {
-  if (tabContainer instanceof HTMLElement) tabContainer.classList.remove("tasklens-hide-tabs");
-  if (leafRootEl instanceof HTMLElement) leafRootEl.classList.remove("tasklens-chromeless");
+  if (tabContainer instanceof HTMLElement) tabContainer.classList.remove(CLASS_HIDE_TABS);
+  if (leafRootEl instanceof HTMLElement) leafRootEl.classList.remove(CLASS_CHROMELESS);
 }
 var DashboardView = class extends import_obsidian9.ItemView {
   constructor(leaf, plugin) {
@@ -1801,7 +1828,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.leafRootEl = leafRootEl;
     this.tabContainer = tabContainer;
     this.contentEl.empty();
-    this.contentEl.addClass("tasklens-dashboard-view");
+    this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
     this.applyColorTheme();
     void this.taskManager.loadTasks().then(() => {
       this.render();
@@ -2042,7 +2069,6 @@ var DashboardView = class extends import_obsidian9.ItemView {
 
 // src/views/TimelineView.ts
 var import_obsidian10 = require("obsidian");
-var VIEW_TYPE_TIMELINE = "tasklens-timeline-view";
 var TimelineView = class extends import_obsidian10.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -2112,7 +2138,7 @@ var TimelineView = class extends import_obsidian10.ItemView {
     this.leafRootEl = leafRootEl;
     this.tabContainer = tabContainer;
     this.contentEl.empty();
-    this.contentEl.addClass("tasklens-dashboard-view");
+    this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
     void this.plugin.taskManager.loadTasks().then(() => {
       this.render();
       const rendered = this.timelineComponent;
@@ -2187,7 +2213,6 @@ var TimelineView = class extends import_obsidian10.ItemView {
 
 // src/views/TaskListView.ts
 var import_obsidian11 = require("obsidian");
-var VIEW_TYPE_LIST = "tasklens-list-view";
 var TaskListView = class extends import_obsidian11.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -2231,7 +2256,7 @@ var TaskListView = class extends import_obsidian11.ItemView {
     this.leafRootEl = leafRootEl;
     this.tabContainer = tabContainer;
     this.contentEl.empty();
-    this.contentEl.addClass("tasklens-dashboard-view");
+    this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
     this.contentEl.addClass("is-single-view");
     this.isOpen = true;
     this.render();
@@ -2320,7 +2345,6 @@ var StatsComponent = class {
 };
 
 // src/views/StatsView.ts
-var VIEW_TYPE_STATS = "tasklens-stats-view";
 var StatsView = class extends import_obsidian12.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -2362,7 +2386,7 @@ var StatsView = class extends import_obsidian12.ItemView {
     this.leafRootEl = leafRootEl;
     this.tabContainer = tabContainer;
     this.contentEl.empty();
-    this.contentEl.addClass("tasklens-dashboard-view");
+    this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
     this.render();
     return Promise.resolve();
   }
@@ -2399,12 +2423,6 @@ var StatsView = class extends import_obsidian12.ItemView {
 };
 
 // src/main.ts
-var ALL_VIEW_TYPES = [VIEW_TYPE_DASHBOARD, VIEW_TYPE_TIMELINE, VIEW_TYPE_LIST, VIEW_TYPE_STATS];
-var TASKLENS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="11" cy="11" r="8"></circle>
-  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-  <path d="M8 11.5L10 13.5L14 8.5"></path>
-</svg>`;
 var TaskLensPlugin = class extends import_obsidian13.Plugin {
   constructor() {
     super(...arguments);
@@ -2432,7 +2450,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     this.registerView(VIEW_TYPE_TIMELINE, (leaf) => new TimelineView(leaf, this));
     this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));
     this.registerView(VIEW_TYPE_STATS, (leaf) => new StatsView(leaf, this));
-    (0, import_obsidian13.addIcon)("tasklens-icon", TASKLENS_ICON);
+    (0, import_obsidian13.addIcon)(ICON_NAME, ICON_SVG);
     this.setupRibbonIcon();
     this.setupCommands();
     if (!this.settings.hasSeenWelcome) {
@@ -2446,8 +2464,8 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     });
   }
   setupRibbonIcon() {
-    const ribbonIconEl = this.addRibbonIcon("tasklens-icon", "Tasklens", (evt) => {
-      ribbonIconEl.removeClass("feature-highlight");
+    const ribbonIconEl = this.addRibbonIcon(ICON_NAME, "Tasklens", (evt) => {
+      ribbonIconEl.removeClass(CLASS_FEATURE_HIGHLIGHT);
       if (!this.settings.hasClickedRibbonIcon) {
         this.settings.hasClickedRibbonIcon = true;
         void this.saveSettings();
@@ -2477,7 +2495,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
       menu.showAtMouseEvent(evt);
     });
     if (!this.settings.hasSeenWelcome || !this.settings.hasClickedRibbonIcon) {
-      ribbonIconEl.addClass("feature-highlight");
+      ribbonIconEl.addClass(CLASS_FEATURE_HIGHLIGHT);
     }
   }
   setupCommands() {
@@ -2513,7 +2531,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
       this.app.workspace.getLeavesOfType(type).forEach((leaf) => {
         const tabContainer = leaf.view.containerEl.closest(".workspace-tabs");
         if (tabContainer) {
-          tabContainer.classList.toggle("tasklens-hide-tabs", this.isLayoutLocked);
+          tabContainer.classList.toggle(CLASS_HIDE_TABS, this.isLayoutLocked);
         }
       });
     });
@@ -2564,7 +2582,7 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     } else {
       const tabContainer = leaf.view.containerEl.closest(".workspace-tabs");
       if (tabContainer instanceof HTMLElement) {
-        tabContainer.classList.remove("tasklens-hide-tabs");
+        tabContainer.classList.remove(CLASS_HIDE_TABS);
       }
     }
   }
