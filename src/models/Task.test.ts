@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Task, TaskStatus, getTaskStatus } from './Task';
 
 describe('getTaskStatus', () => {
@@ -17,7 +18,7 @@ describe('getTaskStatus', () => {
     });
 
     afterEach(() => {
-        jest.useRealTimers();
+        vi.useRealTimers();
     });
 
     it('returns Completed when task.completed is true', () => {
@@ -34,8 +35,8 @@ describe('getTaskStatus', () => {
         beforeEach(() => {
             // Set fixed system time for consistent testing
             // We use '2025-02-14T12:00:00Z'
-            jest.useFakeTimers();
-            jest.setSystemTime(new Date('2025-02-14T12:00:00Z'));
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-02-14T12:00:00Z'));
         });
 
         it('returns Overdue when due date is before today', () => {
