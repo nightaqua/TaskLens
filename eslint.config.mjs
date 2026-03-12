@@ -11,12 +11,12 @@ export default defineConfig([
     ...obsidianmd.configs.recommended,
 
     {
-        files: ["**/*.ts"],
+        files: ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
         extends: [...tseslint.configs.strictTypeChecked],
         languageOptions: {
             parser: tsparser,
             parserOptions: {
-                project: "./tsconfig.json",
+                project: ["./tsconfig.json"],
                 tsconfigRootDir: import.meta.dirname,
             },
         },
@@ -25,4 +25,15 @@ export default defineConfig([
             "obsidianmd/no-static-styles-assignment": "warn",
         },
     },
+    {
+        files: ["tests/**/*.ts", "vitest.config.ts"],
+        rules: {
+            "@typescript-eslint/no-unsafe-argument": "off",
+            "@typescript-eslint/no-unsafe-assignment": "off",
+            "@typescript-eslint/no-unsafe-member-access": "off",
+            "@typescript-eslint/no-unsafe-call": "off",
+            "@typescript-eslint/no-explicit-any": "off",
+            "@typescript-eslint/no-extraneous-class": "off"
+        }
+    }
 ]);
