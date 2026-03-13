@@ -146,7 +146,7 @@ describe('TaskManager.processManualUpdate', () => {
 
         await expect(taskManager.processManualUpdate(mockFile)).rejects.toThrow('Parser failed');
 
-        expect(taskManager.getIsInternalChange()).toBe(false);
+        expect((taskManager as unknown as { isInternalChange: boolean }).isInternalChange).toBe(false);
         expect(refreshSpy).not.toHaveBeenCalled();
     });
 });
