@@ -44,7 +44,7 @@ export class StatsComponent {
             const percent = (val / maxVal) * 100;
 
             const bar = barWrapper.createDiv('histogram-bar');
-            bar.style.height = `${String(percent)}%`;
+            bar.setCssProps({ '--bar-height': `${String(percent)}%` });
 
             // Value above bar
             bar.createDiv('histogram-value').setText(String(val));

@@ -2469,7 +2469,7 @@ var StatsComponent = class {
       const barWrapper = histogramContainer.createDiv("histogram-bar-wrapper");
       const percent = val / maxVal * 100;
       const bar = barWrapper.createDiv("histogram-bar");
-      bar.style.height = `${String(percent)}%`;
+      bar.setCssProps({ "--bar-height": `${String(percent)}%` });
       bar.createDiv("histogram-value").setText(String(val));
       barWrapper.createDiv("histogram-label").setText(days[i]);
     });

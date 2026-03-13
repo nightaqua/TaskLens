@@ -310,6 +310,7 @@
 
 .tasklens-dashboard-content .histogram-bar {
     width: 24px;
+    height: var(--bar-height, 0%);
     background-color: var(--color-blue);
     border-radius: 4px 4px 0 0;
     position: relative;
