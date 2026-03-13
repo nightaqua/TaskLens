@@ -41,9 +41,10 @@ export class TaskManager extends Events {
         this.isInternalChange = true;
         try {
             const freshTasks = await this.parser.getTasksFromFile(file.path);
+            const cachedTasksMap = new Map(cachedTasks.map(t => [t.lineNumber, t]));
 
             for (const fresh of freshTasks) {
-                const cached = cachedTasks.find(c => c.lineNumber === fresh.lineNumber);
+                const cached = cachedTasksMap.get(fresh.lineNumber);
 
                 // Detection: line went from [ ] → [x] manually
                 if (cached && !cached.completed && fresh.completed) {
