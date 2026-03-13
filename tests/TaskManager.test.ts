@@ -152,5 +152,34 @@ describe('TaskManager', () => {
             expect(nextDate).toEqual(new Date('2026-03-11T00:00:00'));
         });
     });
+
+    describe('formatDisplayDate', () => {
+        it('formats dates with double-digit day and month correctly', () => {
+            const date = new Date('2024-12-25T00:00:00');
+            expect(TaskManager.formatDisplayDate(date)).toBe('25-12-2024');
+        });
+
+        it('pads single-digit day correctly', () => {
+            const date = new Date('2024-12-05T00:00:00');
+            expect(TaskManager.formatDisplayDate(date)).toBe('05-12-2024');
+        });
+
+        it('pads single-digit month correctly', () => {
+            const date = new Date('2024-05-25T00:00:00');
+            expect(TaskManager.formatDisplayDate(date)).toBe('25-05-2024');
+        });
+
+        it('pads single-digit day and month correctly', () => {
+            const date = new Date('2024-05-05T00:00:00');
+            expect(TaskManager.formatDisplayDate(date)).toBe('05-05-2024');
+        });
+
+        it('handles different years correctly', () => {
+            const date1 = new Date('1999-01-01T00:00:00');
+            expect(TaskManager.formatDisplayDate(date1)).toBe('01-01-1999');
+
+            const date2 = new Date('2100-01-01T00:00:00');
+            expect(TaskManager.formatDisplayDate(date2)).toBe('01-01-2100');
+        });
     });
 });
