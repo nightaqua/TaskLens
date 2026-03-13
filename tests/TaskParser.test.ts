@@ -1,14 +1,13 @@
 import { App } from 'obsidian';
 import { describe, it, expect } from 'vitest';
-import { SemesterSettings } from '../settings/Settings';
-import { TaskParser } from '../../src/services/TaskParser';
+import { SemesterSettings } from '../src/settings/Settings';
+import { TaskParser } from '../src/services/TaskParser';
 
 describe('TaskParser.parseTaskMetadata', () => {
     // Create a dummy instance. Since parseTaskMetadata doesn't use `this.app` or `this.settings`,
     // we can pass null or empty objects casted to unknown.
     const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
-    // @ts-expect-error - testing private method
-    const parseTaskMetadata = parser.parseTaskMetadata.bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string };
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string };
 
     const getLocalMidnight = (dateStr: string) => new Date(`${dateStr}T00:00:00`);
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Task, TaskStatus, getTaskStatus } from './Task';
+import { Task, TaskStatus, getTaskStatus } from '../src/models/Task';
 
 describe('getTaskStatus', () => {
     let mockTask: Task;
@@ -66,11 +66,11 @@ describe('getTaskStatus', () => {
 
         it('handles different time zones correctly by ignoring time part', () => {
             // Overdue
-            mockTask.dueDate = new Date('2025-02-13T23:59:59Z');
+            mockTask.dueDate = new Date('2025-02-13T23:59:59');
             expect(getTaskStatus(mockTask)).toBe(TaskStatus.Overdue);
 
             // Today
-            mockTask.dueDate = new Date('2025-02-14T23:59:59Z');
+            mockTask.dueDate = new Date('2025-02-14T23:59:59');
             expect(getTaskStatus(mockTask)).toBe(TaskStatus.Urgent);
         });
     });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getTopicColor, SemesterSettings } from './Settings';
+import { getTopicColor, SemesterSettings } from '../src/settings/Settings';
 
 describe('getTopicColor', () => {
     let settings: SemesterSettings;
