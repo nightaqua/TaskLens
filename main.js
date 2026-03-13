@@ -809,6 +809,11 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
+  async updateScanPaths(value) {
+    this.plugin.settings.scanFolders = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
+    await this.plugin.saveSettings();
+    await this.plugin.taskManager.loadTasks();
+  }
   display() {
     const { containerEl } = this;
     containerEl.empty();
@@ -827,10 +832,7 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     });
     const scanPathsSetting = new import_obsidian4.Setting(scanDetails).setName("Scan paths").setDesc("Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.").addTextArea((text) => {
       text.setPlaceholder("Projects\nUni/History\nTo-Do.md").setValue(this.plugin.settings.scanFolders.join("\n")).onChange((value) => {
-        this.plugin.settings.scanFolders = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
-        void this.plugin.saveSettings().then(() => {
-          void this.plugin.taskManager.loadTasks();
-        });
+        void this.updateScanPaths(value);
       });
     });
     scanPathsSetting.settingEl.addClass("scan-paths-setting");
