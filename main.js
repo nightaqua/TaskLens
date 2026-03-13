@@ -350,16 +350,37 @@ var TaskManager = class extends import_obsidian.Events {
   getStatistics() {
     const groups = this.groupTasks(this.tasks);
     const todayStr = this.formatDate(/* @__PURE__ */ new Date());
+    let completed = 0;
+    let overdue = 0;
+    let upcoming = 0;
+    let urgent = 0;
+    for (const g of groups) {
+      const rep = g.representative;
+      if (rep.completed) {
+        completed++;
+      } else {
+        const status = getTaskStatus(rep);
+        if (status === "overdue" /* Overdue */) overdue++;
+        else if (status === "upcoming_week" /* UpcomingWeek */) upcoming++;
+        else if (status === "urgent" /* Urgent */) urgent++;
+      }
+    }
+    let completedToday = 0;
+    const courses = /* @__PURE__ */ new Set();
+    for (const t of this.tasks) {
+      courses.add(t.fileName);
+      if (t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr) {
+        completedToday++;
+      }
+    }
     return {
       total: groups.length,
-      completed: groups.filter((g) => g.representative.completed).length,
-      completedToday: this.tasks.filter(
-        (t) => t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr
-      ).length,
-      overdue: groups.filter((g) => getTaskStatus(g.representative) === "overdue" /* Overdue */).length,
-      upcoming: groups.filter((g) => getTaskStatus(g.representative) === "upcoming_week" /* UpcomingWeek */).length,
-      urgent: groups.filter((g) => getTaskStatus(g.representative) === "urgent" /* Urgent */).length,
-      courses: new Set(this.tasks.map((t) => t.fileName)).size
+      completed,
+      completedToday,
+      overdue,
+      upcoming,
+      urgent,
+      courses: courses.size
     };
   }
   getCourseNames() {

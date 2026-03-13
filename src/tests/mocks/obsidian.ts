@@ -7,3 +7,5 @@ export class TFile {
 }
 
 export type CachedMetadata = Record<string, unknown>;
+
+export class Events {}
