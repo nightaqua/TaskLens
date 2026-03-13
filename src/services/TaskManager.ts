@@ -231,6 +231,41 @@ export class TaskManager extends Events {
     }
 
     /**
+     * Updates a task's status based on drag-and-drop actions.
+     */
+    async updateTaskStatus(task: Task, newStatus: TaskStatus): Promise<void> {
+        if (newStatus === TaskStatus.Completed) {
+            if (!task.completed) {
+                await this.toggleTaskCompletion(task);
+            }
+            return;
+        }
+
+        // If moving out of completed, uncheck it first
+        if (task.completed) {
+            await this.toggleTaskCompletion(task);
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let newDate: Date | null = null;
+        if (newStatus === TaskStatus.UpcomingWeek) {
+            newDate = new Date(today);
+            newDate.setDate(today.getDate() + 7);
+        } else if (newStatus === TaskStatus.Urgent) {
+            newDate = new Date(today);
+            newDate.setDate(today.getDate() + 1);
+        } else if (newStatus === TaskStatus.Overdue) {
+            newDate = new Date(today);
+            newDate.setDate(today.getDate() - 1);
+        }
+
+        // Update the date, or clear it if null (NoDate case - handled by passing null)
+        await this.updateTask(task, task.title, newDate);
+    }
+
+    /**
      * Delete a task from its file
      */
     async deleteTask(task: Task): Promise<void> {
