@@ -35,8 +35,7 @@ export class BoardComponent {
             { id: TaskStatus.UpcomingWeek, title: 'Active' },
             { id: TaskStatus.Urgent, title: 'Urgent' },
             { id: TaskStatus.Overdue, title: 'Overdue' },
-            { id: TaskStatus.Completed, title: 'Completed' },
-            { id: TaskStatus.NoDate, title: 'No Date' }
+            { id: TaskStatus.Completed, title: 'Completed' }
         ];
 
         columnsData.forEach(colData => {
@@ -93,6 +92,8 @@ export class BoardComponent {
         const targetColumn = (e.currentTarget as HTMLElement).closest('.board-column');
         if (targetColumn instanceof HTMLElement) {
             const newStatus = targetColumn.dataset.status as TaskStatus;
+
+            // Trigger update via TaskManager
             void this.taskManager.updateTaskStatus(this.draggedTaskGroup.representative, newStatus);
         }
 

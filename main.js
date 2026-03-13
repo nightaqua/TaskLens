@@ -1910,21 +1910,6 @@ var HeaderComponent = class {
 
 // src/modals/QuickAddModal.ts
 var import_obsidian9 = require("obsidian");
-function resolveActiveMarkdownView(app) {
-  let view = app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
-  if (!view) {
-    const markdownLeaves = app.workspace.getLeavesOfType("markdown");
-    const visibleMarkdownLeaf = markdownLeaves.find(
-      (leaf) => leaf.view instanceof import_obsidian9.MarkdownView && leaf.view.containerEl.isShown()
-    );
-    if (visibleMarkdownLeaf) {
-      view = visibleMarkdownLeaf.view;
-    } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian9.MarkdownView) {
-      view = markdownLeaves[0].view;
-    }
-  }
-  return view;
-}
 var QuickAddModal = class extends import_obsidian9.Modal {
   constructor(app, taskManager) {
     super(app);
@@ -1939,7 +1924,19 @@ var QuickAddModal = class extends import_obsidian9.Modal {
      * `'__CURSOR__'` when the user wants to insert at the cursor position.
      */
     this.selectedFile = "";
-    this.activeViewAtOpen = resolveActiveMarkdownView(this.app);
+    let view = this.app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
+    if (!view) {
+      const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
+      const visibleMarkdownLeaf = markdownLeaves.find(
+        (leaf) => leaf.view instanceof import_obsidian9.MarkdownView && leaf.view.containerEl.isShown()
+      );
+      if (visibleMarkdownLeaf) {
+        view = visibleMarkdownLeaf.view;
+      } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian9.MarkdownView) {
+        view = markdownLeaves[0].view;
+      }
+    }
+    this.activeViewAtOpen = view;
   }
   // -------------------------------------------------------------------------
   // Lifecycle
