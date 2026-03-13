@@ -544,15 +544,30 @@ export class TimelineComponent {
         if (isRecurring) {
             this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 recurring');
         }
+        if (task.notes) {
+            this.tooltipEl.createDiv('tooltip-notes').setText(task.notes);
+        }
         this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
     }
 
     private moveTooltip(e: MouseEvent): void {
         if (this.tooltipEl) {
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+
+            // Bounds checking against viewport
+            const width = this.tooltipEl.offsetWidth || 0;
+            const height = this.tooltipEl.offsetHeight || 0;
+            const maxLeft = window.innerWidth - width - 15;
+            const maxTop = window.innerHeight - height - 15;
+
+            if (left > maxLeft) left = Math.max(0, e.clientX - width - 15);
+            if (top > maxTop) top = Math.max(0, e.clientY - height - 15);
+
             this.tooltipEl.setCssProps({
-                top: `${String(e.clientY + 15)}px`,
-                left: `${String(e.clientX + 15)}px`
+                top: `${String(top)}px`,
+                left: `${String(left)}px`
             });
         }
     }

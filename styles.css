@@ -454,6 +454,18 @@
     width: 100%;
 }
 
+.tasklens-dashboard-content .task-notes {
+    width: 100%;
+    margin-top: 6px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    font-style: italic;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-left: 2px solid var(--background-modifier-border);
+    padding-left: 8px;
+}
+
 /* Badges (Course name truncation & date protection) */
 .tasklens-dashboard-content .task-course, .tasklens-dashboard-content .task-date {
     background-color: var(--background-primary);
@@ -744,10 +756,21 @@
     pointer-events: none;
     display: none;
     min-width: 150px;
+    max-width: 300px; /* Prevent overly wide tooltips with notes */
 }
 
 .tasklens-dashboard-content .tooltip-title { font-weight: 600; margin-bottom: 4px; font-size: 0.9em; }
 .tasklens-dashboard-content .tooltip-meta, .tasklens-dashboard-content .tooltip-date { font-size: 0.8em; color: var(--text-muted); }
+.tasklens-dashboard-content .tooltip-notes {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--background-modifier-border);
+    font-style: italic;
+    white-space: pre-wrap; /* Preserve line breaks in notes */
+    word-break: break-word;
+}
 
 
 /* =========================================

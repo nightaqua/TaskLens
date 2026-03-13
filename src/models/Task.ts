@@ -32,6 +32,9 @@ export interface Task {
     /** The recurrence rule string (e.g., 'daily', '2w+') */
     recurrence?: string;
 
+    /** Extracted notes content, e.g. [notes:: ...] (optional) */
+    notes?: string;
+
     /** Original task text (for reference) */
     originalText: string;
 }

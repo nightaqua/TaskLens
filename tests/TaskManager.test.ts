@@ -33,7 +33,7 @@ describe('TaskManager', () => {
 
     describe('calculateNextDueDate', () => {
         describe('Strict Recurrence (from dueDate)', () => {
-        it('calculates daily recurrence correctly', () => {
+            it('calculates daily recurrence correctly', () => {
             const dueDate = new Date('2026-03-10T00:00:00');
             const completionDate = new Date('2026-03-12T00:00:00');
 
@@ -142,14 +142,15 @@ describe('TaskManager', () => {
         });
     });
 
-    describe('Invalid recurrence rule', () => {
-        it('defaults to 1 day for unknown rules', () => {
-            const dueDate = new Date('2026-03-10T00:00:00');
-            const completionDate = new Date('2026-03-12T00:00:00');
+        describe('Invalid recurrence rule', () => {
+            it('defaults to 1 day for unknown rules', () => {
+                const dueDate = new Date('2026-03-10T00:00:00');
+                const completionDate = new Date('2026-03-12T00:00:00');
 
-            // "xyz" is an invalid rule, so it falls back to unit 'd' and amount 1
-            const nextDate = taskManager.calculateNextDueDate(dueDate, 'xyz', completionDate);
-            expect(nextDate).toEqual(new Date('2026-03-11T00:00:00'));
+                // "xyz" is an invalid rule, so it falls back to unit 'd' and amount 1
+                const nextDate = taskManager.calculateNextDueDate(dueDate, 'xyz', completionDate);
+                expect(nextDate).toEqual(new Date('2026-03-11T00:00:00'));
+            });
         });
     });
 
@@ -197,7 +198,8 @@ describe('TaskManager', () => {
             expect(TaskManager.formatDisplayDate(date)).toBe('29-02-2024');
         });
     });
-});
+
+
 });
 
 describe('TaskManager.processManualUpdate', () => {
@@ -219,3 +221,4 @@ describe('TaskManager.processManualUpdate', () => {
         expect(refreshSpy).not.toHaveBeenCalled();
     });
 });
+
