@@ -7,8 +7,8 @@ import { VIEW_TYPE_STATS, CLASS_DASHBOARD_VIEW } from '../constants';
 
 
 export class StatsView extends ItemView {
-    private leafRootEl: Element | null = null;
-    private tabContainer: Element | null = null;
+    private leafRootEl: HTMLElement | null = null;
+    private tabContainer: HTMLElement | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
     private readonly onTasksUpdated = (): void => { this.render(); };
@@ -63,9 +63,7 @@ export class StatsView extends ItemView {
 
     onClose(): Promise<void> {
         this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
-        const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
-        const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
-        cleanUpViewDOM(root, tabs);
+        cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
 
