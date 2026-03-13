@@ -152,7 +152,6 @@ describe('TaskManager', () => {
             expect(nextDate).toEqual(new Date('2026-03-11T00:00:00'));
         });
     });
-    });
 
     describe('formatDisplayDate', () => {
         it('formats dates with double-digit day and month correctly', () => {
@@ -183,4 +182,5 @@ describe('TaskManager', () => {
             expect(TaskManager.formatDisplayDate(date2)).toBe('01-01-2100');
         });
     });
+});
 });
