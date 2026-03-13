@@ -74,6 +74,8 @@ var TaskManager = class extends import_obsidian.Events {
     this.isInternalChange = false;
     this.currentStatusFilter = "open" /* Open */;
     this.currentCourseFilter = null;
+    this.cachedStats = null;
+    this.lastTasksRef = null;
   }
   async loadTasks() {
     this.tasks = await this.parser.findAllTasks();
@@ -97,8 +99,9 @@ var TaskManager = class extends import_obsidian.Events {
     this.isInternalChange = true;
     try {
       const freshTasks = await this.parser.getTasksFromFile(file.path);
+      const cachedTasksMap = new Map(cachedTasks.map((t) => [t.lineNumber, t]));
       for (const fresh of freshTasks) {
-        const cached = cachedTasks.find((c) => c.lineNumber === fresh.lineNumber);
+        const cached = cachedTasksMap.get(fresh.lineNumber);
         if (cached && !cached.completed && fresh.completed) {
           await this.addCompletionMetadata(fresh);
           return;
@@ -356,8 +359,53 @@ var TaskManager = class extends import_obsidian.Events {
     return this.parser.getFilesToScan().map((file) => file.path);
   }
   getStatistics() {
+    if (this.lastTasksRef === this.tasks && this.cachedStats) {
+      return this.cachedStats;
+    }
+    this.cachedStats = this.calculateStatistics();
+    this.lastTasksRef = this.tasks;
+    return this.cachedStats;
+  }
+  calculateStatistics() {
+    var _a;
     const groups = this.groupTasks(this.tasks);
-    const todayStr = this.formatDate(/* @__PURE__ */ new Date());
+    const now = /* @__PURE__ */ new Date();
+    const todayStr = this.formatDate(now);
+    now.setHours(0, 0, 0, 0);
+    const velocity7Days = [0, 0, 0, 0, 0, 0, 0];
+    for (const task of this.tasks) {
+      if (task.completed && task.completionDate) {
+        const compDate = new Date(task.completionDate);
+        compDate.setHours(0, 0, 0, 0);
+        const diffTime = now.getTime() - compDate.getTime();
+        const diffDays = Math.round(diffTime / (1e3 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 7) {
+          velocity7Days[6 - diffDays]++;
+        }
+      }
+    }
+    const topicStats = /* @__PURE__ */ new Map();
+    for (const task of this.tasks) {
+      if (!task.completed) {
+        const stats = (_a = topicStats.get(task.fileName)) != null ? _a : { totalOpen: 0, urgent: 0 };
+        stats.totalOpen++;
+        if (getTaskStatus(task) === "urgent" /* Urgent */) {
+          stats.urgent++;
+        }
+        topicStats.set(task.fileName, stats);
+      }
+    }
+    let mostUrgentTopic = null;
+    let maxRatio = -1;
+    for (const [name, stats] of topicStats.entries()) {
+      if (stats.totalOpen > 0) {
+        const ratio = stats.urgent / stats.totalOpen;
+        if (ratio > maxRatio || ratio === maxRatio && mostUrgentTopic && stats.urgent > mostUrgentTopic.urgent) {
+          maxRatio = ratio;
+          mostUrgentTopic = { name, ratio, urgent: stats.urgent, total: stats.totalOpen };
+        }
+      }
+    }
     return {
       total: groups.length,
       completed: groups.filter((g) => g.representative.completed).length,
@@ -367,7 +415,9 @@ var TaskManager = class extends import_obsidian.Events {
       overdue: groups.filter((g) => getTaskStatus(g.representative) === "overdue" /* Overdue */).length,
       upcoming: groups.filter((g) => getTaskStatus(g.representative) === "upcoming_week" /* UpcomingWeek */).length,
       urgent: groups.filter((g) => getTaskStatus(g.representative) === "urgent" /* Urgent */).length,
-      courses: new Set(this.tasks.map((t) => t.fileName)).size
+      courses: new Set(this.tasks.map((t) => t.fileName)).size,
+      velocity7Days,
+      mostUrgentTopic
     };
   }
   getCourseNames() {
@@ -1662,6 +1712,21 @@ var HeaderComponent = class {
 
 // src/modals/QuickAddModal.ts
 var import_obsidian8 = require("obsidian");
+function resolveActiveMarkdownView(app) {
+  let view = app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
+  if (!view) {
+    const markdownLeaves = app.workspace.getLeavesOfType("markdown");
+    const visibleMarkdownLeaf = markdownLeaves.find(
+      (leaf) => leaf.view instanceof import_obsidian8.MarkdownView && leaf.view.containerEl.isShown()
+    );
+    if (visibleMarkdownLeaf) {
+      view = visibleMarkdownLeaf.view;
+    } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian8.MarkdownView) {
+      view = markdownLeaves[0].view;
+    }
+  }
+  return view;
+}
 var QuickAddModal = class extends import_obsidian8.Modal {
   constructor(app, taskManager) {
     super(app);
@@ -1676,19 +1741,7 @@ var QuickAddModal = class extends import_obsidian8.Modal {
      * `'__CURSOR__'` when the user wants to insert at the cursor position.
      */
     this.selectedFile = "";
-    let view = this.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
-    if (!view) {
-      const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
-      const visibleMarkdownLeaf = markdownLeaves.find(
-        (leaf) => leaf.view instanceof import_obsidian8.MarkdownView && leaf.view.containerEl.isShown()
-      );
-      if (visibleMarkdownLeaf) {
-        view = visibleMarkdownLeaf.view;
-      } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian8.MarkdownView) {
-        view = markdownLeaves[0].view;
-      }
-    }
-    this.activeViewAtOpen = view;
+    this.activeViewAtOpen = resolveActiveMarkdownView(this.app);
   }
   // -------------------------------------------------------------------------
   // Lifecycle
@@ -2431,6 +2484,37 @@ var StatsComponent = class {
       card.createDiv("stat-value").setText(String(stat.value));
       card.createDiv("stat-label").setText(stat.label);
     });
+    this.renderPacingAnalysis(stats.velocity7Days);
+    if (stats.mostUrgentTopic) {
+      this.renderUrgentTopic(stats.mostUrgentTopic);
+    }
+  }
+  renderPacingAnalysis(velocity) {
+    const wrapper = this.container.createDiv("dashboard-pacing-analysis");
+    wrapper.createEl("h3", { text: "7-day pacing analysis" });
+    const maxVal = Math.max(...velocity, 1);
+    const histogramContainer = wrapper.createDiv("pacing-histogram");
+    const days = ["6d", "5d", "4d", "3d", "2d", "1d", "Today"];
+    velocity.forEach((val, i) => {
+      const barWrapper = histogramContainer.createDiv("histogram-bar-wrapper");
+      const percent = val / maxVal * 100;
+      const bar = barWrapper.createDiv("histogram-bar");
+      bar.setCssProps({ "--bar-height": `${String(percent)}%` });
+      bar.createDiv("histogram-value").setText(String(val));
+      barWrapper.createDiv("histogram-label").setText(days[i]);
+    });
+  }
+  renderUrgentTopic(topic) {
+    const wrapper = this.container.createDiv("dashboard-urgent-topic");
+    wrapper.createEl("h3", { text: "Most urgent topic" });
+    const card = wrapper.createDiv({ cls: ["stat-card", "stat-urgent-topic"] });
+    const nameDiv = card.createDiv("urgent-topic-name");
+    nameDiv.setText(topic.name);
+    const percent = Math.round(topic.ratio * 100);
+    card.createDiv("urgent-topic-ratio").setText(`${String(percent)}% Urgent`);
+    card.createDiv("urgent-topic-details").setText(
+      `${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`
+    );
   }
 };
 
