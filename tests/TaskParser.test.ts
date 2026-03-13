@@ -7,7 +7,7 @@ describe('TaskParser.parseTaskMetadata', () => {
     // Create a dummy instance. Since parseTaskMetadata doesn't use `this.app` or `this.settings`,
     // we can pass null or empty objects casted to unknown.
     const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
-    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string };
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string };
 
     const getLocalMidnight = (dateStr: string) => new Date(`${dateStr}T00:00:00`);
 
@@ -18,6 +18,7 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.dueDate).toBeUndefined();
         expect(result.completionDate).toBeUndefined();
         expect(result.recurrence).toBeUndefined();
+        expect(result.notes).toBeUndefined();
     });
 
     it('should parse start date in yyyy-mm-dd format', () => {
@@ -121,5 +122,25 @@ describe('TaskParser.parseTaskMetadata', () => {
         const result = parseTaskMetadata('   Task   with   spaces   [due:: 2023-01-01]   ');
         expect(result.title).toBe('Task with spaces');
         expect(result.dueDate).toEqual(getLocalMidnight('2023-01-01'));
+    });
+
+    it('should parse notes with notes::', () => {
+        const result = parseTaskMetadata('Task with a note [notes:: This is an important note]');
+        expect(result.title).toBe('Task with a note');
+        expect(result.notes).toBe('This is an important note');
+    });
+
+    it('should parse notes with parenthesis format', () => {
+        const result = parseTaskMetadata('Task with parens note (notes:: Another note here)');
+        expect(result.title).toBe('Task with parens note');
+        expect(result.notes).toBe('Another note here');
+    });
+
+    it('should handle notes alongside other metadata', () => {
+        const result = parseTaskMetadata('Complex task [due:: 2024-12-01] [notes:: Requires review before submission] [repeat:: weekly]');
+        expect(result.title).toBe('Complex task');
+        expect(result.dueDate).toEqual(getLocalMidnight('2024-12-01'));
+        expect(result.notes).toBe('Requires review before submission');
+        expect(result.recurrence).toBe('weekly');
     });
 });

@@ -575,7 +575,7 @@ var _TaskParser = class _TaskParser {
       if (taskMatch) {
         const completed = taskMatch[2].toLowerCase() === "x";
         const taskText = taskMatch[3];
-        const { title, startDate, dueDate, completionDate, recurrence } = this.parseTaskMetadata(taskText);
+        const { title, startDate, dueDate, completionDate, recurrence, notes } = this.parseTaskMetadata(taskText);
         const task = {
           id: `${file.path}:${String(i)}`,
           title,
@@ -588,6 +588,8 @@ var _TaskParser = class _TaskParser {
           completionDate,
           // Added
           recurrence,
+          // Added
+          notes,
           // Added
           originalText: line
         };
@@ -619,6 +621,7 @@ var _TaskParser = class _TaskParser {
     let dueDate;
     let completionDate;
     let recurrence;
+    let notes;
     const parseDate = (raw) => {
       const dmy = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
       const iso = dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : raw;
@@ -648,6 +651,12 @@ var _TaskParser = class _TaskParser {
       recurrence = repeatMatch[1].trim().toLowerCase();
       title = title.replace(_TaskParser.REPEAT_REGEX, "");
     }
+    _TaskParser.NOTES_REGEX.lastIndex = 0;
+    const notesMatch = _TaskParser.NOTES_REGEX.exec(taskText);
+    if (notesMatch) {
+      notes = notesMatch[1].trim();
+      title = title.replace(_TaskParser.NOTES_REGEX, "");
+    }
     if (!recurrence) {
       const emojiRecurMatch = taskText.match(_TaskParser.EMOJI_RECUR_MATCH_REGEX);
       if (emojiRecurMatch) {
@@ -663,7 +672,7 @@ var _TaskParser = class _TaskParser {
       }
     }
     title = title.replace(/\s+/g, " ").trim();
-    return { title, startDate, dueDate, completionDate, recurrence };
+    return { title, startDate, dueDate, completionDate, recurrence, notes };
   }
 };
 // Matches both yyyy-mm-dd and dd-mm-yyyy after the key
@@ -676,6 +685,8 @@ _TaskParser.DUE_REGEX = new RegExp(`\\[?\\(?due::\\s*${_TaskParser.DATE_PAT}[\\]
 _TaskParser.COMP_REGEX = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, "gi");
 // 4. RECURRENCE — TaskLens format: [repeat:: weekly]
 _TaskParser.REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
+// 5. NOTES — TaskLens format: [notes:: ...]
+_TaskParser.NOTES_REGEX = /\[?\(?notes::\s*([^\])]+)[\])]?/gi;
 // Fallback emoji regexes
 _TaskParser.EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u;
 _TaskParser.EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u;
@@ -1464,14 +1475,25 @@ var _TimelineComponent = class _TimelineComponent {
     if (isRecurring) {
       this.tooltipEl.createDiv("tooltip-recurrence").setText("\u{1F501} recurring");
     }
+    if (task.notes) {
+      this.tooltipEl.createDiv("tooltip-notes").setText(task.notes);
+    }
     this.tooltipEl.setCssProps({ display: "block" });
     this.moveTooltip(e);
   }
   moveTooltip(e) {
     if (this.tooltipEl) {
+      let left = e.clientX + 15;
+      let top = e.clientY + 15;
+      const width = this.tooltipEl.offsetWidth || 0;
+      const height = this.tooltipEl.offsetHeight || 0;
+      const maxLeft = window.innerWidth - width - 15;
+      const maxTop = window.innerHeight - height - 15;
+      if (left > maxLeft) left = Math.max(0, e.clientX - width - 15);
+      if (top > maxTop) top = Math.max(0, e.clientY - height - 15);
       this.tooltipEl.setCssProps({
-        top: `${String(e.clientY + 15)}px`,
-        left: `${String(e.clientX + 15)}px`
+        top: `${String(top)}px`,
+        left: `${String(left)}px`
       });
     }
   }
