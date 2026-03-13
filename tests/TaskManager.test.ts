@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TaskManager } from '../src/services/TaskManager';
 import { TaskParser } from '../src/services/TaskParser';
-import { App } from 'obsidian';
+import { App, TFile } from 'obsidian';
 
 describe('TaskManager.calculateNextDueDate', () => {
     // We can just cast empty objects since calculateNextDueDate doesn't use 'this'
@@ -128,5 +128,25 @@ describe('TaskManager.calculateNextDueDate', () => {
             const nextDate = taskManager.calculateNextDueDate(dueDate, 'xyz', completionDate);
             expect(nextDate).toEqual(new Date('2026-03-11T00:00:00'));
         });
+    });
+});
+
+describe('TaskManager.processManualUpdate', () => {
+    it('resets isInternalChange to false if parser.getTasksFromFile throws', async () => {
+        const mockApp = {} as App;
+        const mockParser = {
+            getTasksFromFile: vi.fn().mockRejectedValue(new Error('Parser failed'))
+        } as unknown as TaskParser;
+
+        const taskManager = new TaskManager(mockParser, mockApp);
+        const refreshSpy = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue();
+
+        const mockFile = Object.create(TFile.prototype);
+        mockFile.path = 'test.md';
+
+        await expect(taskManager.processManualUpdate(mockFile)).rejects.toThrow('Parser failed');
+
+        expect(taskManager.getIsInternalChange()).toBe(false);
+        expect(refreshSpy).not.toHaveBeenCalled();
     });
 });
