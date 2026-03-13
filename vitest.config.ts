@@ -5,4 +5,9 @@ export default defineConfig({
         setupFiles: ['./tests/setup.ts'],
         environment: 'node',
     },
+        environment: 'node',
+        alias: {
+            'obsidian': '/src/tests/mocks/obsidian.ts'
+        }
+    }
 });
