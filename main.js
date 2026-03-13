@@ -987,6 +987,7 @@ var TaskListComponent = class {
     }
     const checkbox = taskEl.createEl("input", { type: "checkbox", cls: "task-checkbox" });
     checkbox.checked = task.completed;
+    checkbox.setAttribute("aria-label", `Toggle task: ${task.title}`);
     checkbox.addEventListener("change", () => {
       this.callbacks.onToggle(task);
     });
@@ -1501,6 +1502,7 @@ var HeaderComponent = class {
     if (this.onSettings) {
       const settingsBtn = leftGroup.createEl("button", { cls: "header-icon-btn" });
       (0, import_obsidian7.setIcon)(settingsBtn, "settings");
+      settingsBtn.setAttribute("aria-label", "Settings");
       settingsBtn.addEventListener("click", () => {
         var _a;
         (_a = this.onSettings) == null ? void 0 : _a.call(this);
@@ -1955,10 +1957,12 @@ var DashboardView = class extends import_obsidian9.ItemView {
       } }
     ];
     toggles.forEach(({ label, getter, setter }) => {
+      const isActive = getter();
       const btn = actionsDiv.createEl("button", {
-        cls: `view-toggle-btn ${getter() ? "is-active" : ""}`,
+        cls: `view-toggle-btn ${isActive ? "is-active" : ""}`,
         text: label
       });
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
       btn.addEventListener("click", () => {
         setter(!getter());
         this.app.workspace.requestSaveLayout();
@@ -2024,20 +2028,24 @@ var DashboardView = class extends import_obsidian9.ItemView {
     const zoomControls = controls.createDiv("zoom-controls");
     zoomControls.createSpan({ text: "Zoom: " });
     const zoomOut = zoomControls.createEl("button", { text: "-", cls: "view-toggle-btn" });
+    zoomOut.setAttribute("aria-label", "Zoom out timeline");
     zoomOut.addEventListener("click", () => {
       this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
       this.render();
     });
     zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} days ` });
     const zoomIn = zoomControls.createEl("button", { text: "+", cls: "view-toggle-btn" });
+    zoomIn.setAttribute("aria-label", "Zoom in timeline");
     zoomIn.addEventListener("click", () => {
       this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);
       this.render();
     });
     const navControls = controls.createDiv("nav-controls");
     const scrollLeft = navControls.createEl("button", { cls: "view-toggle-btn" });
+    scrollLeft.setAttribute("aria-label", "Scroll left");
     (0, import_obsidian9.setIcon)(scrollLeft, "chevron-left");
     const scrollRight = navControls.createEl("button", { cls: "view-toggle-btn" });
+    scrollRight.setAttribute("aria-label", "Scroll right");
     (0, import_obsidian9.setIcon)(scrollRight, "chevron-right");
     this.timelineComponent = new TimelineComponent(
       container,
