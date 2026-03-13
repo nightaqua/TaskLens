@@ -382,16 +382,42 @@ export class TaskManager extends Events {
         // Group first so recurring clones count as one work item, not N lines.
         const groups = this.groupTasks(this.tasks);
         const todayStr = this.formatDate(new Date());
+
+        let completed = 0;
+        let overdue = 0;
+        let upcoming = 0;
+        let urgent = 0;
+
+        for (const g of groups) {
+            const status = getTaskStatus(g.representative);
+            if (status === TaskStatus.Completed) {
+                completed++;
+            } else if (status === TaskStatus.Overdue) {
+                overdue++;
+            } else if (status === TaskStatus.UpcomingWeek) {
+                upcoming++;
+            } else if (status === TaskStatus.Urgent) {
+                urgent++;
+            }
+        }
+
+        let completedToday = 0;
+        const courses = new Set<string>();
+        for (const t of this.tasks) {
+            if (t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr) {
+                completedToday++;
+            }
+            courses.add(t.fileName);
+        }
+
         return {
             total: groups.length,
-            completed: groups.filter(g => g.representative.completed).length,
-            completedToday: this.tasks.filter(t =>
-                t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr
-            ).length,
-            overdue: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.Overdue).length,
-            upcoming: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.UpcomingWeek).length,
-            urgent: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.Urgent).length,
-            courses: new Set(this.tasks.map(t => t.fileName)).size
+            completed,
+            completedToday,
+            overdue,
+            upcoming,
+            urgent,
+            courses: courses.size
         };
     }
 
