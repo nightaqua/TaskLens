@@ -15,12 +15,16 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Lint
+        run: npx eslint . --max-warnings=0
 
       - name: Run tests
         run: npm run test
@@ -31,3 +35,4 @@ jobs:
       - name: Verify build output
         run: |
           test -f main.js || (echo "main.js not found!" && exit 1)
+          test -f styles.css || (echo "styles.css not found!" && exit 1)
