@@ -578,6 +578,7 @@ export class TimelineComponent {
 
     /** Removes DOM nodes owned by this component that live outside its container. */
     public destroy(): void {
+        this.hideTooltip();
         this.tooltipEl?.remove();
         this.tooltipEl = null;
         if (this.ribbonOutsideHandler) {
