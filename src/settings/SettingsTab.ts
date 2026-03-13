@@ -12,6 +12,16 @@ export class SettingsTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    private async updateScanPaths(value: string): Promise<void> {
+        this.plugin.settings.scanFolders = value
+            .split('\n')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        await this.plugin.saveSettings();
+        await this.plugin.taskManager.loadTasks();
+    }
+
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
@@ -44,8 +54,7 @@ export class SettingsTab extends PluginSettingTab {
                 text.setPlaceholder('Projects\nUni/History\nTo-Do.md')
                     .setValue(this.plugin.settings.scanFolders.join('\n'))
                     .onChange((value) => {
-                        this.plugin.settings.scanFolders = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-                        void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                        void this.updateScanPaths(value);
                     });
             });
 
