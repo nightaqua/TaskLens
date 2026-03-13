@@ -181,6 +181,21 @@ describe('TaskManager', () => {
             const date2 = new Date('2100-01-01T00:00:00');
             expect(TaskManager.formatDisplayDate(date2)).toBe('01-01-2100');
         });
+
+        it('ignores time components correctly', () => {
+            const date = new Date('2024-05-15T14:30:45');
+            expect(TaskManager.formatDisplayDate(date)).toBe('15-05-2024');
+        });
+
+        it('formats end of year correctly', () => {
+            const date = new Date('2024-12-31T23:59:59');
+            expect(TaskManager.formatDisplayDate(date)).toBe('31-12-2024');
+        });
+
+        it('formats leap year date correctly', () => {
+            const date = new Date('2024-02-29T12:00:00');
+            expect(TaskManager.formatDisplayDate(date)).toBe('29-02-2024');
+        });
     });
 });
 });
