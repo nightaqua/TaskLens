@@ -16,6 +16,34 @@ import { TaskManager } from '../services/TaskManager';
  * The available destination files come from `TaskManager.getScannedFiles()`,
  * so only files already known to the plugin are offered.
  */
+/**
+ * Resolves the active MarkdownView.
+ * First tries to get the active view, and if that fails,
+ * finds the first visible Markdown leaf.
+ */
+export function resolveActiveMarkdownView(app: App): MarkdownView | null {
+    // 1. First, try the standard active view (works for Ribbon clicks)
+    let view = app.workspace.getActiveViewOfType(MarkdownView);
+
+    // 2. If null (Dashboard button click), find the first visible Markdown leaf
+    if (!view) {
+        const markdownLeaves = app.workspace.getLeavesOfType('markdown');
+
+        const visibleMarkdownLeaf = markdownLeaves.find(leaf =>
+            leaf.view instanceof MarkdownView && (leaf.view.containerEl.isShown())
+        );
+
+        if (visibleMarkdownLeaf) {
+            view = visibleMarkdownLeaf.view as MarkdownView;
+        } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof MarkdownView) {
+            // Fallback to the first Markdown leaf found if none are explicitly 'shown'
+            view = markdownLeaves[0].view;
+        }
+    }
+
+    return view;
+}
+
 export class QuickAddModal extends Modal {
     /** Raw text entered by the user for the task title. */
     private title: string = '';
@@ -44,26 +72,7 @@ export class QuickAddModal extends Modal {
     constructor(app: App, private readonly taskManager: TaskManager) {
         super(app);
 
-        // 1. First, try the standard active view (works for Ribbon clicks)
-        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-        // 2. If null (Dashboard button click), find the first visible Markdown leaf
-        if (!view) {
-            const markdownLeaves = this.app.workspace.getLeavesOfType('markdown');
-
-            const visibleMarkdownLeaf = markdownLeaves.find(leaf =>
-                leaf.view instanceof MarkdownView && (leaf.view.containerEl.isShown())
-            );
-
-            if (visibleMarkdownLeaf) {
-                view = visibleMarkdownLeaf.view as MarkdownView;
-            } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof MarkdownView) {
-                // Fallback to the first Markdown leaf found if none are explicitly 'shown'
-                view = markdownLeaves[0].view;
-            }
-        }
-
-        this.activeViewAtOpen = view;
+        this.activeViewAtOpen = resolveActiveMarkdownView(this.app);
     }
 
     // -------------------------------------------------------------------------
