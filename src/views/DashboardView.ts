@@ -275,9 +275,12 @@ export class DashboardView extends ItemView implements RefreshableView {
         const statusSelect = statusGroup.createEl('select');
 
         const statusOptions = [
-            { value: TaskStatus.Open, label: 'Active' },
-            { value: TaskStatus.All, label: 'All tasks' },
+            { value: TaskStatus.Open, label: 'Active (All)' },
+            { value: TaskStatus.UpcomingWeek, label: 'Upcoming' },
+            { value: TaskStatus.Urgent, label: 'Urgent' },
+            { value: TaskStatus.Overdue, label: 'Overdue' },
             { value: TaskStatus.Completed, label: 'Completed' },
+            { value: TaskStatus.All, label: 'All tasks' },
         ];
         statusOptions.forEach(opt => {
             const option = statusSelect.createEl('option', { value: opt.value, text: opt.label });

@@ -312,6 +312,9 @@ var TaskManager = class extends import_obsidian.Events {
       } else {
         newBody = `${newBody} [due:: ${dateStr}]`;
       }
+    } else if (newDate === null) {
+      const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
+      newBody = newBody.replace(dueRegex, "").replace(/\s+/g, " ").trim();
     }
     lines[task.lineNumber] = `${prefix}${newBody}`;
     await this.app.vault.modify(file, lines.join("\n"));
@@ -1587,6 +1590,7 @@ var _TimelineComponent = class _TimelineComponent {
   /** Removes DOM nodes owned by this component that live outside its container. */
   destroy() {
     var _a;
+    this.hideTooltip();
     (_a = this.tooltipEl) == null ? void 0 : _a.remove();
     this.tooltipEl = null;
     if (this.ribbonOutsideHandler) {
@@ -1675,6 +1679,7 @@ var BoardComponent = class {
       let status = getTaskStatus(group.representative);
       if (status === "no_date" /* NoDate */) status = "upcoming_week" /* UpcomingWeek */;
       const col = this.columns[status];
+      if (!col) return;
       this.renderTaskCard(col, group);
     });
   }
@@ -1909,23 +1914,23 @@ var HeaderComponent = class {
 };
 
 // src/modals/QuickAddModal.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 function resolveActiveMarkdownView(app) {
-  let view = app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
+  let view = app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
   if (!view) {
     const markdownLeaves = app.workspace.getLeavesOfType("markdown");
     const visibleMarkdownLeaf = markdownLeaves.find(
-      (leaf) => leaf.view instanceof import_obsidian8.MarkdownView && leaf.view.containerEl.isShown()
+      (leaf) => leaf.view instanceof import_obsidian9.MarkdownView && leaf.view.containerEl.isShown()
     );
     if (visibleMarkdownLeaf) {
       view = visibleMarkdownLeaf.view;
-    } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian8.MarkdownView) {
+    } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian9.MarkdownView) {
       view = markdownLeaves[0].view;
     }
   }
   return view;
 }
-var QuickAddModal = class extends import_obsidian8.Modal {
+var QuickAddModal = class extends import_obsidian9.Modal {
   constructor(app, taskManager) {
     super(app);
     this.taskManager = taskManager;
@@ -2000,12 +2005,12 @@ var QuickAddModal = class extends import_obsidian8.Modal {
           } else {
             const fallbackFile = this.taskManager.getScannedFiles()[0];
             if (fallbackFile) {
-              const dateObj = this.date ? new Date(this.date) : null;
+              const dateObj = this.date ? /* @__PURE__ */ new Date(`${this.date}T00:00:00`) : null;
               await this.taskManager.addTask(this.title, dateObj, fallbackFile);
             }
           }
         } else {
-          const dateObj = this.date ? new Date(this.date) : null;
+          const dateObj = this.date ? /* @__PURE__ */ new Date(`${this.date}T00:00:00`) : null;
           await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
         }
         this.close();
@@ -2232,9 +2237,12 @@ var DashboardView = class extends import_obsidian10.ItemView {
     statusGroup.createEl("label", { text: "Show:" });
     const statusSelect = statusGroup.createEl("select");
     const statusOptions = [
-      { value: "open" /* Open */, label: "Active" },
-      { value: "all" /* All */, label: "All tasks" },
-      { value: "completed" /* Completed */, label: "Completed" }
+      { value: "open" /* Open */, label: "Active (All)" },
+      { value: "upcoming_week" /* UpcomingWeek */, label: "Upcoming" },
+      { value: "urgent" /* Urgent */, label: "Urgent" },
+      { value: "overdue" /* Overdue */, label: "Overdue" },
+      { value: "completed" /* Completed */, label: "Completed" },
+      { value: "all" /* All */, label: "All tasks" }
     ];
     statusOptions.forEach((opt) => {
       const option = statusSelect.createEl("option", { value: opt.value, text: opt.label });
@@ -2793,9 +2801,7 @@ var StatsView = class extends import_obsidian13.ItemView {
   }
   onClose() {
     this.plugin.taskManager.off("tasks-updated", this.onTasksUpdated);
-    const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
-    const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
-    cleanUpViewDOM(root, tabs);
+    cleanUpViewDOM(this.leafRootEl, this.tabContainer);
     return Promise.resolve();
   }
   render() {

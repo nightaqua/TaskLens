@@ -222,23 +222,38 @@ describe('TaskManager.processManualUpdate', () => {
 
 });
 
-describe('TaskManager.processManualUpdate', () => {
-    it('resets isInternalChange to false if parser.getTasksFromFile throws', async () => {
-        const mockApp = {} as App;
-        const mockParser = {
-            getTasksFromFile: vi.fn().mockRejectedValue(new Error('Parser failed'))
-        } as unknown as TaskParser;
+describe('TaskManager.updateTask', () => {
+    it('strips due:: metadata explicitly when newDate is null', async () => {
+        const mockApp = {
+            vault: {
+                getAbstractFileByPath: vi.fn().mockImplementation((path) => {
+                    const file = Object.create(TFile.prototype);
+                    file.path = path;
+                    return file;
+                }),
+                read: vi.fn().mockResolvedValue('- [ ] Complete assignment [due:: 2026-03-15]'),
+                modify: vi.fn().mockResolvedValue(undefined)
+            }
+        } as unknown as App;
 
+        const mockParser = {} as TaskParser;
         const taskManager = new TaskManager(mockParser, mockApp);
-        const refreshSpy = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue();
+        
+        vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue(undefined);
 
-        const mockFile = Object.create(TFile.prototype);
-        mockFile.path = 'test.md';
+        const task = {
+            id: 'test.md:0',
+            title: 'Complete assignment',
+            completed: false,
+            filePath: 'test.md',
+            lineNumber: 0,
+            originalText: '- [ ] Complete assignment [due:: 2026-03-15]'
+        } as import('../src/models/Task').Task;
 
-        await expect(taskManager.processManualUpdate(mockFile)).rejects.toThrow('Parser failed');
+        await taskManager.updateTask(task, 'Complete assignment', null);
 
-        expect((taskManager as unknown as { isInternalChange: boolean }).isInternalChange).toBe(false);
-        expect(refreshSpy).not.toHaveBeenCalled();
+        const modifyCalls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+        expect(modifyCalls.length).toBe(1);
+        expect(modifyCalls[0][1]).toBe('- [ ] Complete assignment');
     });
 });
-

@@ -69,7 +69,8 @@ export class BoardComponent {
 
         // Add tasks to columns
         groups.forEach(group => {
-            const status = getTaskStatus(group.representative);
+            let status = getTaskStatus(group.representative);
+            if (status === TaskStatus.NoDate) status = TaskStatus.UpcomingWeek; // fallback NoDate to Active for display
 
             const col = this.columns[status];
             if (!col) return; // status has no column (e.g. open filter passes Completed tasks through)
