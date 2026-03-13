@@ -8,4 +8,6 @@ export class TFile {
 
 export type CachedMetadata = Record<string, unknown>;
 
-export class Events {}
+export class Events {
+    public mockEventsProp = true;
+}
