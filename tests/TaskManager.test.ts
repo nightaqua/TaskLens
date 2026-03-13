@@ -3,13 +3,36 @@ import { TaskManager } from '../src/services/TaskManager';
 import { TaskParser } from '../src/services/TaskParser';
 import { App } from 'obsidian';
 
-describe('TaskManager.calculateNextDueDate', () => {
+describe('TaskManager', () => {
     // We can just cast empty objects since calculateNextDueDate doesn't use 'this'
     const mockApp = {} as App;
     const mockParser = {} as TaskParser;
     const taskManager = new TaskManager(mockParser, mockApp);
 
-    describe('Strict Recurrence (from dueDate)', () => {
+    describe('formatCompletionDate', () => {
+        it('formats a standard date correctly', () => {
+            const date = new Date('2024-05-15T14:30:00');
+            expect(taskManager.formatCompletionDate(date)).toBe('15-05-2024 14:30');
+        });
+
+        it('pads single-digit days, months, hours, and minutes with zeros', () => {
+            const date = new Date('2024-01-05T08:05:00');
+            expect(taskManager.formatCompletionDate(date)).toBe('05-01-2024 08:05');
+        });
+
+        it('formats midnight correctly', () => {
+            const date = new Date('2024-12-31T00:00:00');
+            expect(taskManager.formatCompletionDate(date)).toBe('31-12-2024 00:00');
+        });
+
+        it('formats just before midnight correctly', () => {
+            const date = new Date('2024-12-31T23:59:00');
+            expect(taskManager.formatCompletionDate(date)).toBe('31-12-2024 23:59');
+        });
+    });
+
+    describe('calculateNextDueDate', () => {
+        describe('Strict Recurrence (from dueDate)', () => {
         it('calculates daily recurrence correctly', () => {
             const dueDate = new Date('2026-03-10T00:00:00');
             const completionDate = new Date('2026-03-12T00:00:00');
