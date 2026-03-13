@@ -150,23 +150,3 @@ describe('TaskManager.processManualUpdate', () => {
         expect(refreshSpy).not.toHaveBeenCalled();
     });
 });
-
-describe('TaskManager.processManualUpdate', () => {
-    it('resets isInternalChange to false if parser.getTasksFromFile throws', async () => {
-        const mockApp = {} as App;
-        const mockParser = {
-            getTasksFromFile: vi.fn().mockRejectedValue(new Error('Parser failed'))
-        } as unknown as TaskParser;
-
-        const taskManager = new TaskManager(mockParser, mockApp);
-        const refreshSpy = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue();
-
-        const mockFile = Object.create(TFile.prototype);
-        mockFile.path = 'test.md';
-
-        await expect(taskManager.processManualUpdate(mockFile)).rejects.toThrow('Parser failed');
-
-        expect(taskManager.getIsInternalChange()).toBe(false);
-        expect(refreshSpy).not.toHaveBeenCalled();
-    });
-});
