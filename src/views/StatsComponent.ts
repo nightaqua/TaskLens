@@ -3,7 +3,7 @@ import { TaskManager } from '../services/TaskManager';
 export class StatsComponent {
     constructor(private readonly container: HTMLElement) {}
 
-    render(taskManager: TaskManager) {
+    render(taskManager: TaskManager): void {
         this.container.empty();
         const stats = taskManager.getStatistics();
 

@@ -21,9 +21,16 @@ export class TaskParser {
     private static readonly EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
     private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
 
+    // NOTE: All gi-flagged static regexes above (START_REGEX, DUE_REGEX, COMP_REGEX, REPEAT_REGEX)
+    // carry lastIndex state between calls because they are shared class-level objects.
+    // parseTaskMetadata() resets lastIndex to 0 before every exec() call to prevent
+    // a previous match position from skipping characters on the next parse.
+    // String.prototype.replace() resets lastIndex internally when called, so the
+    // title.replace(REGEX, '') calls after exec() are safe without an extra reset.
+
     constructor(
-        private app: App,
-        private settings: SemesterSettings
+        private readonly app: App,
+        private readonly settings: SemesterSettings
     ) {}
 
     /**

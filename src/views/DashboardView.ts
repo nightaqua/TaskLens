@@ -184,17 +184,19 @@ export class DashboardView extends ItemView implements RefreshableView {
 
     onClose(): Promise<void> {
         this.taskManager.off('tasks-updated', this.onTasksUpdated);
+        this.timelineComponent?.destroy();
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
 
     public render(): void {
-        // Snapshot viewport state before wiping the DOM — covers direct render() calls
-        // (header toggle, controls toggle) that bypass the tasks-updated debounce handler.
+        // Snapshot viewport state before wiping the DOM
         if (this.timelineComponent && !this.forceScrollToToday) {
             this.lastViewportStart = this.timelineComponent.getViewportStart();
             this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
         }
+        // Clean up out-of-container DOM nodes before wiping contentEl
+        this.timelineComponent?.destroy();
 
         this.contentEl.empty();
 

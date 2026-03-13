@@ -10,14 +10,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Bug fixes
 
 - **Restored dynamic recurring urgency logic.** Recurring tasks no longer bypass chronological filters to become unconditionally 'Urgent' immediately upon parsing. Tasks natively slide from Upcoming -> Urgent -> Overdue based on their parsed distance from `dueDate`, regardless of sequence.
-- **Added missing `npm run test` CI gate.** The GitHub Actions workflow now correctly aborts PR test build passes immediately if any components report a `vitest` logic break.
-- **Resolved floating ribbon creation promise.** Resolved an unhandled async call in `main.ts` by escalating `this.saveSettings()` to natively resolve `await` operations correctly.
-- **Fixed memory leak inside `DashboardView.ts`.** Event hooks bound to `tasks-updated` on the singleton instance are now properly dereferenced during modal and component `onClose()`.
+- **Improved data integrity in `updateTask()`.** Modifying a task title via the UI now surgically replaces only the title text, preserving all other metadata like `start::`, `repeat::`, and completion stamps.
+- **Fixed memory leak inside `DashboardView.ts` and `TimelineView.ts`.** Event hooks bound to `tasks-updated` and timeline tooltips appended to the document body are now properly cleaned up on view closure.
+- **Added missing `vault.modify` listeners to all views.** `TimelineView`, `StatsView`, and `TaskListView` now update live when tasks are edited in the Markdown editor, even when the main dashboard is closed.
+- **Restored Obsidian view state persistence.** Fixed a bug where `StatsView` was dropping internal leaf state; Obsidian can now correctly remember active folder/file context for this view across restarts.
+- **Added missing `npm run test` CI gate.** The GitHub Actions workflow now correctly aborts builds if any `vitest` logic checks fail.
+- **Resolved floating ribbon creation promise.** Fixed an unhandled async call in `main.ts` for safer plugin initialization.
 
 ### Improvements & Optimization
 
+- **Optimized Timeline layout performance.** Built a precomputed date lookup map for the timeline render loop, reducing layout complexity from $O(N^2)$ to $O(N)$ for visible tasks.
+- **Hardened type safety and interface consistency.** Collapsed double-optional `Date | null` fields on the `Task` interface to standard `?: Date` and enforced `private readonly` on all service class dependencies.
+- **Cleaned up View vs CSS class naming.** Decoupled the `CLASS_DASHBOARD_VIEW` CSS constant from the Obsidian view identifier to prevent latent collision bugs.
 - **Removed `TaskSortBy` definitions.** Stripped dead code algorithms targeting obsolete sorting states to lean down memory footprints.
-- **Eliminated repetitive regex allocations inside `TaskParser.ts`.** Dynamically defined parser configurations have been strictly refactored up to top-level `private static readonly` properties to halt constant JS garbage-collection thrashing.
+- **Eliminated repetitive regex allocations.** Parser regexes have been moved to static class properties, significantly reducing garbage collection pressure during vault scans.
 
 ---
 

@@ -35,7 +35,6 @@ var import_obsidian = require("obsidian");
 // src/models/Task.ts
 function getTaskStatus(task) {
   if (task.completed) return "completed" /* Completed */;
-  if (task.recurrence) return "urgent" /* Urgent */;
   if (task.dueDate) {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -75,7 +74,6 @@ var TaskManager = class extends import_obsidian.Events {
     this.isInternalChange = false;
     this.currentStatusFilter = "open" /* Open */;
     this.currentCourseFilter = null;
-    this.currentSortBy = "due-date" /* DueDate */;
   }
   async loadTasks() {
     this.tasks = await this.parser.findAllTasks();
@@ -258,25 +256,35 @@ var TaskManager = class extends import_obsidian.Events {
    */
   async updateTask(task, newTitle, newDate) {
     const file = this.app.vault.getAbstractFileByPath(task.filePath);
-    if (file instanceof import_obsidian.TFile) {
-      const content = await this.app.vault.read(file);
-      const lines = content.split("\n");
-      if (lines[task.lineNumber]) {
-        const originalLine = lines[task.lineNumber];
-        const match = originalLine.match(/^(\s*-\s\[.]\s)(.*)$/);
-        if (match) {
-          const prefix = match[1];
-          let newLine = `${prefix}${newTitle}`;
-          if (newDate) {
-            const dateStr = this.formatDate(newDate);
-            newLine += ` [due:: ${dateStr}]`;
-          }
-          lines[task.lineNumber] = newLine;
-          await this.app.vault.modify(file, lines.join("\n"));
-          await this.refreshFileTask(task.filePath);
-        }
+    if (!(file instanceof import_obsidian.TFile)) return;
+    const content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    if (!lines[task.lineNumber]) return;
+    const originalLine = lines[task.lineNumber];
+    const match = originalLine.match(/^(\s*[-*]\s\[.\]\s)(.*)$/);
+    if (!match) return;
+    const prefix = match[1];
+    const body = match[2];
+    const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*/gi;
+    const titleOnly = body.replace(metaPattern, "").replace(/\s+/g, " ").trim();
+    let newBody;
+    if (titleOnly.length > 0) {
+      newBody = body.replace(titleOnly, newTitle);
+    } else {
+      newBody = newTitle;
+    }
+    if (newDate) {
+      const dateStr = this.formatDate(newDate);
+      const dueRegex = /(\[?\(?due::\s*)(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})([\])]?)/i;
+      if (dueRegex.test(newBody)) {
+        newBody = newBody.replace(dueRegex, `$1${dateStr}$3`);
+      } else {
+        newBody = `${newBody} [due:: ${dateStr}]`;
       }
     }
+    lines[task.lineNumber] = `${prefix}${newBody}`;
+    await this.app.vault.modify(file, lines.join("\n"));
+    await this.refreshFileTask(task.filePath);
   }
   async refreshFileTask(filePath) {
     const fileTasks = await this.parser.getTasksFromFile(filePath);
@@ -375,17 +383,10 @@ var TaskManager = class extends import_obsidian.Events {
     this.applyFiltersAndSort();
     this.trigger("tasks-updated");
   }
-  // UNUSED for now
-  // setSortBy(sortBy: TaskSortBy) {
-  //        this.currentSortBy = sortBy;
-  //        this.applyFiltersAndSort();
-  //        this.trigger('tasks-updated');
-  //    }
   getCurrentFilters() {
     return {
       status: this.currentStatusFilter,
-      course: this.currentCourseFilter,
-      sortBy: this.currentSortBy
+      course: this.currentCourseFilter
     };
   }
   async addTask(title, date, filePath, recurrence) {
@@ -509,7 +510,13 @@ var TaskManager = class extends import_obsidian.Events {
 
 // src/services/TaskParser.ts
 var import_obsidian2 = require("obsidian");
-var TaskParser = class {
+var _TaskParser = class _TaskParser {
+  // NOTE: All gi-flagged static regexes above (START_REGEX, DUE_REGEX, COMP_REGEX, REPEAT_REGEX)
+  // carry lastIndex state between calls because they are shared class-level objects.
+  // parseTaskMetadata() resets lastIndex to 0 before every exec() call to prevent
+  // a previous match position from skipping characters on the next parse.
+  // String.prototype.replace() resets lastIndex internally when called, so the
+  // title.replace(REGEX, '') calls after exec() are safe without an extra reset.
   constructor(app, settings) {
     this.app = app;
     this.settings = settings;
@@ -617,49 +624,64 @@ var TaskParser = class {
       const iso = dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : raw;
       return /* @__PURE__ */ new Date(`${iso}T00:00:00`);
     };
-    const DATE_PAT = "(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})";
-    const startRegex = new RegExp(`\\[?\\(?start::\\s*${DATE_PAT}[\\])]?`, "gi");
-    const startMatch = startRegex.exec(taskText);
+    _TaskParser.START_REGEX.lastIndex = 0;
+    const startMatch = _TaskParser.START_REGEX.exec(taskText);
     if (startMatch) {
       startDate = parseDate(startMatch[1]);
-      title = title.replace(startRegex, "");
+      title = title.replace(_TaskParser.START_REGEX, "");
     }
-    const dueRegex = new RegExp(`\\[?\\(?due::\\s*${DATE_PAT}[\\])]?`, "gi");
-    const dueMatch = dueRegex.exec(taskText);
+    _TaskParser.DUE_REGEX.lastIndex = 0;
+    const dueMatch = _TaskParser.DUE_REGEX.exec(taskText);
     if (dueMatch) {
       dueDate = parseDate(dueMatch[1]);
-      title = title.replace(dueRegex, "");
+      title = title.replace(_TaskParser.DUE_REGEX, "");
     }
-    const compRegex = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, "gi");
-    const compMatch = compRegex.exec(taskText);
+    _TaskParser.COMP_REGEX.lastIndex = 0;
+    const compMatch = _TaskParser.COMP_REGEX.exec(taskText);
     if (compMatch) {
       completionDate = parseDate(compMatch[1]);
-      title = title.replace(compRegex, "");
+      title = title.replace(_TaskParser.COMP_REGEX, "");
     }
-    const repeatRegex = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
-    const repeatMatch = repeatRegex.exec(taskText);
+    _TaskParser.REPEAT_REGEX.lastIndex = 0;
+    const repeatMatch = _TaskParser.REPEAT_REGEX.exec(taskText);
     if (repeatMatch) {
       recurrence = repeatMatch[1].trim().toLowerCase();
-      title = title.replace(repeatRegex, "");
+      title = title.replace(_TaskParser.REPEAT_REGEX, "");
     }
     if (!recurrence) {
-      const emojiRecurMatch = taskText.match(/[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u);
+      const emojiRecurMatch = taskText.match(_TaskParser.EMOJI_RECUR_MATCH_REGEX);
       if (emojiRecurMatch) {
         recurrence = emojiRecurMatch[1].trim().toLowerCase();
-        title = title.replace(/[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u, "").trim();
+        title = title.replace(_TaskParser.EMOJI_RECUR_REPLACE_REGEX, "").trim();
       }
     }
     if (!dueDate) {
-      const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u);
+      const emojiMatch = taskText.match(_TaskParser.EMOJI_DATE_MATCH_REGEX);
       if (emojiMatch) {
         dueDate = parseDate(emojiMatch[1]);
-        title = title.replace(/\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu, "");
+        title = title.replace(_TaskParser.EMOJI_DATE_REPLACE_REGEX, "");
       }
     }
     title = title.replace(/\s+/g, " ").trim();
     return { title, startDate, dueDate, completionDate, recurrence };
   }
 };
+// Matches both yyyy-mm-dd and dd-mm-yyyy after the key
+_TaskParser.DATE_PAT = "(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})";
+// 1. START DATE
+_TaskParser.START_REGEX = new RegExp(`\\[?\\(?start::\\s*${_TaskParser.DATE_PAT}[\\])]?`, "gi");
+// 2. DUE DATE
+_TaskParser.DUE_REGEX = new RegExp(`\\[?\\(?due::\\s*${_TaskParser.DATE_PAT}[\\])]?`, "gi");
+// 3. COMPLETION DATE (also supports HH:mm suffix)
+_TaskParser.COMP_REGEX = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, "gi");
+// 4. RECURRENCE — TaskLens format: [repeat:: weekly]
+_TaskParser.REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
+// Fallback emoji regexes
+_TaskParser.EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u;
+_TaskParser.EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u;
+_TaskParser.EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
+_TaskParser.EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
+var TaskParser = _TaskParser;
 
 // src/settings/Settings.ts
 var DEFAULT_SETTINGS = {
@@ -717,7 +739,7 @@ var ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill
 </svg>`;
 var CLASS_HIDE_TABS = "tasklens-hide-tabs";
 var CLASS_CHROMELESS = "tasklens-chromeless";
-var CLASS_DASHBOARD_VIEW = "tasklens-dashboard-view";
+var CLASS_DASHBOARD_VIEW = "tasklens-dashboard-content";
 var CLASS_SETTINGS = "tasklens-settings";
 var CLASS_WELCOME_MODAL = "tasklens-welcome-modal";
 var CLASS_FEATURE_HIGHLIGHT = "feature-highlight";
@@ -1298,16 +1320,20 @@ var _TimelineComponent = class _TimelineComponent {
       const startMs = new Date(startDate).setHours(0, 0, 0, 0);
       return dueMs >= windowStartMs && startMs <= windowEndMs;
     });
+    const dayIndexMap = /* @__PURE__ */ new Map();
+    for (let i = 0; i < allDays.length; i++) {
+      dayIndexMap.set(allDays[i].toDateString(), i);
+    }
     visibleGroups.forEach((group) => {
-      var _a;
+      var _a, _b, _c;
       const task = group.representative;
       if (!task.dueDate) return;
       const taskStart = new Date((_a = task.startDate) != null ? _a : task.dueDate);
       const taskEnd = new Date(task.dueDate);
       taskStart.setHours(0, 0, 0, 0);
       taskEnd.setHours(0, 0, 0, 0);
-      let startIdx = allDays.findIndex((d) => d.toDateString() === taskStart.toDateString());
-      let dueIdx = allDays.findIndex((d) => d.toDateString() === taskEnd.toDateString());
+      let startIdx = (_b = dayIndexMap.get(taskStart.toDateString())) != null ? _b : -1;
+      let dueIdx = (_c = dayIndexMap.get(taskEnd.toDateString())) != null ? _c : -1;
       if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
       if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
       if (startIdx === -1 || dueIdx === -1 || startIdx === 0 && dueIdx === 0 && taskEnd < allDays[0]) return;
@@ -1452,6 +1478,16 @@ var _TimelineComponent = class _TimelineComponent {
   hideTooltip() {
     var _a;
     (_a = this.tooltipEl) == null ? void 0 : _a.setCssProps({ display: "none" });
+  }
+  /** Removes DOM nodes owned by this component that live outside its container. */
+  destroy() {
+    var _a;
+    (_a = this.tooltipEl) == null ? void 0 : _a.remove();
+    this.tooltipEl = null;
+    if (this.ribbonOutsideHandler) {
+      document.removeEventListener("mousedown", this.ribbonOutsideHandler);
+      this.ribbonOutsideHandler = null;
+    }
   }
 };
 // The viewport always renders exactly MAX_DAYS columns — the DOM size stays constant
@@ -1743,8 +1779,7 @@ var DashboardView = class extends import_obsidian9.ItemView {
     this.lastTimelineScroll = null;
     this.lastViewportStart = null;
     this.forceScrollToToday = false;
-    this.taskManager = this.plugin.taskManager;
-    this.taskManager.on("tasks-updated", () => {
+    this.onTasksUpdated = () => {
       if (this.renderTimer) clearTimeout(this.renderTimer);
       this.renderTimer = setTimeout(() => {
         if (this.timelineComponent && !this.forceScrollToToday) {
@@ -1761,7 +1796,9 @@ var DashboardView = class extends import_obsidian9.ItemView {
           }
         }
       }, 500);
-    });
+    };
+    this.taskManager = this.plugin.taskManager;
+    this.taskManager.on("tasks-updated", this.onTasksUpdated);
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
         if (file.path.endsWith(".md") && !this.taskManager.getIsInternalChange()) {
@@ -1839,14 +1876,19 @@ var DashboardView = class extends import_obsidian9.ItemView {
     return Promise.resolve();
   }
   onClose() {
+    var _a;
+    this.taskManager.off("tasks-updated", this.onTasksUpdated);
+    (_a = this.timelineComponent) == null ? void 0 : _a.destroy();
     cleanUpViewDOM(this.leafRootEl, this.tabContainer);
     return Promise.resolve();
   }
   render() {
+    var _a;
     if (this.timelineComponent && !this.forceScrollToToday) {
       this.lastViewportStart = this.timelineComponent.getViewportStart();
       this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
     }
+    (_a = this.timelineComponent) == null ? void 0 : _a.destroy();
     this.contentEl.empty();
     this.headerComponent = new HeaderComponent(
       this.contentEl,
@@ -2157,10 +2199,19 @@ var TimelineView = class extends import_obsidian10.ItemView {
         }, 50);
       }
     });
+    this.registerEvent(
+      this.app.vault.on("modify", (file) => {
+        if (file.path.endsWith(".md") && !this.plugin.taskManager.getIsInternalChange()) {
+          void this.plugin.taskManager.refreshFileTask(file.path);
+        }
+      })
+    );
     return Promise.resolve();
   }
   onClose() {
+    var _a;
     this.plugin.taskManager.off("tasks-updated", this.onTasksUpdated);
+    (_a = this.timelineComponent) == null ? void 0 : _a.destroy();
     this.performCleanup();
     return Promise.resolve();
   }
@@ -2168,8 +2219,9 @@ var TimelineView = class extends import_obsidian10.ItemView {
     cleanUpViewDOM(this.leafRootEl, this.tabContainer);
   }
   render() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     this.savedScrollLeft = (_b = (_a = this.timelineComponent) == null ? void 0 : _a.getScrollPosition()) != null ? _b : this.savedScrollLeft;
+    (_c = this.timelineComponent) == null ? void 0 : _c.destroy();
     this.contentEl.empty();
     this.headerComponent = new HeaderComponent(
       this.contentEl,
@@ -2194,7 +2246,7 @@ var TimelineView = class extends import_obsidian10.ItemView {
       this.plugin.taskManager.getAllGroupedTasks(),
       this.timelineDaysToShow,
       this.plugin.settings,
-      (_c = this.viewportStart) != null ? _c : void 0,
+      (_d = this.viewportStart) != null ? _d : void 0,
       // When the user jumps the viewport, persist it immediately so layout saves reflect it
       (newStart) => {
         this.viewportStart = newStart;
@@ -2241,9 +2293,11 @@ var TaskListView = class extends import_obsidian11.ItemView {
     return "list-todo";
   }
   async setState(state, result) {
-    const parsedState = state;
-    if (parsedState.headerState) {
-      this.headerState = parsedState.headerState;
+    if (state && typeof state === "object") {
+      const s = state;
+      if (Object.prototype.hasOwnProperty.call(s, "headerState")) {
+        this.headerState = s.headerState;
+      }
     }
     await super.setState(state, result);
     this.render();
@@ -2263,6 +2317,13 @@ var TaskListView = class extends import_obsidian11.ItemView {
     this.contentEl.addClass("is-single-view");
     this.isOpen = true;
     this.render();
+    this.registerEvent(
+      this.app.vault.on("modify", (file) => {
+        if (file.path.endsWith(".md") && !this.plugin.taskManager.getIsInternalChange()) {
+          void this.plugin.taskManager.refreshFileTask(file.path);
+        }
+      })
+    );
     return Promise.resolve();
   }
   onClose() {
@@ -2371,9 +2432,11 @@ var StatsView = class extends import_obsidian12.ItemView {
     return "bar-chart-3";
   }
   async setState(state, result) {
-    const parsedState = state;
-    if (parsedState.headerState) {
-      this.headerState = parsedState.headerState;
+    if (state && typeof state === "object") {
+      const s = state;
+      if (Object.prototype.hasOwnProperty.call(s, "headerState")) {
+        this.headerState = s.headerState;
+      }
     }
     await super.setState(state, result);
     this.render();
@@ -2382,7 +2445,7 @@ var StatsView = class extends import_obsidian12.ItemView {
     if (this.headerComponent) {
       this.headerState = this.headerComponent.getState();
     }
-    return { headerState: this.headerState };
+    return Object.assign(super.getState(), { headerState: this.headerState });
   }
   onOpen() {
     const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, true);
@@ -2391,6 +2454,13 @@ var StatsView = class extends import_obsidian12.ItemView {
     this.contentEl.empty();
     this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
     this.render();
+    this.registerEvent(
+      this.app.vault.on("modify", (file) => {
+        if (file.path.endsWith(".md") && !this.plugin.taskManager.getIsInternalChange()) {
+          void this.plugin.taskManager.refreshFileTask(file.path);
+        }
+      })
+    );
     return Promise.resolve();
   }
   onClose() {
@@ -2467,11 +2537,11 @@ var TaskLensPlugin = class extends import_obsidian13.Plugin {
     });
   }
   setupRibbonIcon() {
-    const ribbonIconEl = this.addRibbonIcon(ICON_NAME, "Tasklens", (evt) => {
+    const ribbonIconEl = this.addRibbonIcon(ICON_NAME, "Tasklens", async (evt) => {
       ribbonIconEl.removeClass(CLASS_FEATURE_HIGHLIGHT);
       if (!this.settings.hasClickedRibbonIcon) {
         this.settings.hasClickedRibbonIcon = true;
-        void this.saveSettings();
+        await this.saveSettings();
       }
       const menu = new import_obsidian13.Menu();
       menu.addItem(

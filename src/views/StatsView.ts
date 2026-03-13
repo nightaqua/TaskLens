@@ -11,9 +11,9 @@ export class StatsView extends ItemView {
     private tabContainer: Element | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
-    private onTasksUpdated = (): void => { this.render(); };
+    private readonly onTasksUpdated = (): void => { this.render(); };
 
-    constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
+    constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
         this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
     }
@@ -23,9 +23,11 @@ export class StatsView extends ItemView {
     getIcon(): string { return 'bar-chart-3'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
-        const parsedState = state as Record<string, unknown>;
-        if (parsedState.headerState) {
-            this.headerState = parsedState.headerState as HeaderState;
+        if (state && typeof state === 'object') {
+            const s = state as Record<string, unknown>;
+            if (Object.prototype.hasOwnProperty.call(s, 'headerState')) {
+                this.headerState = s.headerState as HeaderState;
+            }
         }
         await super.setState(state, result);
         this.render();
@@ -35,7 +37,7 @@ export class StatsView extends ItemView {
         if (this.headerComponent) {
             this.headerState = this.headerComponent.getState();
         }
-        return { headerState: this.headerState as unknown };
+        return Object.assign(super.getState(), { headerState: this.headerState });
     }
 
     onOpen(): Promise<void> {
@@ -46,6 +48,15 @@ export class StatsView extends ItemView {
         this.contentEl.empty();
         this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
         this.render();
+
+        // Keep stats live when the user edits tasks outside the dashboard
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
+                    void this.plugin.taskManager.refreshFileTask(file.path);
+                }
+            })
+        );
 
         return Promise.resolve();
     }

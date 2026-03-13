@@ -1,19 +1,38 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
+REM Change to project root (parent of the tests directory)
+cd /d "%~dp0\.."
+
 REM ========================================
 REM Resolve Node / npm (PATH or manual)
 REM ========================================
 set "NODE_PATH=node"
-set "NPM_PATH=npm"
+set "NPM_PATH="
 set "NODE_USING_MANUAL=0"
 
+REM Try to find node in PATH first
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo Node not found in PATH. Using manual Node.js location...
     set "NODE_PATH=C:\Program Files\nodejs\node.exe"
-    set "NPM_PATH=C:\Program Files\nodejs\npm.cmd"
     set "NODE_USING_MANUAL=1"
+)
+
+REM Resolve the FULL absolute path of npm.cmd so that %~dp0 inside npm.cmd
+REM always points to the nodejs install dir, not the caller's working directory.
+for /f "delims=" %%I in ('where npm.cmd 2^>nul') do (
+    if not defined NPM_PATH set "NPM_PATH=%%I"
+)
+if not defined NPM_PATH (
+    REM Last resort: fall back to the known install location
+    if exist "C:\Program Files\nodejs\npm.cmd" (
+        set "NPM_PATH=C:\Program Files\nodejs\npm.cmd"
+    )
+)
+if not defined NPM_PATH (
+    echo ERROR: npm not found!
+    goto :end_fail
 )
 
 REM If we're using manual node, make sure PATH includes node's folder

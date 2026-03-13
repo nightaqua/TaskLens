@@ -3,11 +3,11 @@ import TaskLensPlugin from '../main';
 import { CLASS_WELCOME_MODAL } from '../constants';
 
 export class WelcomeModal extends Modal {
-    constructor(app: App, private plugin: TaskLensPlugin) {
+    constructor(app: App, private readonly plugin: TaskLensPlugin) {
         super(app);
     }
 
-    onOpen() {
+    onOpen(): void {
         const { contentEl } = this;
         contentEl.empty();
         contentEl.addClass(CLASS_WELCOME_MODAL);
@@ -51,7 +51,7 @@ export class WelcomeModal extends Modal {
                 }));
     }
 
-    private createStep(container: HTMLElement, icon: string, title: string, desc: string) {
+    private createStep(container: HTMLElement, icon: string, title: string, desc: string): void {
         const row = container.createDiv('welcome-step');
         row.setCssProps({ display: 'flex', gap: '15px', 'margin-bottom': '15px', 'align-items': 'flex-start', padding: '10px', 'background-color': 'var(--background-secondary)', 'border-radius': '8px' });
 
@@ -66,7 +66,7 @@ export class WelcomeModal extends Modal {
         descEl.setCssProps({ 'font-size': '0.9em', 'line-height': '1.4' });
     }
 
-    onClose() {
+    onClose(): void {
         this.contentEl.empty();
     }
 }

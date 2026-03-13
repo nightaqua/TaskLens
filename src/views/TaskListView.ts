@@ -30,9 +30,11 @@ export class TaskListView extends ItemView {
     getIcon() { return 'list-todo'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
-        const parsedState = state as Record<string, unknown>;
-        if (parsedState.headerState) {
-            this.headerState = parsedState.headerState as HeaderState;
+        if (state && typeof state === 'object') {
+            const s = state as Record<string, unknown>;
+            if (Object.prototype.hasOwnProperty.call(s, 'headerState')) {
+                this.headerState = s.headerState as HeaderState;
+            }
         }
         await super.setState(state, result);
         this.render();
@@ -55,6 +57,15 @@ export class TaskListView extends ItemView {
         this.contentEl.addClass('is-single-view');
         this.isOpen = true;
         this.render();
+
+        // Keep the list live when the user edits tasks outside the dashboard
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
+                    void this.plugin.taskManager.refreshFileTask(file.path);
+                }
+            })
+        );
 
         return Promise.resolve();
     }

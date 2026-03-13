@@ -24,11 +24,11 @@ raw Markdown files.
 
 Shared helpers live as named exports in the file that owns them most naturally:
 
-| Helper | Home file |
-|---|---|
-| `setupViewDOM` / `cleanUpViewDOM` | `DashboardView.ts` |
-| `getTopicColor` | `Settings.ts` |
-| `openTaskInEditor` | `TaskListComponent.ts` |
+| Helper                            | Home file              |
+| --------------------------------- | ---------------------- |
+| `setupViewDOM` / `cleanUpViewDOM` | `DashboardView.ts`     |
+| `getTopicColor`                   | `Settings.ts`          |
+| `openTaskInEditor`                | `TaskListComponent.ts` |
 
 Do not create a `utils/` or `helpers/` directory.
 
@@ -57,7 +57,7 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
 - **No unnecessary conditionals.** Do not check existence when TypeScript
   already guarantees it.
 - **No bare numbers in template literals.** Wrap with `String()`:
-  `\`value: ${String(n)}\`` not `\`value: ${n}\``.
+  `\`value: ${String(n)}\``not`\`value: ${n}\``.
 - **No static-only classes.** Use exported module functions instead
   (`@typescript-eslint/no-extraneous-class`).
 - **British English** for internal method/variable names where relevant
@@ -70,7 +70,9 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
 - **No floating promises.** Every promise must be handled. Inside synchronous
   callbacks use `void`:
   ```ts
-  button.addEventListener('click', () => { void this.activateView(); });
+  button.addEventListener("click", () => {
+    void this.activateView();
+  });
   ```
 - **Lifecycle methods.** `onOpen()` and `onClose()` in `ItemView` must return
   `Promise<void>`. Return `Promise.resolve()` even when synchronous.
@@ -119,11 +121,11 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
 
 ## 7. Date Conventions
 
-| Purpose | Format |
-|---|---|
-| Storage (`due::`, `start::`, cloned lines) | `yyyy-mm-dd` |
-| Display (list chip, timeline tooltip) | `dd-mm-yyyy` |
-| Completion timestamps (written to file) | `dd-mm-yyyy HH:mm` |
+| Purpose                                    | Format             |
+| ------------------------------------------ | ------------------ |
+| Storage (`due::`, `start::`, cloned lines) | `yyyy-mm-dd`       |
+| Display (list chip, timeline tooltip)      | `dd-mm-yyyy`       |
+| Completion timestamps (written to file)    | `dd-mm-yyyy HH:mm` |
 
 - Always parse date strings with a `T00:00:00` suffix:
   `new Date('2026-03-10T00:00:00')` not `new Date('2026-03-10')`.
@@ -160,7 +162,7 @@ There is no mock environment for `app.vault`, `app.workspace`, or `ItemView`.
 ## 10. Commit Style
 
 Conventional commits: `fix:`, `feat:`, `refactor:`, `test:`, `chore:`.
-Keep the subject line under 72 characters. Body lines under 80 characters.
+Keep the subject line under 72 characters. Body lines under 100 characters.
 
 ---
 

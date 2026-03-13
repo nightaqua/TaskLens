@@ -26,11 +26,11 @@ export interface Task {
     /** Due date (optional) */
     dueDate?: Date;
 
-    /** NEW: The date and exact time the task was completed */
-    completionDate?: Date | null;
+    /** The date and exact time the task was completed */
+    completionDate?: Date;
 
-    /** NEW: The recurrence rule string (e.g., 'daily', '2w+') */
-    recurrence?: string | null;
+    /** The recurrence rule string (e.g., 'daily', '2w+') */
+    recurrence?: string;
 
     /** Original task text (for reference) */
     originalText: string;
@@ -87,11 +87,4 @@ export function getTaskStatus(task: Task): TaskStatus {
 
     return TaskStatus.NoDate;
 }
-
-// UNUSED for now: Commented out to satisfy the linter
-/*
-export function taskMatchesStatus(task: Task, status: TaskStatus): boolean {
-    if (status === TaskStatus.All) return true;
-    return getTaskStatus(task) === status;
-}
-*/
+

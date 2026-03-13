@@ -25,17 +25,17 @@ export async function openTaskInEditor(app: App, task: Task): Promise<void> {
 
 export class TaskListComponent {
     constructor(
-        private container: HTMLElement,
-        private app: App,
-        private callbacks: {
+        private readonly container: HTMLElement,
+        private readonly app: App,
+        private readonly callbacks: {
             onToggle: (t: Task) => void,
             onEdit: (t: Task, newTitle: string, newDate: Date | null) => void,
             onDelete: (t: Task) => void
         },
-        private settings: SemesterSettings
+        private readonly settings: SemesterSettings
     ) {}
 
-    render(groups: TaskGroup[]) {
+    render(groups: TaskGroup[]): void {
         this.container.empty();
 
         if (groups.length === 0) {
@@ -51,7 +51,7 @@ export class TaskListComponent {
         });
     }
 
-    private renderTaskItem(container: HTMLElement, group: TaskGroup) {
+    private renderTaskItem(container: HTMLElement, group: TaskGroup): void {
         const task = group.representative;
         const taskEl = container.createDiv({ cls: ['task-item'] });
 

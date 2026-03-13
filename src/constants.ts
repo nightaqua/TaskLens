@@ -12,7 +12,7 @@ export const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24
 
 export const CLASS_HIDE_TABS = 'tasklens-hide-tabs';
 export const CLASS_CHROMELESS = 'tasklens-chromeless';
-export const CLASS_DASHBOARD_VIEW = 'tasklens-dashboard-view';
+export const CLASS_DASHBOARD_VIEW = 'tasklens-dashboard-content';
 export const CLASS_SETTINGS = 'tasklens-settings';
 export const CLASS_WELCOME_MODAL = 'tasklens-welcome-modal';
 export const CLASS_FEATURE_HIGHLIGHT = 'feature-highlight';

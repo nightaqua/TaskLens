@@ -255,38 +255,48 @@ export class TaskManager extends Events {
      */
     async updateTask(task: Task, newTitle: string, newDate: Date | null): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file instanceof TFile) {
-            const content = await this.app.vault.read(file);
-            const lines = content.split('\n');
+        if (!(file instanceof TFile)) return;
 
-            if (lines[task.lineNumber]) {
-                const originalLine = lines[task.lineNumber];
+        const content = await this.app.vault.read(file);
+        const lines = content.split('\n');
+        if (!lines[task.lineNumber]) return;
 
-                // Preserve indentation and checkbox status
-                // Regex: (Whitespace)(- [x]) (Rest)
-                const match = originalLine.match(/^(\s*-\s\[.]\s)(.*)$/);
+        const originalLine = lines[task.lineNumber];
+        const match = originalLine.match(/^(\s*[-*]\s\[.\]\s)(.*)$/);
+        if (!match) return;
 
-                if (match) {
-                    const prefix = match[1]; // "- [ ] "
+        const prefix = match[1];
+        const body = match[2];
 
-                    // Reconstruct the line
-                    let newLine = `${prefix}${newTitle}`;
-                    if (newDate) {
-                        const dateStr = this.formatDate(newDate);
-                        newLine += ` [due:: ${dateStr}]`;
-                    }
+        // Isolate the bare title by stripping all known metadata tokens from a copy
+        // of the body. We replace only the title portion in the original body so that
+        // start::, repeat::, completion:: and any other metadata survive untouched.
+        const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*/gi;
+        const titleOnly = body.replace(metaPattern, '').replace(/\s+/g, ' ').trim();
 
-                    // Keep other existing metadata if it was not touched?
-                    // For now, this replaces the end of the line.
-                    // To be safer, I need to parse the old line more carefully,
-                    // but this covers the [due::] format perfectly.
+        let newBody: string;
+        if (titleOnly.length > 0) {
+            // Replace just the title substring; leave everything else intact
+            newBody = body.replace(titleOnly, newTitle);
+        } else {
+            // Edge case: couldn't isolate a title — use new title as the full body
+            newBody = newTitle;
+        }
 
-                    lines[task.lineNumber] = newLine;
-                    await this.app.vault.modify(file, lines.join('\n'));
-                    await this.refreshFileTask(task.filePath);
-                }
+        // Update or append the due:: field
+        if (newDate) {
+            const dateStr = this.formatDate(newDate);
+            const dueRegex = /(\[?\(?due::\s*)(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})([\])]?)/i;
+            if (dueRegex.test(newBody)) {
+                newBody = newBody.replace(dueRegex, `$1${dateStr}$3`);
+            } else {
+                newBody = `${newBody} [due:: ${dateStr}]`;
             }
         }
+
+        lines[task.lineNumber] = `${prefix}${newBody}`;
+        await this.app.vault.modify(file, lines.join('\n'));
+        await this.refreshFileTask(task.filePath);
     }
     async refreshFileTask(filePath: string): Promise<void> {
         const fileTasks = await this.parser.getTasksFromFile(filePath);

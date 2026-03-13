@@ -41,7 +41,7 @@ export class QuickAddModal extends Modal {
      */
     private readonly activeViewAtOpen: MarkdownView | null;
 
-    constructor(app: App, private taskManager: TaskManager) {
+    constructor(app: App, private readonly taskManager: TaskManager) {
         super(app);
 
         // 1. First, try the standard active view (works for Ribbon clicks)

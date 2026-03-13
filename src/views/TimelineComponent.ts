@@ -376,6 +376,12 @@ export class TimelineComponent {
             return dueMs >= windowStartMs && startMs <= windowEndMs;
         });
 
+        // Precompute date string → column index for O(1) lookups instead of O(N) array scans
+        const dayIndexMap = new Map<string, number>();
+        for (let i = 0; i < allDays.length; i++) {
+            dayIndexMap.set(allDays[i].toDateString(), i);
+        }
+
         visibleGroups.forEach((group) => {
             const task = group.representative;
             if (!task.dueDate) return;
@@ -385,8 +391,8 @@ export class TimelineComponent {
             taskStart.setHours(0, 0, 0, 0);
             taskEnd.setHours(0, 0, 0, 0);
 
-            let startIdx = allDays.findIndex(d => d.toDateString() === taskStart.toDateString());
-            let dueIdx = allDays.findIndex(d => d.toDateString() === taskEnd.toDateString());
+            let startIdx = dayIndexMap.get(taskStart.toDateString()) ?? -1;
+            let dueIdx = dayIndexMap.get(taskEnd.toDateString()) ?? -1;
 
             // Clamp tasks that extend beyond the visible range
             if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
@@ -553,6 +559,16 @@ export class TimelineComponent {
 
     private hideTooltip(): void {
         this.tooltipEl?.setCssProps({ display: 'none' });
+    }
+
+    /** Removes DOM nodes owned by this component that live outside its container. */
+    public destroy(): void {
+        this.tooltipEl?.remove();
+        this.tooltipEl = null;
+        if (this.ribbonOutsideHandler) {
+            document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            this.ribbonOutsideHandler = null;
+        }
     }
 
 }

@@ -90,11 +90,21 @@ export class TimelineView extends ItemView implements RefreshableView {
             }
         });
 
+        // Keep the timeline live when the user edits tasks outside the dashboard
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
+                    void this.plugin.taskManager.refreshFileTask(file.path);
+                }
+            })
+        );
+
         return Promise.resolve();
     }
 
     onClose(): Promise<void> {
         this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
+        this.timelineComponent?.destroy();
         this.performCleanup();
         return Promise.resolve();
     }
@@ -104,9 +114,10 @@ export class TimelineView extends ItemView implements RefreshableView {
     }
 
     public render(): void {
-        // Preserve pan position across re-renders so collapsing the header / task refreshes
-        // don't snap the user back to the start of the chart
+        // Preserve pan position across re-renders
         this.savedScrollLeft = this.timelineComponent?.getScrollPosition() ?? this.savedScrollLeft;
+        // Clean up out-of-container DOM nodes before wiping contentEl
+        this.timelineComponent?.destroy();
 
         this.contentEl.empty();
 
