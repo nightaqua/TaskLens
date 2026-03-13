@@ -21,7 +21,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.4",
     "@eslint/json": "^1.1.0",
-    "@types/node": "^16.11.6",
+    "@types/node": "^25.5.0",
     "@typescript-eslint/parser": "^8.57.0",
     "builtin-modules": "^5.0.0",
     "esbuild": "^0.27.3",
