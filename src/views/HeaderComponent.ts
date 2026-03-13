@@ -81,6 +81,7 @@ export class HeaderComponent {
         if (this.onSettings) {
             const settingsBtn = leftGroup.createEl('button', { cls: 'header-icon-btn' });
             setIcon(settingsBtn, 'settings');
+            settingsBtn.setAttribute('aria-label', 'Settings');
             settingsBtn.addEventListener('click', () => { this.onSettings?.(); });
         }
 

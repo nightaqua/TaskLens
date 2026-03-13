@@ -314,10 +314,12 @@ export class DashboardView extends ItemView implements RefreshableView {
         ];
 
         toggles.forEach(({ label, getter, setter }) => {
+            const isActive = getter();
             const btn = actionsDiv.createEl('button', {
-                cls: `view-toggle-btn ${getter() ? 'is-active' : ''}`,
+                cls: `view-toggle-btn ${isActive ? 'is-active' : ''}`,
                 text: label,
             });
+            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             btn.addEventListener('click', () => {
                 setter(!getter());
                 this.app.workspace.requestSaveLayout();
@@ -388,12 +390,14 @@ export class DashboardView extends ItemView implements RefreshableView {
         zoomControls.createSpan({ text: 'Zoom: ' });
 
         const zoomOut = zoomControls.createEl('button', { text: '-', cls: 'view-toggle-btn' });
+        zoomOut.setAttribute('aria-label', 'Zoom out timeline');
         zoomOut.addEventListener('click', () => {
             this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
             this.render();
         });
         zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} days ` });
         const zoomIn = zoomControls.createEl('button', { text: '+', cls: 'view-toggle-btn' });
+        zoomIn.setAttribute('aria-label', 'Zoom in timeline');
         zoomIn.addEventListener('click', () => {
             this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);
             this.render();
@@ -402,8 +406,10 @@ export class DashboardView extends ItemView implements RefreshableView {
         // Manual scroll buttons — delegate to TimelineComponent.scroll()
         const navControls = controls.createDiv('nav-controls');
         const scrollLeft = navControls.createEl('button', { cls: 'view-toggle-btn' });
+        scrollLeft.setAttribute('aria-label', 'Scroll left');
         setIcon(scrollLeft, 'chevron-left');
         const scrollRight = navControls.createEl('button', { cls: 'view-toggle-btn' });
+        scrollRight.setAttribute('aria-label', 'Scroll right');
         setIcon(scrollRight, 'chevron-right');
 
         this.timelineComponent = new TimelineComponent(

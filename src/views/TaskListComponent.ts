@@ -68,6 +68,7 @@ export class TaskListComponent {
 
         const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
         checkbox.checked = task.completed;
+        checkbox.setAttribute('aria-label', `Toggle task: ${task.title}`);
         checkbox.addEventListener('change', () => { this.callbacks.onToggle(task); });
 
         const content = taskEl.createDiv('task-content');
