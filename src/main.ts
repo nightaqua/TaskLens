@@ -90,12 +90,12 @@ export default class TaskLensPlugin extends Plugin {
     }
 
     private setupRibbonIcon(): void {
-        const ribbonIconEl = this.addRibbonIcon(ICON_NAME, 'Tasklens', (evt: MouseEvent) => {
+        const ribbonIconEl = this.addRibbonIcon(ICON_NAME, 'Tasklens', async (evt: MouseEvent) => {
             ribbonIconEl.removeClass(CLASS_FEATURE_HIGHLIGHT);
 
             if (!this.settings.hasClickedRibbonIcon) {
                 this.settings.hasClickedRibbonIcon = true;
-                void this.saveSettings();
+                await this.saveSettings();
             }
 
             const menu = new Menu();

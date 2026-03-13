@@ -26,11 +26,6 @@ describe('getTaskStatus', () => {
         expect(getTaskStatus(mockTask)).toBe(TaskStatus.Completed);
     });
 
-    it('returns Urgent when task.recurrence is truthy and not completed', () => {
-        mockTask.recurrence = 'daily';
-        expect(getTaskStatus(mockTask)).toBe(TaskStatus.Urgent);
-    });
-
     describe('when task has a dueDate', () => {
         beforeEach(() => {
             // Set fixed system time for consistent testing

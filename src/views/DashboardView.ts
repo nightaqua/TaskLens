@@ -59,32 +59,34 @@ export class DashboardView extends ItemView implements RefreshableView {
     private lastViewportStart: Date | null = null;
     private forceScrollToToday: boolean = false;
 
+    private readonly onTasksUpdated = (): void => {
+        if (this.renderTimer) clearTimeout(this.renderTimer);
+
+        this.renderTimer = setTimeout(() => {
+            if (this.timelineComponent && !this.forceScrollToToday) {
+                this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
+                this.lastViewportStart = this.timelineComponent.getViewportStart();
+            }
+
+            this.render();
+
+            if (this.timelineComponent) {
+                if (this.forceScrollToToday) {
+                    this.timelineComponent.scrollToToday();
+                    this.forceScrollToToday = false;
+                } else if (this.lastTimelineScroll !== null) {
+                    this.timelineComponent.setScrollPosition(this.lastTimelineScroll);
+                }
+            }
+        }, 500);
+    };
+
     constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
         this.taskManager = this.plugin.taskManager;
 
         // Debounce renders triggered by task updates to avoid rapid successive redraws
-        this.taskManager.on('tasks-updated', () => {
-            if (this.renderTimer) clearTimeout(this.renderTimer);
-
-            this.renderTimer = setTimeout(() => {
-                if (this.timelineComponent && !this.forceScrollToToday) {
-                    this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
-                    this.lastViewportStart = this.timelineComponent.getViewportStart();
-                }
-
-                this.render();
-
-                if (this.timelineComponent) {
-                    if (this.forceScrollToToday) {
-                        this.timelineComponent.scrollToToday();
-                        this.forceScrollToToday = false;
-                    } else if (this.lastTimelineScroll !== null) {
-                        this.timelineComponent.setScrollPosition(this.lastTimelineScroll);
-                    }
-                }
-            }, 500);
-        });
+        this.taskManager.on('tasks-updated', this.onTasksUpdated);
 
         // Refresh tasks when a Markdown file is saved externally.
         // The isInternalChange guard prevents this from racing with processManualUpdate:
@@ -181,6 +183,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     }
 
     onClose(): Promise<void> {
+        this.taskManager.off('tasks-updated', this.onTasksUpdated);
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }

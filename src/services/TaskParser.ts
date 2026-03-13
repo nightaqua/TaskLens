@@ -3,6 +3,24 @@ import { Task } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
 
 export class TaskParser {
+    // Matches both yyyy-mm-dd and dd-mm-yyyy after the key
+    private static readonly DATE_PAT = '(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})';
+
+    // 1. START DATE
+    private static readonly START_REGEX = new RegExp(`\\[?\\(?start::\\s*${TaskParser.DATE_PAT}[\\])]?`, 'gi');
+    // 2. DUE DATE
+    private static readonly DUE_REGEX = new RegExp(`\\[?\\(?due::\\s*${TaskParser.DATE_PAT}[\\])]?`, 'gi');
+    // 3. COMPLETION DATE (also supports HH:mm suffix)
+    private static readonly COMP_REGEX = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, 'gi');
+    // 4. RECURRENCE — TaskLens format: [repeat:: weekly]
+    private static readonly REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
+
+    // Fallback emoji regexes
+    private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u;
+    private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u;
+    private static readonly EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
+    private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
+
     constructor(
         private app: App,
         private settings: SemesterSettings
@@ -134,58 +152,55 @@ export class TaskParser {
             return new Date(`${iso}T00:00:00`);
         };
 
-        // Matches both yyyy-mm-dd and dd-mm-yyyy after the key
-        const DATE_PAT = '(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})';
-
         // 1. START DATE
-        const startRegex = new RegExp(`\\[?\\(?start::\\s*${DATE_PAT}[\\])]?`, 'gi');
-        const startMatch = startRegex.exec(taskText);
+        TaskParser.START_REGEX.lastIndex = 0;
+        const startMatch = TaskParser.START_REGEX.exec(taskText);
         if (startMatch) {
             startDate = parseDate(startMatch[1]);
-            title = title.replace(startRegex, '');
+            title = title.replace(TaskParser.START_REGEX, '');
         }
 
         // 2. DUE DATE
-        const dueRegex = new RegExp(`\\[?\\(?due::\\s*${DATE_PAT}[\\])]?`, 'gi');
-        const dueMatch = dueRegex.exec(taskText);
+        TaskParser.DUE_REGEX.lastIndex = 0;
+        const dueMatch = TaskParser.DUE_REGEX.exec(taskText);
         if (dueMatch) {
             dueDate = parseDate(dueMatch[1]);
-            title = title.replace(dueRegex, '');
+            title = title.replace(TaskParser.DUE_REGEX, '');
         }
 
         // 3. COMPLETION DATE (also supports HH:mm suffix)
-        const compRegex = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, 'gi');
-        const compMatch = compRegex.exec(taskText);
+        TaskParser.COMP_REGEX.lastIndex = 0;
+        const compMatch = TaskParser.COMP_REGEX.exec(taskText);
         if (compMatch) {
             completionDate = parseDate(compMatch[1]);
-            title = title.replace(compRegex, '');
+            title = title.replace(TaskParser.COMP_REGEX, '');
         }
 
         // 4. RECURRENCE — TaskLens format: [repeat:: weekly]
-        const repeatRegex = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
-        const repeatMatch = repeatRegex.exec(taskText);
+        TaskParser.REPEAT_REGEX.lastIndex = 0;
+        const repeatMatch = TaskParser.REPEAT_REGEX.exec(taskText);
         if (repeatMatch) {
             recurrence = repeatMatch[1].trim().toLowerCase();
-            title = title.replace(repeatRegex, '');
+            title = title.replace(TaskParser.REPEAT_REGEX, '');
         }
 
         // Tasks-plugin emoji recurrence: 🔁 / 🔄 followed by a rule string.
         // Read-only — we recognise it so isRecurring is correct and the chip shows,
         // but we never write back in this format (TaskLens writes [repeat:: ...]).
         if (!recurrence) {
-            const emojiRecurMatch = taskText.match(/[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u);
+            const emojiRecurMatch = taskText.match(TaskParser.EMOJI_RECUR_MATCH_REGEX);
             if (emojiRecurMatch) {
                 recurrence = emojiRecurMatch[1].trim().toLowerCase();
-                title = title.replace(/[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u, '').trim();
+                title = title.replace(TaskParser.EMOJI_RECUR_REPLACE_REGEX, '').trim();
             }
         }
 
         // 5. Emoji fallback 📅 — accepts both date formats
         if (!dueDate) {
-            const emojiMatch = taskText.match(/\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u);
+            const emojiMatch = taskText.match(TaskParser.EMOJI_DATE_MATCH_REGEX);
             if (emojiMatch) {
                 dueDate = parseDate(emojiMatch[1]);
-                title = title.replace(/\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu, '');
+                title = title.replace(TaskParser.EMOJI_DATE_REPLACE_REGEX, '');
             }
         }
 

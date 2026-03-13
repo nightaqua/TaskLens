@@ -1,5 +1,5 @@
 import { TFile, Events, App } from 'obsidian';
-import { Task, TaskGroup, TaskStatus, TaskSortBy, getTaskStatus } from '../models/Task';
+import { Task, TaskGroup, TaskStatus, getTaskStatus } from '../models/Task';
 import { TaskParser } from './TaskParser';
 import { hasCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
 
@@ -10,7 +10,6 @@ export class TaskManager extends Events {
 
     private currentStatusFilter: TaskStatus = TaskStatus.Open;
     private currentCourseFilter: string | null = null;
-    private currentSortBy: TaskSortBy = TaskSortBy.DueDate;
 
     constructor(private readonly parser: TaskParser, private readonly app: App) {
         super();
@@ -402,18 +401,11 @@ export class TaskManager extends Events {
         this.trigger('tasks-updated');
     }
 
-// UNUSED for now
-// setSortBy(sortBy: TaskSortBy) {
-//        this.currentSortBy = sortBy;
-//        this.applyFiltersAndSort();
-//        this.trigger('tasks-updated');
-//    }
 
     getCurrentFilters() {
         return {
             status: this.currentStatusFilter,
-            course: this.currentCourseFilter,
-            sortBy: this.currentSortBy
+            course: this.currentCourseFilter
         };
     }
 

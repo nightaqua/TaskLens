@@ -64,21 +64,8 @@ export enum TaskStatus {
     Urgent = 'urgent'
 }
 
-/**
- * Sorting options for tasks
- */
-export enum TaskSortBy {
-    DueDate = 'due-date',
-    // StartDate = 'start-date', // UNUSED for now
-    // FileName = 'file-name',   // UNUSED for now
-    // Created = 'created'       // UNUSED for now
-}
-
 export function getTaskStatus(task: Task): TaskStatus {
     if (task.completed) return TaskStatus.Completed;
-
-    // v1.2: Recurring tasks gain immediate urgency
-    if (task.recurrence) return TaskStatus.Urgent;
 
     if (task.dueDate) {
         const today = new Date();

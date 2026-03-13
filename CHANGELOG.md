@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.2]
+
+### Bug fixes
+
+- **Restored dynamic recurring urgency logic.** Recurring tasks no longer bypass chronological filters to become unconditionally 'Urgent' immediately upon parsing. Tasks natively slide from Upcoming -> Urgent -> Overdue based on their parsed distance from `dueDate`, regardless of sequence.
+- **Added missing `npm run test` CI gate.** The GitHub Actions workflow now correctly aborts PR test build passes immediately if any components report a `vitest` logic break.
+- **Resolved floating ribbon creation promise.** Resolved an unhandled async call in `main.ts` by escalating `this.saveSettings()` to natively resolve `await` operations correctly.
+- **Fixed memory leak inside `DashboardView.ts`.** Event hooks bound to `tasks-updated` on the singleton instance are now properly dereferenced during modal and component `onClose()`.
+
+### Improvements & Optimization
+
+- **Removed `TaskSortBy` definitions.** Stripped dead code algorithms targeting obsolete sorting states to lean down memory footprints.
+- **Eliminated repetitive regex allocations inside `TaskParser.ts`.** Dynamically defined parser configurations have been strictly refactored up to top-level `private static readonly` properties to halt constant JS garbage-collection thrashing.
+
+---
+
 ## [1.2.1]
 
 ### Bug fixes
