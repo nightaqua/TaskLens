@@ -124,6 +124,7 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.dueDate).toEqual(getLocalMidnight('2023-01-01'));
     });
 
+
     it('should parse notes with notes::', () => {
         const result = parseTaskMetadata('Task with a note [notes:: This is an important note]');
         expect(result.title).toBe('Task with a note');
@@ -142,5 +143,119 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.dueDate).toEqual(getLocalMidnight('2024-12-01'));
         expect(result.notes).toBe('Requires review before submission');
         expect(result.recurrence).toBe('weekly');
+    });
+});
+
+describe('TaskParser.getFilesToScan', () => {
+    // Helper to create mock TFile objects
+    const createMockFile = (path: string, parentPath?: string) => {
+        return {
+            path,
+            parent: parentPath !== undefined ? { path: parentPath } : null,
+        } as unknown as import('obsidian').TFile;
+    };
+
+    const mockFiles = [
+        createMockFile('Projects/Todo.md', 'Projects'),
+        createMockFile('Projects/SubProject/Tasks.md', 'Projects/SubProject'),
+        createMockFile('RootFile.md', '/'),
+        createMockFile('OtherFolder/Notes.md', 'OtherFolder'),
+        createMockFile('ProjectsTodo.md', '/'), // Edge case for startsWith
+    ];
+
+    const createAppMock = (files: import('obsidian').TFile[]) => {
+        return {
+            vault: {
+                getMarkdownFiles: () => files,
+            },
+        } as unknown as App;
+    };
+
+    it('should return all files if scanFolders is empty', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: [] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(5);
+        expect(result).toEqual(mockFiles);
+    });
+
+    it('should return matched file directly when given exact file name', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: ['Projects/Todo.md'] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should return matched file directly when given file name without .md', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: ['Projects/Todo'] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should return files recursively matching a folder', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: true
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(2);
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('Projects/Todo.md');
+        expect(paths).toContain('Projects/SubProject/Tasks.md');
+    });
+
+    it('should not match files starting with folder name but not inside it when scanRecursively is true', () => {
+        // e.g., 'ProjectsTodo.md' should not be matched by 'Projects/'
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: true
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        const paths = result.map(f => f.path);
+        expect(paths).not.toContain('ProjectsTodo.md');
+    });
+
+    it('should return files exactly matching a folder when scanRecursively is false', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should match files in the root directory', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['/'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        // RootFile.md and ProjectsTodo.md are in root
+        expect(result).toHaveLength(2);
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('RootFile.md');
+        expect(paths).toContain('ProjectsTodo.md');
     });
 });

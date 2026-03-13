@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TaskManager } from '../src/services/TaskManager';
 import { TaskParser } from '../src/services/TaskParser';
-import { App } from 'obsidian';
+import { App, TFile } from 'obsidian';
 
 describe('TaskManager', () => {
     // We can just cast empty objects since calculateNextDueDate doesn't use 'this'
@@ -182,5 +182,40 @@ describe('TaskManager', () => {
             const date2 = new Date('2100-01-01T00:00:00');
             expect(TaskManager.formatDisplayDate(date2)).toBe('01-01-2100');
         });
+
+        it('ignores time components correctly', () => {
+            const date = new Date('2024-05-15T14:30:45');
+            expect(TaskManager.formatDisplayDate(date)).toBe('15-05-2024');
+        });
+
+        it('formats end of year correctly', () => {
+            const date = new Date('2024-12-31T23:59:59');
+            expect(TaskManager.formatDisplayDate(date)).toBe('31-12-2024');
+        });
+
+        it('formats leap year date correctly', () => {
+            const date = new Date('2024-02-29T12:00:00');
+            expect(TaskManager.formatDisplayDate(date)).toBe('29-02-2024');
+        });
+    });
+});
+
+describe('TaskManager.processManualUpdate', () => {
+    it('resets isInternalChange to false if parser.getTasksFromFile throws', async () => {
+        const mockApp = {} as App;
+        const mockParser = {
+            getTasksFromFile: vi.fn().mockRejectedValue(new Error('Parser failed'))
+        } as unknown as TaskParser;
+
+        const taskManager = new TaskManager(mockParser, mockApp);
+        const refreshSpy = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue();
+
+        const mockFile = Object.create(TFile.prototype);
+        mockFile.path = 'test.md';
+
+        await expect(taskManager.processManualUpdate(mockFile)).rejects.toThrow('Parser failed');
+
+        expect((taskManager as unknown as { isInternalChange: boolean }).isInternalChange).toBe(false);
+        expect(refreshSpy).not.toHaveBeenCalled();
     });
 });

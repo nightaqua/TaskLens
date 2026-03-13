@@ -12,6 +12,16 @@ export class SettingsTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    private async updateScanPaths(value: string): Promise<void> {
+        this.plugin.settings.scanFolders = value
+            .split('\n')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        await this.plugin.saveSettings();
+        await this.plugin.taskManager.loadTasks();
+    }
+
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
@@ -44,8 +54,7 @@ export class SettingsTab extends PluginSettingTab {
                 text.setPlaceholder('Projects\nUni/History\nTo-Do.md')
                     .setValue(this.plugin.settings.scanFolders.join('\n'))
                     .onChange((value) => {
-                        this.plugin.settings.scanFolders = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-                        void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                        void this.updateScanPaths(value);
                     });
             });
 
@@ -109,50 +118,12 @@ export class SettingsTab extends PluginSettingTab {
                     this.plugin.settings.colorMode = v as 'status' | 'course';
                     void this.plugin.saveSettings().then(() => {
                         this.plugin.refreshViews();
-                        renderColorPickers();
+                        this.renderColorPickers(colorPickersContainer);
                     });
                 }));
 
         const colorPickersContainer = uiDetails.createDiv();
-
-        const renderColorPickers = () => {
-            colorPickersContainer.empty();
-
-            if (this.plugin.settings.colorMode === 'status') {
-                new Setting(colorPickersContainer).setName('Overdue color').addColorPicker(c => c.setValue(this.plugin.settings.colors.overdue).onChange(v => { this.plugin.settings.colors.overdue = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
-                new Setting(colorPickersContainer).setName('Urgent color').addColorPicker(c => c.setValue(this.plugin.settings.colors.urgent).onChange(v => { this.plugin.settings.colors.urgent = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
-                new Setting(colorPickersContainer).setName('Active color').addColorPicker(c => c.setValue(this.plugin.settings.colors.active).onChange(v => { this.plugin.settings.colors.active = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
-                new Setting(colorPickersContainer).setName('Completed color').addColorPicker(c => c.setValue(this.plugin.settings.colors.completed).onChange(v => { this.plugin.settings.colors.completed = v; void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); }); }));
-            } else {
-                const helperText = colorPickersContainer.createEl('p', {
-                    text: 'Assign a custom color to each of your active topics.',
-                    cls: 'text-muted'
-                });
-                helperText.setCssProps({ 'margin-left': '14px', 'margin-bottom': '12px', 'font-size': '0.9em' });
-
-                const allTasks = this.plugin.taskManager.getAllTasks();
-                const uniqueTopics = Array.from(new Set(allTasks.map(t => t.fileName).filter((t): t is string => Boolean(t))));
-
-                if (uniqueTopics.length === 0) {
-                    const emptyText = colorPickersContainer.createEl('p', { text: 'No active topics found. Add some tasks first!' });
-                    emptyText.setCssProps({ 'margin-left': '14px', 'font-style': 'italic' });
-                    return;
-                }
-
-                uniqueTopics.forEach(topic => {
-                    const savedColor = getTopicColor(topic, this.plugin.settings);
-
-                    new Setting(colorPickersContainer)
-                        .setName(`${topic} color`)
-                        .addColorPicker(c => c.setValue(savedColor).onChange(v => {
-                            this.plugin.settings.topicColors[topic] = v;
-                            void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
-                        }));
-                });
-            }
-        };
-
-        renderColorPickers();
+        this.renderColorPickers(colorPickersContainer);
 
 // --- CLEAN DONATION BUTTON ---
         containerEl.createEl('br');
@@ -183,5 +154,69 @@ export class SettingsTab extends PluginSettingTab {
         bmcImg.setAttribute('src', 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png');
         bmcImg.setAttribute('width', '200');
         bmcImg.setAttribute('alt', 'Buy Me A Coffee');
+    }
+
+    private renderColorPickers(container: HTMLElement): void {
+        container.empty();
+
+        if (this.plugin.settings.colorMode === 'status') {
+            this.renderStatusColors(container);
+        } else {
+            this.renderTopicColors(container);
+        }
+    }
+
+    private renderStatusColors(container: HTMLElement): void {
+        const createColorSetting = (name: string, settingKey: keyof typeof this.plugin.settings.colors) => {
+            new Setting(container)
+                .setName(name)
+                .addColorPicker(c => c
+                    .setValue(this.plugin.settings.colors[settingKey])
+                    .onChange(v => {
+                        this.plugin.settings.colors[settingKey] = v;
+                        void this.plugin.saveSettings().then(() => {
+                            this.plugin.refreshViews();
+                        });
+                    })
+                );
+        };
+
+        createColorSetting('Overdue color', 'overdue');
+        createColorSetting('Urgent color', 'urgent');
+        createColorSetting('Active color', 'active');
+        createColorSetting('Completed color', 'completed');
+    }
+
+    private renderTopicColors(container: HTMLElement): void {
+        const helperText = container.createEl('p', {
+            text: 'Assign a custom color to each of your active topics.',
+            cls: 'text-muted'
+        });
+        helperText.setCssProps({ 'margin-left': '14px', 'margin-bottom': '12px', 'font-size': '0.9em' });
+
+        const allTasks = this.plugin.taskManager.getAllTasks();
+        const uniqueTopics = Array.from(new Set(allTasks.map(t => t.fileName).filter((t): t is string => Boolean(t))));
+
+        if (uniqueTopics.length === 0) {
+            const emptyText = container.createEl('p', { text: 'No active topics found. Add some tasks first!' });
+            emptyText.setCssProps({ 'margin-left': '14px', 'font-style': 'italic' });
+            return;
+        }
+
+        uniqueTopics.forEach(topic => {
+            const savedColor = getTopicColor(topic, this.plugin.settings);
+
+            new Setting(container)
+                .setName(`${topic} color`)
+                .addColorPicker(c => c
+                    .setValue(savedColor)
+                    .onChange(v => {
+                        this.plugin.settings.topicColors[topic] = v;
+                        void this.plugin.saveSettings().then(() => {
+                            this.plugin.refreshViews();
+                        });
+                    })
+                );
+        });
     }
 }
