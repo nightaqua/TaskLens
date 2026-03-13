@@ -1,4 +1,4 @@
-import { App, setIcon, Notice } from 'obsidian';
+import { App, setIcon } from 'obsidian';
 import { TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
 import { SemesterSettings, getTopicColor } from '../settings/Settings';
 import { TaskManager } from '../services/TaskManager';
@@ -93,18 +93,7 @@ export class BoardComponent {
         const targetColumn = (e.currentTarget as HTMLElement).closest('.board-column');
         if (targetColumn instanceof HTMLElement) {
             const newStatus = targetColumn.dataset.status as TaskStatus;
-            const task = this.draggedTaskGroup.representative;
-
-            if (newStatus === TaskStatus.Completed && !task.completed) {
-                // Mark as done
-                void this.taskManager.toggleTaskCompletion(task);
-            } else if (newStatus !== TaskStatus.Completed && task.completed) {
-                // Uncheck a completed task
-                void this.taskManager.toggleTaskCompletion(task);
-            } else if (newStatus !== TaskStatus.Completed) {
-                // Status is date-derived — cannot be changed by dragging
-                new Notice('Task status is based on its due date. Edit the date to reschedule.');
-            }
+            void this.taskManager.updateTaskStatus(this.draggedTaskGroup.representative, newStatus);
         }
 
         this.draggedTaskGroup = null;
