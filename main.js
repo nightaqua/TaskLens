@@ -74,6 +74,8 @@ var TaskManager = class extends import_obsidian.Events {
     this.isInternalChange = false;
     this.currentStatusFilter = "open" /* Open */;
     this.currentCourseFilter = null;
+    this.cachedStats = null;
+    this.lastTasksRef = null;
   }
   async loadTasks() {
     this.tasks = await this.parser.findAllTasks();
@@ -97,8 +99,9 @@ var TaskManager = class extends import_obsidian.Events {
     this.isInternalChange = true;
     try {
       const freshTasks = await this.parser.getTasksFromFile(file.path);
+      const cachedTasksMap = new Map(cachedTasks.map((t) => [t.lineNumber, t]));
       for (const fresh of freshTasks) {
-        const cached = cachedTasks.find((c) => c.lineNumber === fresh.lineNumber);
+        const cached = cachedTasksMap.get(fresh.lineNumber);
         if (cached && !cached.completed && fresh.completed) {
           await this.addCompletionMetadata(fresh);
           return;
@@ -293,7 +296,7 @@ var TaskManager = class extends import_obsidian.Events {
     if (!match) return;
     const prefix = match[1];
     const body = match[2];
-    const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*/gi;
+    const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*[\])]?/gi;
     const titleOnly = body.replace(metaPattern, "").replace(/\s+/g, " ").trim();
     let newBody;
     if (titleOnly.length > 0) {
@@ -384,8 +387,53 @@ var TaskManager = class extends import_obsidian.Events {
     return this.parser.getFilesToScan().map((file) => file.path);
   }
   getStatistics() {
+    if (this.lastTasksRef === this.tasks && this.cachedStats) {
+      return this.cachedStats;
+    }
+    this.cachedStats = this.calculateStatistics();
+    this.lastTasksRef = this.tasks;
+    return this.cachedStats;
+  }
+  calculateStatistics() {
+    var _a;
     const groups = this.groupTasks(this.tasks);
-    const todayStr = this.formatDate(/* @__PURE__ */ new Date());
+    const now = /* @__PURE__ */ new Date();
+    const todayStr = this.formatDate(now);
+    now.setHours(0, 0, 0, 0);
+    const velocity7Days = [0, 0, 0, 0, 0, 0, 0];
+    for (const task of this.tasks) {
+      if (task.completed && task.completionDate) {
+        const compDate = new Date(task.completionDate);
+        compDate.setHours(0, 0, 0, 0);
+        const diffTime = now.getTime() - compDate.getTime();
+        const diffDays = Math.round(diffTime / (1e3 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 7) {
+          velocity7Days[6 - diffDays]++;
+        }
+      }
+    }
+    const topicStats = /* @__PURE__ */ new Map();
+    for (const task of this.tasks) {
+      if (!task.completed) {
+        const stats = (_a = topicStats.get(task.fileName)) != null ? _a : { totalOpen: 0, urgent: 0 };
+        stats.totalOpen++;
+        if (getTaskStatus(task) === "urgent" /* Urgent */) {
+          stats.urgent++;
+        }
+        topicStats.set(task.fileName, stats);
+      }
+    }
+    let mostUrgentTopic = null;
+    let maxRatio = -1;
+    for (const [name, stats] of topicStats.entries()) {
+      if (stats.totalOpen > 0) {
+        const ratio = stats.urgent / stats.totalOpen;
+        if (ratio > maxRatio || ratio === maxRatio && mostUrgentTopic && stats.urgent > mostUrgentTopic.urgent) {
+          maxRatio = ratio;
+          mostUrgentTopic = { name, ratio, urgent: stats.urgent, total: stats.totalOpen };
+        }
+      }
+    }
     return {
       total: groups.length,
       completed: groups.filter((g) => g.representative.completed).length,
@@ -395,7 +443,9 @@ var TaskManager = class extends import_obsidian.Events {
       overdue: groups.filter((g) => getTaskStatus(g.representative) === "overdue" /* Overdue */).length,
       upcoming: groups.filter((g) => getTaskStatus(g.representative) === "upcoming_week" /* UpcomingWeek */).length,
       urgent: groups.filter((g) => getTaskStatus(g.representative) === "urgent" /* Urgent */).length,
-      courses: new Set(this.tasks.map((t) => t.fileName)).size
+      courses: new Set(this.tasks.map((t) => t.fileName)).size,
+      velocity7Days,
+      mostUrgentTopic
     };
   }
   getCourseNames() {
@@ -603,7 +653,7 @@ var _TaskParser = class _TaskParser {
       if (taskMatch) {
         const completed = taskMatch[2].toLowerCase() === "x";
         const taskText = taskMatch[3];
-        const { title, startDate, dueDate, completionDate, recurrence } = this.parseTaskMetadata(taskText);
+        const { title, startDate, dueDate, completionDate, recurrence, notes } = this.parseTaskMetadata(taskText);
         const task = {
           id: `${file.path}:${String(i)}`,
           title,
@@ -616,6 +666,8 @@ var _TaskParser = class _TaskParser {
           completionDate,
           // Added
           recurrence,
+          // Added
+          notes,
           // Added
           originalText: line
         };
@@ -647,6 +699,7 @@ var _TaskParser = class _TaskParser {
     let dueDate;
     let completionDate;
     let recurrence;
+    let notes;
     const parseDate = (raw) => {
       const dmy = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
       const iso = dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : raw;
@@ -676,6 +729,12 @@ var _TaskParser = class _TaskParser {
       recurrence = repeatMatch[1].trim().toLowerCase();
       title = title.replace(_TaskParser.REPEAT_REGEX, "");
     }
+    _TaskParser.NOTES_REGEX.lastIndex = 0;
+    const notesMatch = _TaskParser.NOTES_REGEX.exec(taskText);
+    if (notesMatch) {
+      notes = notesMatch[1].trim();
+      title = title.replace(_TaskParser.NOTES_REGEX, "");
+    }
     if (!recurrence) {
       const emojiRecurMatch = taskText.match(_TaskParser.EMOJI_RECUR_MATCH_REGEX);
       if (emojiRecurMatch) {
@@ -691,7 +750,7 @@ var _TaskParser = class _TaskParser {
       }
     }
     title = title.replace(/\s+/g, " ").trim();
-    return { title, startDate, dueDate, completionDate, recurrence };
+    return { title, startDate, dueDate, completionDate, recurrence, notes };
   }
 };
 // Matches both yyyy-mm-dd and dd-mm-yyyy after the key
@@ -704,6 +763,8 @@ _TaskParser.DUE_REGEX = new RegExp(`\\[?\\(?due::\\s*${_TaskParser.DATE_PAT}[\\]
 _TaskParser.COMP_REGEX = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, "gi");
 // 4. RECURRENCE — TaskLens format: [repeat:: weekly]
 _TaskParser.REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
+// 5. NOTES — TaskLens format: [notes:: ...]
+_TaskParser.NOTES_REGEX = /\[?\(?notes::\s*([^\])]+)[\])]?/gi;
 // Fallback emoji regexes
 _TaskParser.EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u;
 _TaskParser.EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u;
@@ -838,6 +899,11 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
+  async updateScanPaths(value) {
+    this.plugin.settings.scanFolders = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
+    await this.plugin.saveSettings();
+    await this.plugin.taskManager.loadTasks();
+  }
   display() {
     const { containerEl } = this;
     containerEl.empty();
@@ -856,10 +922,7 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     });
     const scanPathsSetting = new import_obsidian4.Setting(scanDetails).setName("Scan paths").setDesc("Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.").addTextArea((text) => {
       text.setPlaceholder("Projects\nUni/History\nTo-Do.md").setValue(this.plugin.settings.scanFolders.join("\n")).onChange((value) => {
-        this.plugin.settings.scanFolders = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
-        void this.plugin.saveSettings().then(() => {
-          void this.plugin.taskManager.loadTasks();
-        });
+        void this.updateScanPaths(value);
       });
     });
     scanPathsSetting.settingEl.addClass("scan-paths-setting");
@@ -903,62 +966,11 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
       this.plugin.settings.colorMode = v;
       void this.plugin.saveSettings().then(() => {
         this.plugin.refreshViews();
-        renderColorPickers();
+        this.renderColorPickers(colorPickersContainer);
       });
     }));
     const colorPickersContainer = uiDetails.createDiv();
-    const renderColorPickers = () => {
-      colorPickersContainer.empty();
-      if (this.plugin.settings.colorMode === "status") {
-        new import_obsidian4.Setting(colorPickersContainer).setName("Overdue color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.overdue).onChange((v) => {
-          this.plugin.settings.colors.overdue = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-        new import_obsidian4.Setting(colorPickersContainer).setName("Urgent color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.urgent).onChange((v) => {
-          this.plugin.settings.colors.urgent = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-        new import_obsidian4.Setting(colorPickersContainer).setName("Active color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.active).onChange((v) => {
-          this.plugin.settings.colors.active = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-        new import_obsidian4.Setting(colorPickersContainer).setName("Completed color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.completed).onChange((v) => {
-          this.plugin.settings.colors.completed = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-      } else {
-        const helperText = colorPickersContainer.createEl("p", {
-          text: "Assign a custom color to each of your active topics.",
-          cls: "text-muted"
-        });
-        helperText.setCssProps({ "margin-left": "14px", "margin-bottom": "12px", "font-size": "0.9em" });
-        const allTasks = this.plugin.taskManager.getAllTasks();
-        const uniqueTopics = Array.from(new Set(allTasks.map((t) => t.fileName).filter((t) => Boolean(t))));
-        if (uniqueTopics.length === 0) {
-          const emptyText = colorPickersContainer.createEl("p", { text: "No active topics found. Add some tasks first!" });
-          emptyText.setCssProps({ "margin-left": "14px", "font-style": "italic" });
-          return;
-        }
-        uniqueTopics.forEach((topic) => {
-          const savedColor = getTopicColor(topic, this.plugin.settings);
-          new import_obsidian4.Setting(colorPickersContainer).setName(`${topic} color`).addColorPicker((c) => c.setValue(savedColor).onChange((v) => {
-            this.plugin.settings.topicColors[topic] = v;
-            void this.plugin.saveSettings().then(() => {
-              this.plugin.refreshViews();
-            });
-          }));
-        });
-      }
-    };
-    renderColorPickers();
+    this.renderColorPickers(colorPickersContainer);
     containerEl.createEl("br");
     containerEl.createEl("hr");
     const supportDiv = containerEl.createDiv();
@@ -983,6 +995,55 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     bmcImg.setAttribute("width", "200");
     bmcImg.setAttribute("alt", "Buy Me A Coffee");
   }
+  renderColorPickers(container) {
+    container.empty();
+    if (this.plugin.settings.colorMode === "status") {
+      this.renderStatusColors(container);
+    } else {
+      this.renderTopicColors(container);
+    }
+  }
+  renderStatusColors(container) {
+    const createColorSetting = (name, settingKey) => {
+      new import_obsidian4.Setting(container).setName(name).addColorPicker(
+        (c) => c.setValue(this.plugin.settings.colors[settingKey]).onChange((v) => {
+          this.plugin.settings.colors[settingKey] = v;
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
+        })
+      );
+    };
+    createColorSetting("Overdue color", "overdue");
+    createColorSetting("Urgent color", "urgent");
+    createColorSetting("Active color", "active");
+    createColorSetting("Completed color", "completed");
+  }
+  renderTopicColors(container) {
+    const helperText = container.createEl("p", {
+      text: "Assign a custom color to each of your active topics.",
+      cls: "text-muted"
+    });
+    helperText.setCssProps({ "margin-left": "14px", "margin-bottom": "12px", "font-size": "0.9em" });
+    const allTasks = this.plugin.taskManager.getAllTasks();
+    const uniqueTopics = Array.from(new Set(allTasks.map((t) => t.fileName).filter((t) => Boolean(t))));
+    if (uniqueTopics.length === 0) {
+      const emptyText = container.createEl("p", { text: "No active topics found. Add some tasks first!" });
+      emptyText.setCssProps({ "margin-left": "14px", "font-style": "italic" });
+      return;
+    }
+    uniqueTopics.forEach((topic) => {
+      const savedColor = getTopicColor(topic, this.plugin.settings);
+      new import_obsidian4.Setting(container).setName(`${topic} color`).addColorPicker(
+        (c) => c.setValue(savedColor).onChange((v) => {
+          this.plugin.settings.topicColors[topic] = v;
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
+        })
+      );
+    });
+  }
 };
 
 // src/views/DashboardView.ts
@@ -996,7 +1057,7 @@ var import_obsidian5 = require("obsidian");
 async function openTaskInEditor(app, task) {
   const file = app.vault.getAbstractFileByPath(task.filePath);
   if (!(file instanceof import_obsidian5.TFile)) return;
-  const leaf = app.workspace.getLeaf(false);
+  const leaf = app.workspace.getLeaf("tab");
   await leaf.openFile(file);
   const view = app.workspace.getActiveViewOfType(import_obsidian5.MarkdownView);
   if (view) {
@@ -1067,6 +1128,10 @@ var TaskListComponent = class {
           attr: { "aria-label": `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? "" : "s"}` }
         });
       }
+    }
+    if (task.notes) {
+      const notesEl = viewMode.createDiv("task-notes");
+      notesEl.setText(task.notes);
     }
     titleEl.addEventListener("click", () => {
       void openTaskInEditor(this.app, task);
@@ -1493,14 +1558,25 @@ var _TimelineComponent = class _TimelineComponent {
     if (isRecurring) {
       this.tooltipEl.createDiv("tooltip-recurrence").setText("\u{1F501} recurring");
     }
+    if (task.notes) {
+      this.tooltipEl.createDiv("tooltip-notes").setText(task.notes);
+    }
     this.tooltipEl.setCssProps({ display: "block" });
     this.moveTooltip(e);
   }
   moveTooltip(e) {
     if (this.tooltipEl) {
+      let left = e.clientX + 15;
+      let top = e.clientY + 15;
+      const width = this.tooltipEl.offsetWidth || 0;
+      const height = this.tooltipEl.offsetHeight || 0;
+      const maxLeft = window.innerWidth - width - 15;
+      const maxTop = window.innerHeight - height - 15;
+      if (left > maxLeft) left = Math.max(0, e.clientX - width - 15);
+      if (top > maxTop) top = Math.max(0, e.clientY - height - 15);
       this.tooltipEl.setCssProps({
-        top: `${String(e.clientY + 15)}px`,
-        left: `${String(e.clientX + 15)}px`
+        top: `${String(top)}px`,
+        left: `${String(left)}px`
       });
     }
   }
@@ -2623,6 +2699,37 @@ var StatsComponent = class {
       card.createDiv("stat-value").setText(String(stat.value));
       card.createDiv("stat-label").setText(stat.label);
     });
+    this.renderPacingAnalysis(stats.velocity7Days);
+    if (stats.mostUrgentTopic) {
+      this.renderUrgentTopic(stats.mostUrgentTopic);
+    }
+  }
+  renderPacingAnalysis(velocity) {
+    const wrapper = this.container.createDiv("dashboard-pacing-analysis");
+    wrapper.createEl("h3", { text: "7-day pacing analysis" });
+    const maxVal = Math.max(...velocity, 1);
+    const histogramContainer = wrapper.createDiv("pacing-histogram");
+    const days = ["6d", "5d", "4d", "3d", "2d", "1d", "Today"];
+    velocity.forEach((val, i) => {
+      const barWrapper = histogramContainer.createDiv("histogram-bar-wrapper");
+      const percent = val / maxVal * 100;
+      const bar = barWrapper.createDiv("histogram-bar");
+      bar.setCssProps({ "--bar-height": `${String(percent)}%` });
+      bar.createDiv("histogram-value").setText(String(val));
+      barWrapper.createDiv("histogram-label").setText(days[i]);
+    });
+  }
+  renderUrgentTopic(topic) {
+    const wrapper = this.container.createDiv("dashboard-urgent-topic");
+    wrapper.createEl("h3", { text: "Most urgent topic" });
+    const card = wrapper.createDiv({ cls: ["stat-card", "stat-urgent-topic"] });
+    const nameDiv = card.createDiv("urgent-topic-name");
+    nameDiv.setText(topic.name);
+    const percent = Math.round(topic.ratio * 100);
+    card.createDiv("urgent-topic-ratio").setText(`${String(percent)}% Urgent`);
+    card.createDiv("urgent-topic-details").setText(
+      `${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`
+    );
   }
 };
 

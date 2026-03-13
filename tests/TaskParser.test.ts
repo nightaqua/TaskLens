@@ -7,7 +7,7 @@ describe('TaskParser.parseTaskMetadata', () => {
     // Create a dummy instance. Since parseTaskMetadata doesn't use `this.app` or `this.settings`,
     // we can pass null or empty objects casted to unknown.
     const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
-    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string };
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string };
 
     const getLocalMidnight = (dateStr: string) => new Date(`${dateStr}T00:00:00`);
 
@@ -18,6 +18,7 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.dueDate).toBeUndefined();
         expect(result.completionDate).toBeUndefined();
         expect(result.recurrence).toBeUndefined();
+        expect(result.notes).toBeUndefined();
     });
 
     it('should parse start date in yyyy-mm-dd format', () => {
@@ -121,5 +122,137 @@ describe('TaskParser.parseTaskMetadata', () => {
         const result = parseTaskMetadata('   Task   with   spaces   [due:: 2023-01-01]   ');
         expect(result.title).toBe('Task with spaces');
         expect(result.dueDate).toEqual(getLocalMidnight('2023-01-01'));
+    });
+    it('should parse notes with notes::', () => {
+        const result = parseTaskMetadata('Task with a note [notes:: This is an important note]');
+        expect(result.title).toBe('Task with a note');
+        expect(result.notes).toBe('This is an important note');
+    });
+
+    it('should parse notes with parenthesis format', () => {
+        const result = parseTaskMetadata('Task with parens note (notes:: Another note here)');
+        expect(result.title).toBe('Task with parens note');
+        expect(result.notes).toBe('Another note here');
+    });
+
+    it('should handle notes alongside other metadata', () => {
+        const result = parseTaskMetadata('Complex task [due:: 2024-12-01] [notes:: Requires review before submission] [repeat:: weekly]');
+        expect(result.title).toBe('Complex task');
+        expect(result.dueDate).toEqual(getLocalMidnight('2024-12-01'));
+        expect(result.notes).toBe('Requires review before submission');
+        expect(result.recurrence).toBe('weekly');
+    });
+});
+describe('TaskParser.getFilesToScan', () => {
+    // Helper to create mock TFile objects
+    const createMockFile = (path: string, parentPath?: string) => {
+        return {
+            path,
+            parent: parentPath !== undefined ? { path: parentPath } : null,
+        } as unknown as import('obsidian').TFile;
+    };
+
+    const mockFiles = [
+        createMockFile('Projects/Todo.md', 'Projects'),
+        createMockFile('Projects/SubProject/Tasks.md', 'Projects/SubProject'),
+        createMockFile('RootFile.md', '/'),
+        createMockFile('OtherFolder/Notes.md', 'OtherFolder'),
+        createMockFile('ProjectsTodo.md', '/'), // Edge case for startsWith
+    ];
+
+    const createAppMock = (files: import('obsidian').TFile[]) => {
+        return {
+            vault: {
+                getMarkdownFiles: () => files,
+            },
+        } as unknown as App;
+    };
+
+    it('should return all files if scanFolders is empty', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: [] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(5);
+        expect(result).toEqual(mockFiles);
+    });
+
+    it('should return matched file directly when given exact file name', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: ['Projects/Todo.md'] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should return matched file directly when given file name without .md', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: ['Projects/Todo'] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should return files recursively matching a folder', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: true
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(2);
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('Projects/Todo.md');
+        expect(paths).toContain('Projects/SubProject/Tasks.md');
+    });
+
+    it('should not match files starting with folder name but not inside it when scanRecursively is true', () => {
+        // e.g., 'ProjectsTodo.md' should not be matched by 'Projects/'
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: true
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        const paths = result.map(f => f.path);
+        expect(paths).not.toContain('ProjectsTodo.md');
+    });
+
+    it('should return files exactly matching a folder when scanRecursively is false', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should match files in the root directory', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['/'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        // RootFile.md and ProjectsTodo.md are in root
+        expect(result).toHaveLength(2);
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('RootFile.md');
+        expect(paths).toContain('ProjectsTodo.md');
     });
 });
