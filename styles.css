@@ -355,6 +355,18 @@
     width: 100%;
 }
 
+.tasklens-dashboard-content .task-notes {
+    width: 100%;
+    margin-top: 6px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    font-style: italic;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-left: 2px solid var(--background-modifier-border);
+    padding-left: 8px;
+}
+
 /* Badges (Course name truncation & date protection) */
 .tasklens-dashboard-content .task-course, .tasklens-dashboard-content .task-date {
     background-color: var(--background-primary);

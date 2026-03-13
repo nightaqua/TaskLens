@@ -1050,6 +1050,10 @@ var TaskListComponent = class {
         });
       }
     }
+    if (task.notes) {
+      const notesEl = viewMode.createDiv("task-notes");
+      notesEl.setText(task.notes);
+    }
     titleEl.addEventListener("click", () => {
       void openTaskInEditor(this.app, task);
     });
