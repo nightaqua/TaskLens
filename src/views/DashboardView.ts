@@ -4,6 +4,7 @@ import { TaskManager } from '../services/TaskManager';
 import TaskLensPlugin, { RefreshableView } from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { TaskListComponent } from './TaskListComponent';
+import { BoardComponent } from './BoardComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { QuickAddModal } from '../modals/QuickAddModal';
 import { VIEW_TYPE_DASHBOARD, CLASS_CHROMELESS, CLASS_HIDE_TABS, CLASS_DASHBOARD_VIEW } from '../constants';
@@ -37,6 +38,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private tabContainer: HTMLElement | null = null;
     private taskManager: TaskManager;
     private timelineComponent: TimelineComponent | null = null;
+    private boardComponent: BoardComponent | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
@@ -45,6 +47,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private showTimeline: boolean = true;
     private showList: boolean = true;
     private showStats: boolean = true;
+    private showBoard: boolean = false;
 
     // Per-view stats display preference — persisted via getState/setState
     // Removed from global Settings so each dashboard widget can have its own value.
@@ -126,6 +129,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             if (Object.prototype.hasOwnProperty.call(s, 'showTimeline')) this.showTimeline = s.showTimeline as boolean;
             if (Object.prototype.hasOwnProperty.call(s, 'showList')) this.showList = s.showList as boolean;
             if (Object.prototype.hasOwnProperty.call(s, 'showStats')) this.showStats = s.showStats as boolean;
+            if (Object.prototype.hasOwnProperty.call(s, 'showBoard')) this.showBoard = s.showBoard as boolean;
             if (Object.prototype.hasOwnProperty.call(s, 'zoomLevel')) this.timelineDaysToShow = s.zoomLevel as number;
             if (Object.prototype.hasOwnProperty.call(s, 'statsCompletionFormat')) this.statsCompletionFormat = s.statsCompletionFormat as 'all' | 'today';
 
@@ -150,6 +154,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             showTimeline: this.showTimeline,
             showList: this.showList,
             showStats: this.showStats,
+            showBoard: this.showBoard,
             zoomLevel: this.timelineDaysToShow,
             statsCompletionFormat: this.statsCompletionFormat,
             statusFilter: filters.status,
@@ -185,6 +190,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     onClose(): Promise<void> {
         this.taskManager.off('tasks-updated', this.onTasksUpdated);
         this.timelineComponent?.destroy();
+        this.boardComponent?.destroy();
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
@@ -197,6 +203,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         }
         // Clean up out-of-container DOM nodes before wiping contentEl
         this.timelineComponent?.destroy();
+        this.boardComponent?.destroy();
 
         this.contentEl.empty();
 
@@ -246,9 +253,10 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.renderControls();
 
         // Render sections in order; each is gated by its visibility toggle
-        ['stats', 'timeline', 'list'].forEach(component => {
+        ['stats', 'timeline', 'board', 'list'].forEach(component => {
             if (component === 'stats' && this.showStats) this.renderStatistics();
             if (component === 'timeline' && this.showTimeline) this.renderTimeline();
+            if (component === 'board' && this.showBoard) this.renderBoard();
             if (component === 'list' && this.showList) this.renderTaskList();
         });
     }
@@ -267,9 +275,12 @@ export class DashboardView extends ItemView implements RefreshableView {
         const statusSelect = statusGroup.createEl('select');
 
         const statusOptions = [
-            { value: TaskStatus.Open, label: 'Active' },
-            { value: TaskStatus.All, label: 'All tasks' },
+            { value: TaskStatus.Open, label: 'Active (All)' },
+            { value: TaskStatus.UpcomingWeek, label: 'Upcoming' },
+            { value: TaskStatus.Urgent, label: 'Urgent' },
+            { value: TaskStatus.Overdue, label: 'Overdue' },
             { value: TaskStatus.Completed, label: 'Completed' },
+            { value: TaskStatus.All, label: 'All tasks' },
         ];
         statusOptions.forEach(opt => {
             const option = statusSelect.createEl('option', { value: opt.value, text: opt.label });
@@ -314,6 +325,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         const toggles = [
             { label: 'Timeline', getter: () => this.showTimeline, setter: (v: boolean) => { this.showTimeline = v; } },
+            { label: 'Board', getter: () => this.showBoard, setter: (v: boolean) => { this.showBoard = v; } },
             { label: 'List', getter: () => this.showList, setter: (v: boolean) => { this.showList = v; } },
             { label: 'Stats', getter: () => this.showStats, setter: (v: boolean) => { this.showStats = v; } },
         ];
@@ -352,10 +364,31 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         statCards.forEach(stat => {
             const card = container.createDiv({ cls: ['stat-card', stat.cls, 'is-clickable'] });
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            card.setAttribute('aria-label', `Filter by ${stat.label} (${String(stat.value)} tasks)`);
             card.addEventListener('click', () => { this.taskManager.setStatusFilter(stat.filter); });
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.taskManager.setStatusFilter(stat.filter);
+                }
+            });
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
+    }
+
+    private renderBoard(): void {
+        const container = this.contentEl.createDiv();
+
+        this.boardComponent = new BoardComponent(
+            container,
+            this.app,
+            this.taskManager,
+            this.plugin.settings
+        );
+        this.boardComponent.render(this.taskManager.getGroupedFilteredTasks());
     }
 
     private renderTaskList(): void {

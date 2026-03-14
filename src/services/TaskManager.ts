@@ -11,6 +11,9 @@ export class TaskManager extends Events {
     private currentStatusFilter: TaskStatus = TaskStatus.Open;
     private currentCourseFilter: string | null = null;
 
+    private cachedStats: ReturnType<typeof this.calculateStatistics> | null = null;
+    private lastTasksRef: Task[] | null = null;
+
     constructor(private readonly parser: TaskParser, private readonly app: App) {
         super();
     }
@@ -232,6 +235,41 @@ export class TaskManager extends Events {
     }
 
     /**
+     * Updates a task's status based on drag-and-drop actions.
+     */
+    async updateTaskStatus(task: Task, newStatus: TaskStatus): Promise<void> {
+        if (newStatus === TaskStatus.Completed) {
+            if (!task.completed) {
+                await this.toggleTaskCompletion(task);
+            }
+            return;
+        }
+
+        // If moving out of completed, uncheck it first
+        if (task.completed) {
+            await this.toggleTaskCompletion(task);
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let newDate: Date | null = null;
+        if (newStatus === TaskStatus.UpcomingWeek) {
+            newDate = new Date(today);
+            newDate.setDate(today.getDate() + 7);
+        } else if (newStatus === TaskStatus.Urgent) {
+            newDate = new Date(today);
+            newDate.setDate(today.getDate() + 1);
+        } else if (newStatus === TaskStatus.Overdue) {
+            newDate = new Date(today);
+            newDate.setDate(today.getDate() - 1);
+        }
+
+        // Update the date, or clear it if null (NoDate case - handled by passing null)
+        await this.updateTask(task, task.title, newDate);
+    }
+
+    /**
      * Delete a task from its file
      */
     async deleteTask(task: Task): Promise<void> {
@@ -272,7 +310,7 @@ export class TaskManager extends Events {
         // Isolate the bare title by stripping all known metadata tokens from a copy
         // of the body. We replace only the title portion in the original body so that
         // start::, repeat::, completion:: and any other metadata survive untouched.
-        const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*/gi;
+        const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*[\])]?/gi;
         const titleOnly = body.replace(metaPattern, '').replace(/\s+/g, ' ').trim();
 
         let newBody: string;
@@ -284,7 +322,7 @@ export class TaskManager extends Events {
             newBody = newTitle;
         }
 
-        // Update or append the due:: field
+        // Update, append, or explicitly remove the due:: field
         if (newDate) {
             const dateStr = this.formatDate(newDate);
             const dueRegex = /(\[?\(?due::\s*)(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})([\])]?)/i;
@@ -293,6 +331,10 @@ export class TaskManager extends Events {
             } else {
                 newBody = `${newBody} [due:: ${dateStr}]`;
             }
+        } else {
+            // Strip the due:: tag entirely
+            const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
+            newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
         }
 
         lines[task.lineNumber] = `${prefix}${newBody}`;
@@ -380,9 +422,66 @@ export class TaskManager extends Events {
     }
 
     getStatistics() {
+        if (this.lastTasksRef === this.tasks && this.cachedStats) {
+            return this.cachedStats;
+        }
+
+        this.cachedStats = this.calculateStatistics();
+        this.lastTasksRef = this.tasks;
+        return this.cachedStats;
+    }
+
+    private calculateStatistics() {
         // Group first so recurring clones count as one work item, not N lines.
         const groups = this.groupTasks(this.tasks);
-        const todayStr = this.formatDate(new Date());
+
+        const now = new Date();
+        const todayStr = this.formatDate(now);
+        now.setHours(0, 0, 0, 0);
+
+        // 7-day trailing velocity
+        const velocity7Days = [0, 0, 0, 0, 0, 0, 0];
+
+        for (const task of this.tasks) {
+            if (task.completed && task.completionDate) {
+                const compDate = new Date(task.completionDate);
+                compDate.setHours(0, 0, 0, 0);
+                const diffTime = now.getTime() - compDate.getTime();
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays >= 0 && diffDays < 7) {
+                    velocity7Days[6 - diffDays]++;
+                }
+            }
+        }
+
+        // Topic urgency analysis
+        const topicStats = new Map<string, { totalOpen: number, urgent: number }>();
+
+        for (const task of this.tasks) {
+            if (!task.completed) {
+                const stats = topicStats.get(task.fileName) ?? { totalOpen: 0, urgent: 0 };
+                stats.totalOpen++;
+                if (getTaskStatus(task) === TaskStatus.Urgent) {
+                    stats.urgent++;
+                }
+                topicStats.set(task.fileName, stats);
+            }
+        }
+
+        let mostUrgentTopic: { name: string, ratio: number, urgent: number, total: number } | null = null;
+        let maxRatio = -1;
+
+        for (const [name, stats] of topicStats.entries()) {
+            if (stats.totalOpen > 0) {
+                const ratio = stats.urgent / stats.totalOpen;
+                if (ratio > maxRatio || (ratio === maxRatio && mostUrgentTopic !== null && stats.urgent > mostUrgentTopic.urgent)) {
+                    maxRatio = ratio;
+                    mostUrgentTopic = { name, ratio, urgent: stats.urgent, total: stats.totalOpen };
+                }
+            }
+        }
+
         return {
             total: groups.length,
             completed: groups.filter(g => g.representative.completed).length,
@@ -392,7 +491,9 @@ export class TaskManager extends Events {
             overdue: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.Overdue).length,
             upcoming: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.UpcomingWeek).length,
             urgent: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.Urgent).length,
-            courses: new Set(this.tasks.map(t => t.fileName)).size
+            courses: new Set(this.tasks.map(t => t.fileName)).size,
+            velocity7Days,
+            mostUrgentTopic
         };
     }
 
