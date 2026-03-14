@@ -312,7 +312,7 @@ var TaskManager = class extends import_obsidian.Events {
       } else {
         newBody = `${newBody} [due:: ${dateStr}]`;
       }
-    } else if (newDate === null) {
+    } else {
       const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
       newBody = newBody.replace(dueRegex, "").replace(/\s+/g, " ").trim();
     }
@@ -431,7 +431,7 @@ var TaskManager = class extends import_obsidian.Events {
     for (const [name, stats] of topicStats.entries()) {
       if (stats.totalOpen > 0) {
         const ratio = stats.urgent / stats.totalOpen;
-        if (ratio > maxRatio || ratio === maxRatio && mostUrgentTopic && stats.urgent > mostUrgentTopic.urgent) {
+        if (ratio > maxRatio || ratio === maxRatio && mostUrgentTopic !== null && stats.urgent > mostUrgentTopic.urgent) {
           maxRatio = ratio;
           mostUrgentTopic = { name, ratio, urgent: stats.urgent, total: stats.totalOpen };
         }
@@ -1111,6 +1111,9 @@ var TaskListComponent = class {
     const titleRow = viewMode.createDiv("task-title-row");
     const titleEl = titleRow.createDiv("task-title");
     titleEl.setText(task.title);
+    titleEl.setAttribute("role", "button");
+    titleEl.setAttribute("tabindex", "0");
+    titleEl.setAttribute("aria-label", `Open task in editor: ${task.title}`);
     const meta = viewMode.createDiv("task-meta");
     if (task.fileName) {
       const courseLabel = meta.createDiv("task-course");
@@ -1134,6 +1137,12 @@ var TaskListComponent = class {
     }
     titleEl.addEventListener("click", () => {
       void openTaskInEditor(this.app, task);
+    });
+    titleEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        void openTaskInEditor(this.app, task);
+      }
     });
   }
 };
@@ -1683,6 +1692,9 @@ var BoardComponent = class {
     const task = group.representative;
     const card = container.createDiv("board-task-card");
     card.setAttribute("draggable", "true");
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `Open task in editor: ${task.title}`);
     card.setCssProps({
       background: "var(--background-primary)",
       border: "1px solid var(--background-modifier-border)",
@@ -1768,6 +1780,12 @@ var BoardComponent = class {
     card.addEventListener("dblclick", () => {
       void openTaskInEditor(this.app, task);
     });
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        void openTaskInEditor(this.app, task);
+      }
+    });
   }
 };
 
@@ -1821,11 +1839,19 @@ var HeaderComponent = class {
     }
     const titleWrapper = this.headerEl.createDiv("dashboard-title-wrapper");
     titleWrapper.setAttribute("aria-label", "Click to rename");
+    titleWrapper.setAttribute("role", "button");
+    titleWrapper.setAttribute("tabindex", "0");
     titleWrapper.createEl("h2", { text: this.title });
     const editIcon = titleWrapper.createDiv("edit-title-icon");
     (0, import_obsidian8.setIcon)(editIcon, "pencil");
     titleWrapper.addEventListener("click", () => {
       this.enterEditMode(titleWrapper);
+    });
+    titleWrapper.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.enterEditMode(titleWrapper);
+      }
     });
     const rightGroup = this.headerEl.createDiv("header-actions-right");
     if (this.onAdd) {
@@ -2318,8 +2344,17 @@ var DashboardView = class extends import_obsidian10.ItemView {
     ];
     statCards.forEach((stat) => {
       const card = container.createDiv({ cls: ["stat-card", stat.cls, "is-clickable"] });
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("aria-label", `Filter by ${stat.label} (${String(stat.value)} tasks)`);
       card.addEventListener("click", () => {
         this.taskManager.setStatusFilter(stat.filter);
+      });
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          this.taskManager.setStatusFilter(stat.filter);
+        }
       });
       card.createDiv("stat-value").setText(String(stat.value));
       card.createDiv("stat-label").setText(stat.label);

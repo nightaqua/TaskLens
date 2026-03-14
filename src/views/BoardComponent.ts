@@ -72,7 +72,7 @@ export class BoardComponent {
             let status = getTaskStatus(group.representative);
             if (status === TaskStatus.NoDate) status = TaskStatus.UpcomingWeek; // fallback NoDate to Active for display
 
-            const col = this.columns[status];
+            const col = this.columns[status] as HTMLElement | undefined;
             if (!col) return; // status has no column (e.g. open filter passes Completed tasks through)
             this.renderTaskCard(col, group);
         });
@@ -106,6 +106,9 @@ export class BoardComponent {
         const card = container.createDiv('board-task-card');
 
         card.setAttribute('draggable', 'true');
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', `Open task in editor: ${task.title}`);
         card.setCssProps({
             background: 'var(--background-primary)',
             border: '1px solid var(--background-modifier-border)',
@@ -201,6 +204,12 @@ export class BoardComponent {
         // Add double click to open in editor
         card.addEventListener('dblclick', () => {
             void openTaskInEditor(this.app, task);
+        });
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void openTaskInEditor(this.app, task);
+            }
         });
     }
 }

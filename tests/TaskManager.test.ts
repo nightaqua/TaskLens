@@ -226,9 +226,9 @@ describe('TaskManager.updateTask', () => {
     it('strips due:: metadata explicitly when newDate is null', async () => {
         const mockApp = {
             vault: {
-                getAbstractFileByPath: vi.fn().mockImplementation((path) => {
-                    const file = Object.create(TFile.prototype);
-                    file.path = path;
+                getAbstractFileByPath: vi.fn().mockImplementation((path: string): TFile => {
+                    const file: TFile = Object.create(TFile.prototype);
+                    Object.defineProperty(file, 'path', { value: path, writable: true });
                     return file;
                 }),
                 read: vi.fn().mockResolvedValue('- [ ] Complete assignment [due:: 2026-03-15]'),
