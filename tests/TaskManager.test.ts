@@ -153,7 +153,7 @@ describe('TaskManager', () => {
         });
     });
 
-
+    });
 
     describe('formatDisplayDate', () => {
         it('formats dates with double-digit day and month correctly', () => {
@@ -183,6 +183,5 @@ describe('TaskManager', () => {
             const date2 = new Date('2100-01-01T00:00:00');
             expect(TaskManager.formatDisplayDate(date2)).toBe('01-01-2100');
         });
-
     });
 });
