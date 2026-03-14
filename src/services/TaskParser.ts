@@ -14,6 +14,8 @@ export class TaskParser {
     private static readonly COMP_REGEX = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, 'gi');
     // 4. RECURRENCE — TaskLens format: [repeat:: weekly]
     private static readonly REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
+    // 5. NOTES — TaskLens format: [notes:: ...]
+    private static readonly NOTES_REGEX = /\[?\(?notes::\s*([^\])]+)[\])]?/gi;
 
     // Fallback emoji regexes
     private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u;
@@ -101,7 +103,7 @@ export class TaskParser {
             if (taskMatch) {
                 const completed = taskMatch[2].toLowerCase() === 'x';
                 const taskText = taskMatch[3];
-                const { title, startDate, dueDate, completionDate, recurrence } = this.parseTaskMetadata(taskText);
+                const { title, startDate, dueDate, completionDate, recurrence, notes } = this.parseTaskMetadata(taskText);
 
                 const task: Task = {
                     id: `${file.path}:${String(i)}`,
@@ -114,6 +116,7 @@ export class TaskParser {
                     dueDate,
                     completionDate, // Added
                     recurrence,     // Added
+                    notes,          // Added
                     originalText: line
                 };
                 tasks.push(task);
@@ -139,12 +142,13 @@ export class TaskParser {
         }
     }
 
-    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string } {
+    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string } {
         let title = taskText;
         let startDate: Date | undefined;
         let dueDate: Date | undefined;
         let completionDate: Date | undefined;
         let recurrence: string | undefined;
+        let notes: string | undefined;
 
         /**
          * Normalise a parsed date string to a local-midnight Date.
@@ -191,6 +195,14 @@ export class TaskParser {
             title = title.replace(TaskParser.REPEAT_REGEX, '');
         }
 
+        // 5. NOTES — TaskLens format: [notes:: ...]
+        TaskParser.NOTES_REGEX.lastIndex = 0;
+        const notesMatch = TaskParser.NOTES_REGEX.exec(taskText);
+        if (notesMatch) {
+            notes = notesMatch[1].trim();
+            title = title.replace(TaskParser.NOTES_REGEX, '');
+        }
+
         // Tasks-plugin emoji recurrence: 🔁 / 🔄 followed by a rule string.
         // Read-only — we recognise it so isRecurring is correct and the chip shows,
         // but we never write back in this format (TaskLens writes [repeat:: ...]).
@@ -202,7 +214,7 @@ export class TaskParser {
             }
         }
 
-        // 5. Emoji fallback 📅 — accepts both date formats
+        // 6. Emoji fallback 📅 — accepts both date formats
         if (!dueDate) {
             const emojiMatch = taskText.match(TaskParser.EMOJI_DATE_MATCH_REGEX);
             if (emojiMatch) {
@@ -213,6 +225,6 @@ export class TaskParser {
 
         title = title.replace(/\s+/g, ' ').trim();
 
-        return { title, startDate, dueDate, completionDate, recurrence };
+        return { title, startDate, dueDate, completionDate, recurrence, notes };
     }
 }

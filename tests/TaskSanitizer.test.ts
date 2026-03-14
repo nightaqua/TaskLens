@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripCompletionMetadata, hasRecurrenceMetadata } from '../src/services/TaskSanitizer';
+import { stripCompletionMetadata, hasRecurrenceMetadata, hasCompletionMetadata } from '../src/services/TaskSanitizer';
 
 describe('TaskSanitizer - stripCompletionMetadata', () => {
     it('should strip TaskLens / Dataview bracket format', () => {
@@ -56,6 +56,38 @@ describe('TaskSanitizer - stripCompletionMetadata', () => {
 });
 
 describe('TaskSanitizer', () => {
+    describe('hasCompletionMetadata', () => {
+        it('should return true if line contains Tasks plugin completion emoji ✅ and date', () => {
+            expect(hasCompletionMetadata('- [x] Task ✅ 2024-05-15')).toBe(true);
+            expect(hasCompletionMetadata('✅ 2024-05-15')).toBe(true);
+            expect(hasCompletionMetadata('- [x] Task ✅2024-05-15')).toBe(true); // No space after emoji
+        });
+
+        it('should return true if line contains Dataview/TaskLens completion inline field', () => {
+            expect(hasCompletionMetadata('- [x] Task [completion:: 2024-05-15]')).toBe(true);
+            expect(hasCompletionMetadata('- [x] Task (completion:: 2024-05-15)')).toBe(true);
+            expect(hasCompletionMetadata('completion::')).toBe(true);
+        });
+
+        it('should return true if line contains completion field case-insensitively', () => {
+            expect(hasCompletionMetadata('- [x] Task [COMPLETION:: 2024-05-15]')).toBe(true);
+            expect(hasCompletionMetadata('- [x] Task (Completion:: 2024-05-15)')).toBe(true);
+        });
+
+        it('should return false if Tasks emoji is present but date is missing or malformed', () => {
+            expect(hasCompletionMetadata('- [x] Task ✅')).toBe(false);
+            expect(hasCompletionMetadata('- [x] Task ✅ 24-05-15')).toBe(false);
+            expect(hasCompletionMetadata('- [x] Task ✅ 2024-5-15')).toBe(false);
+        });
+
+        it('should return false if line does not contain completion metadata', () => {
+            expect(hasCompletionMetadata('- [ ] Normal task')).toBe(false);
+            expect(hasCompletionMetadata('- [ ] Task with due date [due:: 2024-05-15]')).toBe(false);
+            expect(hasCompletionMetadata('- [ ] Task with repeat [repeat:: daily]')).toBe(false);
+            expect(hasCompletionMetadata('Just some text')).toBe(false);
+        });
+    });
+
     describe('hasRecurrenceMetadata', () => {
         it('should return true if line contains Tasks plugin repeat emoji 🔁', () => {
             expect(hasRecurrenceMetadata('- [ ] Every day 🔁 every day')).toBe(true);

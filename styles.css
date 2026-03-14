@@ -271,6 +271,105 @@
     margin-top: 4px;
 }
 
+/* --- Pacing Analysis --- */
+.tasklens-dashboard-content .dashboard-pacing-analysis,
+.tasklens-dashboard-content .dashboard-urgent-topic {
+    margin-bottom: 24px;
+}
+
+.tasklens-dashboard-content .dashboard-pacing-analysis h3,
+.tasklens-dashboard-content .dashboard-urgent-topic h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1.1em;
+    color: var(--text-normal);
+}
+
+.tasklens-dashboard-content .pacing-histogram {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 120px;
+    padding: 12px;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+.tasklens-dashboard-content .histogram-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1;
+    min-width: 30px;
+    height: 100%;
+    margin-bottom: 20px;
+}
+
+.tasklens-dashboard-content .histogram-bar {
+    width: 24px;
+    height: var(--bar-height, 0%);
+    background-color: var(--color-blue);
+    border-radius: 4px 4px 0 0;
+    position: relative;
+    transition: height 0.3s ease, background-color 0.2s;
+    min-height: 2px;
+}
+
+.tasklens-dashboard-content .histogram-bar:hover {
+    background-color: var(--color-active);
+    filter: brightness(1.2);
+}
+
+.tasklens-dashboard-content .histogram-value {
+    position: absolute;
+    top: -20px;
+    width: 100%;
+    text-align: center;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.tasklens-dashboard-content .histogram-label {
+    margin-top: 8px;
+    font-size: 0.75em;
+    color: var(--text-muted);
+    text-align: center;
+    position: relative;
+    top: 20px;
+}
+
+/* --- Urgent Topic --- */
+.tasklens-dashboard-content .stat-urgent-topic {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    border-left: 4px solid var(--color-orange);
+}
+
+.tasklens-dashboard-content .urgent-topic-name {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--text-normal);
+    margin-bottom: 4px;
+}
+
+.tasklens-dashboard-content .urgent-topic-ratio {
+    font-size: 1em;
+    font-weight: 500;
+    color: var(--color-orange);
+}
+
+.tasklens-dashboard-content .urgent-topic-details {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
 
 /* =========================================
    3. TASK LIST & RESPONSIVE DESIGN
@@ -353,6 +452,18 @@
     color: var(--text-muted);
     align-items: center;
     width: 100%;
+}
+
+.tasklens-dashboard-content .task-notes {
+    width: 100%;
+    margin-top: 6px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    font-style: italic;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-left: 2px solid var(--background-modifier-border);
+    padding-left: 8px;
 }
 
 /* Badges (Course name truncation & date protection) */
@@ -633,8 +744,8 @@
     justify-self: center;
 }
 
-/* Tooltip !To be reviewed. Idk if scoping this tooltip was a good idea, check if anything broke. */
-.tasklens-dashboard-content .dashboard-tooltip {
+/* Tooltip: Unscoped to allow appending to document.body */
+.dashboard-tooltip {
     position: fixed;
     z-index: 1000;
     background-color: var(--background-primary);
@@ -645,10 +756,21 @@
     pointer-events: none;
     display: none;
     min-width: 150px;
+    max-width: 300px; /* Prevent overly wide tooltips with notes */
 }
 
-.tasklens-dashboard-content .tooltip-title { font-weight: 600; margin-bottom: 4px; font-size: 0.9em; }
-.tasklens-dashboard-content .tooltip-meta, .tasklens-dashboard-content .tooltip-date { font-size: 0.8em; color: var(--text-muted); }
+.tooltip-title { font-weight: 600; margin-bottom: 4px; font-size: 0.9em; }
+.tooltip-meta, .tooltip-date, .tooltip-recurrence { font-size: 0.8em; color: var(--text-muted); }
+.tooltip-notes {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--background-modifier-border);
+    font-style: italic;
+    white-space: pre-wrap; /* Preserve line breaks in notes */
+    word-break: break-word;
+}
 
 
 /* =========================================
