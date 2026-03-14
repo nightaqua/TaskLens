@@ -1060,8 +1060,8 @@ var import_obsidian5 = require("obsidian");
 async function openTaskInEditor(app, task) {
   const file = app.vault.getAbstractFileByPath(task.filePath);
   if (!(file instanceof import_obsidian5.TFile)) return;
-  const leaf = app.workspace.getLeaf("tab");
-  await leaf.openFile(file);
+  const leaf = app.workspace.getLeaf(false);
+  await leaf.openFile(file, { active: true });
   const view = app.workspace.getActiveViewOfType(import_obsidian5.MarkdownView);
   if (view) {
     const pos = { line: task.lineNumber, ch: 0 };
@@ -1131,10 +1131,6 @@ var TaskListComponent = class {
           attr: { "aria-label": `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? "" : "s"}` }
         });
       }
-    }
-    if (task.notes) {
-      const notesEl = viewMode.createDiv("task-notes");
-      notesEl.setText(task.notes);
     }
     titleEl.addEventListener("click", () => {
       void openTaskInEditor(this.app, task);
