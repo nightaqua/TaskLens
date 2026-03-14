@@ -12,8 +12,8 @@ export async function openTaskInEditor(app: App, task: Task): Promise<void> {
     const file = app.vault.getAbstractFileByPath(task.filePath);
     if (!(file instanceof TFile)) return;
 
-    const leaf = app.workspace.getLeaf('tab');
-    await leaf.openFile(file);
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.openFile(file, { active: true });
 
     const view = app.workspace.getActiveViewOfType(MarkdownView);
     if (view) {
