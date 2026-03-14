@@ -13,7 +13,7 @@ export async function openTaskInEditor(app: App, task: Task): Promise<void> {
     if (!(file instanceof TFile)) return;
 
     const leaf = app.workspace.getLeaf(false);
-    await leaf.openFile(file);
+    await leaf.openFile(file, { active: true });
 
     const view = app.workspace.getActiveViewOfType(MarkdownView);
     if (view) {
