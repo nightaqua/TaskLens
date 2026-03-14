@@ -312,7 +312,7 @@ var TaskManager = class extends import_obsidian.Events {
       } else {
         newBody = `${newBody} [due:: ${dateStr}]`;
       }
-    } else if (newDate === null) {
+    } else {
       const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
       newBody = newBody.replace(dueRegex, "").replace(/\s+/g, " ").trim();
     }
@@ -404,20 +404,25 @@ var TaskManager = class extends import_obsidian.Events {
     const todayStr = this.formatDate(now);
     now.setHours(0, 0, 0, 0);
     const velocity7Days = [0, 0, 0, 0, 0, 0, 0];
-    for (const task of this.tasks) {
-      if (task.completed && task.completionDate) {
-        const compDate = new Date(task.completionDate);
-        compDate.setHours(0, 0, 0, 0);
-        const diffTime = now.getTime() - compDate.getTime();
-        const diffDays = Math.round(diffTime / (1e3 * 60 * 60 * 24));
-        if (diffDays >= 0 && diffDays < 7) {
-          velocity7Days[6 - diffDays]++;
-        }
-      }
-    }
     const topicStats = /* @__PURE__ */ new Map();
+    let completedTodayCount = 0;
+    const coursesSet = /* @__PURE__ */ new Set();
     for (const task of this.tasks) {
-      if (!task.completed) {
+      coursesSet.add(task.fileName);
+      if (task.completed) {
+        if (task.completionDate) {
+          if (this.formatDate(task.completionDate) === todayStr) {
+            completedTodayCount++;
+          }
+          const compDate = new Date(task.completionDate);
+          compDate.setHours(0, 0, 0, 0);
+          const diffTime = now.getTime() - compDate.getTime();
+          const diffDays = Math.round(diffTime / (1e3 * 60 * 60 * 24));
+          if (diffDays >= 0 && diffDays < 7) {
+            velocity7Days[6 - diffDays]++;
+          }
+        }
+      } else {
         const stats = (_a = topicStats.get(task.fileName)) != null ? _a : { totalOpen: 0, urgent: 0 };
         stats.totalOpen++;
         if (getTaskStatus(task) === "urgent" /* Urgent */) {
@@ -437,16 +442,28 @@ var TaskManager = class extends import_obsidian.Events {
         }
       }
     }
+    let completedGroupsCount = 0;
+    let overdueCount = 0;
+    let upcomingCount = 0;
+    let urgentCount = 0;
+    for (const g of groups) {
+      if (g.representative.completed) {
+        completedGroupsCount++;
+      } else {
+        const status = getTaskStatus(g.representative);
+        if (status === "overdue" /* Overdue */) overdueCount++;
+        else if (status === "upcoming_week" /* UpcomingWeek */) upcomingCount++;
+        else if (status === "urgent" /* Urgent */) urgentCount++;
+      }
+    }
     return {
       total: groups.length,
-      completed: groups.filter((g) => g.representative.completed).length,
-      completedToday: this.tasks.filter(
-        (t) => t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr
-      ).length,
-      overdue: groups.filter((g) => getTaskStatus(g.representative) === "overdue" /* Overdue */).length,
-      upcoming: groups.filter((g) => getTaskStatus(g.representative) === "upcoming_week" /* UpcomingWeek */).length,
-      urgent: groups.filter((g) => getTaskStatus(g.representative) === "urgent" /* Urgent */).length,
-      courses: new Set(this.tasks.map((t) => t.fileName)).size,
+      completed: completedGroupsCount,
+      completedToday: completedTodayCount,
+      overdue: overdueCount,
+      upcoming: upcomingCount,
+      urgent: urgentCount,
+      courses: coursesSet.size,
       velocity7Days,
       mostUrgentTopic
     };

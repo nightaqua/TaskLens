@@ -72,7 +72,7 @@ export class BoardComponent {
             let status = getTaskStatus(group.representative);
             if (status === TaskStatus.NoDate) status = TaskStatus.UpcomingWeek; // fallback NoDate to Active for display
 
-            const col = this.columns[status];
+            const col = this.columns[status] as HTMLElement | undefined;
             if (!col) return; // status has no column (e.g. open filter passes Completed tasks through)
             this.renderTaskCard(col, group);
         });

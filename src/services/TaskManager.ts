@@ -331,7 +331,7 @@ export class TaskManager extends Events {
             } else {
                 newBody = `${newBody} [due:: ${dateStr}]`;
             }
-        } else if (newDate === null) {
+        } else {
             // Strip the due:: tag entirely
             const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
             newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
@@ -441,25 +441,30 @@ export class TaskManager extends Events {
 
         // 7-day trailing velocity
         const velocity7Days = [0, 0, 0, 0, 0, 0, 0];
-
-        for (const task of this.tasks) {
-            if (task.completed && task.completionDate) {
-                const compDate = new Date(task.completionDate);
-                compDate.setHours(0, 0, 0, 0);
-                const diffTime = now.getTime() - compDate.getTime();
-                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-                if (diffDays >= 0 && diffDays < 7) {
-                    velocity7Days[6 - diffDays]++;
-                }
-            }
-        }
-
         // Topic urgency analysis
         const topicStats = new Map<string, { totalOpen: number, urgent: number }>();
+        let completedTodayCount = 0;
+        const coursesSet = new Set<string>();
 
+        // Single pass over tasks
         for (const task of this.tasks) {
-            if (!task.completed) {
+            coursesSet.add(task.fileName);
+
+            if (task.completed) {
+                if (task.completionDate) {
+                    if (this.formatDate(task.completionDate) === todayStr) {
+                        completedTodayCount++;
+                    }
+                    const compDate = new Date(task.completionDate);
+                    compDate.setHours(0, 0, 0, 0);
+                    const diffTime = now.getTime() - compDate.getTime();
+                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+                    if (diffDays >= 0 && diffDays < 7) {
+                        velocity7Days[6 - diffDays]++;
+                    }
+                }
+            } else {
                 const stats = topicStats.get(task.fileName) ?? { totalOpen: 0, urgent: 0 };
                 stats.totalOpen++;
                 if (getTaskStatus(task) === TaskStatus.Urgent) {
@@ -482,16 +487,31 @@ export class TaskManager extends Events {
             }
         }
 
+        let completedGroupsCount = 0;
+        let overdueCount = 0;
+        let upcomingCount = 0;
+        let urgentCount = 0;
+
+        // Single pass over groups
+        for (const g of groups) {
+            if (g.representative.completed) {
+                completedGroupsCount++;
+            } else {
+                const status = getTaskStatus(g.representative);
+                if (status === TaskStatus.Overdue) overdueCount++;
+                else if (status === TaskStatus.UpcomingWeek) upcomingCount++;
+                else if (status === TaskStatus.Urgent) urgentCount++;
+            }
+        }
+
         return {
             total: groups.length,
-            completed: groups.filter(g => g.representative.completed).length,
-            completedToday: this.tasks.filter(t =>
-                t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr
-            ).length,
-            overdue: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.Overdue).length,
-            upcoming: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.UpcomingWeek).length,
-            urgent: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.Urgent).length,
-            courses: new Set(this.tasks.map(t => t.fileName)).size,
+            completed: completedGroupsCount,
+            completedToday: completedTodayCount,
+            overdue: overdueCount,
+            upcoming: upcomingCount,
+            urgent: urgentCount,
+            courses: coursesSet.size,
             velocity7Days,
             mostUrgentTopic
         };
