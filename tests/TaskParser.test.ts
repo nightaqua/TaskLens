@@ -124,7 +124,6 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.dueDate).toEqual(getLocalMidnight('2023-01-01'));
     });
 
-
     it('should parse notes with notes::', () => {
         const result = parseTaskMetadata('Task with a note [notes:: This is an important note]');
         expect(result.title).toBe('Task with a note');
@@ -145,7 +144,6 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.recurrence).toBe('weekly');
     });
 });
-
 describe('TaskParser.getFilesToScan', () => {
     // Helper to create mock TFile objects
     const createMockFile = (path: string, parentPath?: string) => {

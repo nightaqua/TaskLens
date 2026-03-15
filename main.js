@@ -1111,6 +1111,9 @@ var TaskListComponent = class {
     const titleRow = viewMode.createDiv("task-title-row");
     const titleEl = titleRow.createDiv("task-title");
     titleEl.setText(task.title);
+    titleEl.setAttribute("role", "button");
+    titleEl.setAttribute("tabindex", "0");
+    titleEl.setAttribute("aria-label", `Open task in editor: ${task.title}`);
     const meta = viewMode.createDiv("task-meta");
     if (task.fileName) {
       const courseLabel = meta.createDiv("task-course");
@@ -1134,6 +1137,12 @@ var TaskListComponent = class {
     }
     titleEl.addEventListener("click", () => {
       void openTaskInEditor(this.app, task);
+    });
+    titleEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        void openTaskInEditor(this.app, task);
+      }
     });
   }
 };
@@ -1821,11 +1830,19 @@ var HeaderComponent = class {
     }
     const titleWrapper = this.headerEl.createDiv("dashboard-title-wrapper");
     titleWrapper.setAttribute("aria-label", "Click to rename");
+    titleWrapper.setAttribute("role", "button");
+    titleWrapper.setAttribute("tabindex", "0");
     titleWrapper.createEl("h2", { text: this.title });
     const editIcon = titleWrapper.createDiv("edit-title-icon");
     (0, import_obsidian8.setIcon)(editIcon, "pencil");
     titleWrapper.addEventListener("click", () => {
       this.enterEditMode(titleWrapper);
+    });
+    titleWrapper.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.enterEditMode(titleWrapper);
+      }
     });
     const rightGroup = this.headerEl.createDiv("header-actions-right");
     if (this.onAdd) {
@@ -1910,6 +1927,7 @@ var HeaderComponent = class {
 };
 
 // src/modals/QuickAddModal.ts
+<<<<<<< HEAD
 var import_obsidian9 = require("obsidian");
 function resolveActiveMarkdownView(app) {
   let view = app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
@@ -1921,12 +1939,29 @@ function resolveActiveMarkdownView(app) {
     if (visibleMarkdownLeaf) {
       view = visibleMarkdownLeaf.view;
     } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian9.MarkdownView) {
+=======
+var import_obsidian8 = require("obsidian");
+function resolveActiveMarkdownView(app) {
+  let view = app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
+  if (!view) {
+    const markdownLeaves = app.workspace.getLeavesOfType("markdown");
+    const visibleMarkdownLeaf = markdownLeaves.find(
+      (leaf) => leaf.view instanceof import_obsidian8.MarkdownView && leaf.view.containerEl.isShown()
+    );
+    if (visibleMarkdownLeaf) {
+      view = visibleMarkdownLeaf.view;
+    } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof import_obsidian8.MarkdownView) {
+>>>>>>> main
       view = markdownLeaves[0].view;
     }
   }
   return view;
 }
+<<<<<<< HEAD
 var QuickAddModal = class extends import_obsidian9.Modal {
+=======
+var QuickAddModal = class extends import_obsidian8.Modal {
+>>>>>>> main
   constructor(app, taskManager) {
     super(app);
     this.taskManager = taskManager;

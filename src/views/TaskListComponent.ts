@@ -77,6 +77,9 @@ export class TaskListComponent {
         const titleRow = viewMode.createDiv('task-title-row');
         const titleEl = titleRow.createDiv('task-title');
         titleEl.setText(task.title);
+        titleEl.setAttribute('role', 'button');
+        titleEl.setAttribute('tabindex', '0');
+        titleEl.setAttribute('aria-label', `Open task in editor: ${task.title}`);
 
         const meta = viewMode.createDiv('task-meta');
 
@@ -106,6 +109,12 @@ export class TaskListComponent {
         }
 
         titleEl.addEventListener('click', () => { void openTaskInEditor(this.app, task); });
+        titleEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void openTaskInEditor(this.app, task);
+            }
+        });
     }
 
 }
