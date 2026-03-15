@@ -725,6 +725,12 @@
     z-index: 10;
 }
 
+.tasklens-dashboard-content .timeline-task-bar:focus-visible {
+    outline: 2px solid var(--text-accent);
+    outline-offset: 2px;
+    z-index: 10;
+}
+
 .timeline-row-bg:nth-child(odd) {
     background-color: rgba(var(--mono-rgb-100), 0.03);
 }
