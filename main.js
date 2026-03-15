@@ -97,8 +97,9 @@ var TaskManager = class extends import_obsidian.Events {
     this.isInternalChange = true;
     try {
       const freshTasks = await this.parser.getTasksFromFile(file.path);
+      const cachedTasksMap = new Map(cachedTasks.map((t) => [t.lineNumber, t]));
       for (const fresh of freshTasks) {
-        const cached = cachedTasks.find((c) => c.lineNumber === fresh.lineNumber);
+        const cached = cachedTasksMap.get(fresh.lineNumber);
         if (cached && !cached.completed && fresh.completed) {
           await this.addCompletionMetadata(fresh);
           return;
@@ -876,62 +877,11 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
       this.plugin.settings.colorMode = v;
       void this.plugin.saveSettings().then(() => {
         this.plugin.refreshViews();
-        renderColorPickers();
+        this.renderColorPickers(colorPickersContainer);
       });
     }));
     const colorPickersContainer = uiDetails.createDiv();
-    const renderColorPickers = () => {
-      colorPickersContainer.empty();
-      if (this.plugin.settings.colorMode === "status") {
-        new import_obsidian4.Setting(colorPickersContainer).setName("Overdue color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.overdue).onChange((v) => {
-          this.plugin.settings.colors.overdue = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-        new import_obsidian4.Setting(colorPickersContainer).setName("Urgent color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.urgent).onChange((v) => {
-          this.plugin.settings.colors.urgent = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-        new import_obsidian4.Setting(colorPickersContainer).setName("Active color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.active).onChange((v) => {
-          this.plugin.settings.colors.active = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-        new import_obsidian4.Setting(colorPickersContainer).setName("Completed color").addColorPicker((c) => c.setValue(this.plugin.settings.colors.completed).onChange((v) => {
-          this.plugin.settings.colors.completed = v;
-          void this.plugin.saveSettings().then(() => {
-            this.plugin.refreshViews();
-          });
-        }));
-      } else {
-        const helperText = colorPickersContainer.createEl("p", {
-          text: "Assign a custom color to each of your active topics.",
-          cls: "text-muted"
-        });
-        helperText.setCssProps({ "margin-left": "14px", "margin-bottom": "12px", "font-size": "0.9em" });
-        const allTasks = this.plugin.taskManager.getAllTasks();
-        const uniqueTopics = Array.from(new Set(allTasks.map((t) => t.fileName).filter((t) => Boolean(t))));
-        if (uniqueTopics.length === 0) {
-          const emptyText = colorPickersContainer.createEl("p", { text: "No active topics found. Add some tasks first!" });
-          emptyText.setCssProps({ "margin-left": "14px", "font-style": "italic" });
-          return;
-        }
-        uniqueTopics.forEach((topic) => {
-          const savedColor = getTopicColor(topic, this.plugin.settings);
-          new import_obsidian4.Setting(colorPickersContainer).setName(`${topic} color`).addColorPicker((c) => c.setValue(savedColor).onChange((v) => {
-            this.plugin.settings.topicColors[topic] = v;
-            void this.plugin.saveSettings().then(() => {
-              this.plugin.refreshViews();
-            });
-          }));
-        });
-      }
-    };
-    renderColorPickers();
+    this.renderColorPickers(colorPickersContainer);
     containerEl.createEl("br");
     containerEl.createEl("hr");
     const supportDiv = containerEl.createDiv();
@@ -956,6 +906,55 @@ var SettingsTab = class extends import_obsidian4.PluginSettingTab {
     bmcImg.setAttribute("width", "200");
     bmcImg.setAttribute("alt", "Buy Me A Coffee");
   }
+  renderColorPickers(container) {
+    container.empty();
+    if (this.plugin.settings.colorMode === "status") {
+      this.renderStatusColors(container);
+    } else {
+      this.renderTopicColors(container);
+    }
+  }
+  renderStatusColors(container) {
+    const createColorSetting = (name, settingKey) => {
+      new import_obsidian4.Setting(container).setName(name).addColorPicker(
+        (c) => c.setValue(this.plugin.settings.colors[settingKey]).onChange((v) => {
+          this.plugin.settings.colors[settingKey] = v;
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
+        })
+      );
+    };
+    createColorSetting("Overdue color", "overdue");
+    createColorSetting("Urgent color", "urgent");
+    createColorSetting("Active color", "active");
+    createColorSetting("Completed color", "completed");
+  }
+  renderTopicColors(container) {
+    const helperText = container.createEl("p", {
+      text: "Assign a custom color to each of your active topics.",
+      cls: "text-muted"
+    });
+    helperText.setCssProps({ "margin-left": "14px", "margin-bottom": "12px", "font-size": "0.9em" });
+    const allTasks = this.plugin.taskManager.getAllTasks();
+    const uniqueTopics = Array.from(new Set(allTasks.map((t) => t.fileName).filter((t) => Boolean(t))));
+    if (uniqueTopics.length === 0) {
+      const emptyText = container.createEl("p", { text: "No active topics found. Add some tasks first!" });
+      emptyText.setCssProps({ "margin-left": "14px", "font-style": "italic" });
+      return;
+    }
+    uniqueTopics.forEach((topic) => {
+      const savedColor = getTopicColor(topic, this.plugin.settings);
+      new import_obsidian4.Setting(container).setName(`${topic} color`).addColorPicker(
+        (c) => c.setValue(savedColor).onChange((v) => {
+          this.plugin.settings.topicColors[topic] = v;
+          void this.plugin.saveSettings().then(() => {
+            this.plugin.refreshViews();
+          });
+        })
+      );
+    });
+  }
 };
 
 // src/views/DashboardView.ts
@@ -970,7 +969,7 @@ async function openTaskInEditor(app, task) {
   const file = app.vault.getAbstractFileByPath(task.filePath);
   if (!(file instanceof import_obsidian5.TFile)) return;
   const leaf = app.workspace.getLeaf(false);
-  await leaf.openFile(file);
+  await leaf.openFile(file, { active: true });
   const view = app.workspace.getActiveViewOfType(import_obsidian5.MarkdownView);
   if (view) {
     const pos = { line: task.lineNumber, ch: 0 };
@@ -1020,6 +1019,9 @@ var TaskListComponent = class {
     const titleRow = viewMode.createDiv("task-title-row");
     const titleEl = titleRow.createDiv("task-title");
     titleEl.setText(task.title);
+    titleEl.setAttribute("role", "button");
+    titleEl.setAttribute("tabindex", "0");
+    titleEl.setAttribute("aria-label", `Open task in editor: ${task.title}`);
     const meta = viewMode.createDiv("task-meta");
     if (task.fileName) {
       const courseLabel = meta.createDiv("task-course");
@@ -1043,6 +1045,12 @@ var TaskListComponent = class {
     }
     titleEl.addEventListener("click", () => {
       void openTaskInEditor(this.app, task);
+    });
+    titleEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        void openTaskInEditor(this.app, task);
+      }
     });
   }
 };
@@ -1548,11 +1556,19 @@ var HeaderComponent = class {
     }
     const titleWrapper = this.headerEl.createDiv("dashboard-title-wrapper");
     titleWrapper.setAttribute("aria-label", "Click to rename");
+    titleWrapper.setAttribute("role", "button");
+    titleWrapper.setAttribute("tabindex", "0");
     titleWrapper.createEl("h2", { text: this.title });
     const editIcon = titleWrapper.createDiv("edit-title-icon");
     (0, import_obsidian7.setIcon)(editIcon, "pencil");
     titleWrapper.addEventListener("click", () => {
       this.enterEditMode(titleWrapper);
+    });
+    titleWrapper.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.enterEditMode(titleWrapper);
+      }
     });
     const rightGroup = this.headerEl.createDiv("header-actions-right");
     if (this.onAdd) {

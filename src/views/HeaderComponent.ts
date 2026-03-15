@@ -87,12 +87,20 @@ export class HeaderComponent {
 
         const titleWrapper = this.headerEl.createDiv('dashboard-title-wrapper');
         titleWrapper.setAttribute('aria-label', 'Click to rename');
+        titleWrapper.setAttribute('role', 'button');
+        titleWrapper.setAttribute('tabindex', '0');
         titleWrapper.createEl('h2', { text: this.title });
         const editIcon = titleWrapper.createDiv('edit-title-icon');
         setIcon(editIcon, 'pencil');
 
         titleWrapper.addEventListener('click', () => {
             this.enterEditMode(titleWrapper);
+        });
+        titleWrapper.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.enterEditMode(titleWrapper);
+            }
         });
 
         const rightGroup = this.headerEl.createDiv('header-actions-right');
