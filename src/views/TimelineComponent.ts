@@ -416,6 +416,9 @@ export class TimelineComponent {
 
             const bar = grid.createDiv('timeline-task-bar');
             bar.setText(barLabel);
+            bar.setAttribute('role', 'button');
+            bar.setAttribute('tabindex', '0');
+            bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
             bar.setCssProps({
                 'grid-column-start': String(startIdx + 1),
                 'grid-column-end': `span ${String((dueIdx - startIdx) + 1)}`,
@@ -445,6 +448,13 @@ export class TimelineComponent {
             bar.addEventListener('click', (e) => {
                 e.stopPropagation();
                 void openTaskInEditor(this.app, task);
+            });
+            bar.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void openTaskInEditor(this.app, task);
+                }
             });
         });
 
