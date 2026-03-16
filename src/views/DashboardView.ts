@@ -352,7 +352,19 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         statCards.forEach(stat => {
             const card = container.createDiv({ cls: ['stat-card', stat.cls, 'is-clickable'] });
-            card.addEventListener('click', () => { this.taskManager.setStatusFilter(stat.filter); });
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            card.setAttribute('aria-label', `Filter by ${stat.label} tasks`);
+
+            const triggerFilter = () => { this.taskManager.setStatusFilter(stat.filter); };
+            card.addEventListener('click', triggerFilter);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    triggerFilter();
+                }
+            });
+
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
