@@ -4,9 +4,7 @@ import * as path from 'path';
 export default defineConfig({
     test: {
         setupFiles: ['./tests/setup.ts'],
-        environment: 'node'
-    },
-    resolve: {
+        environment: 'node',
         alias: {
             'obsidian': path.resolve(__dirname, './tests/mocks/obsidian.ts')
         }

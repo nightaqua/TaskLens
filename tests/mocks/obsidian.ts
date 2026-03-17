@@ -22,10 +22,11 @@ export class Modal {
 }
 
 export class SuggestModal<T> {
-    // Make use of T to satisfy linters
     public items: T[] = [];
+    public item?: T;
     open(): void {}
     close(): void {}
+    onChooseItem(item: T, evt: MouseEvent | KeyboardEvent): void {}
 }
 
 export class ItemView {
