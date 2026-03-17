@@ -6,7 +6,7 @@ import { openTaskInEditor } from './TaskListComponent';
 
 export class BoardComponent {
     private draggedTaskGroup: TaskGroup | null = null;
-    private columns: Record<string, HTMLElement> = {};
+    private columns: Record<string, HTMLElement | undefined> = {};
 
     constructor(
         private readonly container: HTMLElement,
@@ -204,6 +204,16 @@ export class BoardComponent {
         // Add double click to open in editor
         card.addEventListener('dblclick', () => {
             void openTaskInEditor(this.app, task);
+        });
+
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void openTaskInEditor(this.app, task);
+            }
         });
     }
 }

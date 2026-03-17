@@ -17,13 +17,13 @@ export class Events {
 }
 
 export class Modal {
-    constructor() {}
     open(): void {}
     close(): void {}
 }
 
 export class SuggestModal<T> {
-    constructor() {}
+    // Make use of T to satisfy linters
+    public items: T[] = [];
     open(): void {}
     close(): void {}
 }

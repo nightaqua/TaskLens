@@ -292,7 +292,7 @@ export class TaskManager extends Events {
     /**
      * Update a task's title and/or due date
      */
-    async updateTask(task: Task, newTitle: string, newDate: Date | null): Promise<void> {
+    async updateTask(task: Task, newTitle: string, newDate: Date | null | undefined): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
         if (!(file instanceof TFile)) return;
 
