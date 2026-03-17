@@ -156,7 +156,7 @@ describe('TaskManager.updateTaskStatus', () => {
     let mockFile: TFile;
 
     beforeEach(() => {
-        mockFile = Object.create(TFile.prototype);
+        mockFile = Object.create(TFile.prototype) as TFile;
         mockFile.path = 'test.md';
 
         const content = '- [ ] My task [due:: 2026-03-10]\n';

@@ -19,6 +19,8 @@ export class StatsComponent {
 
         statCards.forEach(stat => {
             const card = containerDiv.createDiv({ cls: ['stat-card', stat.cls] });
+            card.setAttribute('role', 'status');
+            card.setAttribute('aria-label', `${stat.label} tasks: ${String(stat.value)}`);
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });

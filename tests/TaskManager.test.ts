@@ -33,7 +33,7 @@ describe('TaskManager', () => {
 
     describe('calculateNextDueDate', () => {
         describe('Strict Recurrence (from dueDate)', () => {
-            it('calculates daily recurrence correctly', () => {
+        it('calculates daily recurrence correctly', () => {
             const dueDate = new Date('2026-03-10T00:00:00');
             const completionDate = new Date('2026-03-12T00:00:00');
 
@@ -196,7 +196,6 @@ describe('TaskManager', () => {
         it('formats leap year date correctly', () => {
             const date = new Date('2024-02-29T12:00:00');
             expect(TaskManager.formatDisplayDate(date)).toBe('29-02-2024');
-        });
     });
 });
 
@@ -226,9 +225,9 @@ describe('TaskManager.updateTask', () => {
     it('strips due:: metadata explicitly when newDate is null', async () => {
         const mockApp = {
             vault: {
-                getAbstractFileByPath: vi.fn().mockImplementation((path: string): TFile => {
-                    const file: TFile = Object.create(TFile.prototype);
-                    Object.defineProperty(file, 'path', { value: path, writable: true });
+                getAbstractFileByPath: vi.fn().mockImplementation((path) => {
+                    const file = Object.create(TFile.prototype);
+                    file.path = path;
                     return file;
                 }),
                 read: vi.fn().mockResolvedValue('- [ ] Complete assignment [due:: 2026-03-15]'),
@@ -256,4 +255,5 @@ describe('TaskManager.updateTask', () => {
         expect(modifyCalls.length).toBe(1);
         expect(modifyCalls[0][1]).toBe('- [ ] Complete assignment');
     });
+});
 });

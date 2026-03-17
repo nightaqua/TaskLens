@@ -331,7 +331,7 @@ export class TaskManager extends Events {
             } else {
                 newBody = `${newBody} [due:: ${dateStr}]`;
             }
-        } else {
+        } else if (newDate === null) {
             // Strip the due:: tag entirely
             const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
             newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
@@ -475,7 +475,7 @@ export class TaskManager extends Events {
         for (const [name, stats] of topicStats.entries()) {
             if (stats.totalOpen > 0) {
                 const ratio = stats.urgent / stats.totalOpen;
-                if (ratio > maxRatio || (ratio === maxRatio && mostUrgentTopic !== null && stats.urgent > mostUrgentTopic.urgent)) {
+                if (ratio > maxRatio || (ratio === maxRatio && mostUrgentTopic && stats.urgent > mostUrgentTopic.urgent)) {
                     maxRatio = ratio;
                     mostUrgentTopic = { name, ratio, urgent: stats.urgent, total: stats.totalOpen };
                 }
