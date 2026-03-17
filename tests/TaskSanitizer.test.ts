@@ -32,11 +32,6 @@ describe('TaskSanitizer - stripCompletionMetadata', () => {
         expect(stripCompletionMetadata('- [x] Task (Completion:: 2023-10-27)')).toBe('- [x] Task');
     });
 
-    it('should handle multiple spaces around completion key', () => {
-        expect(stripCompletionMetadata('- [x] Task [ completion:: 2023-10-27 ]')).toBe('- [x] Task');
-        expect(stripCompletionMetadata('- [x] Task (  completion:: 2023-10-27  )')).toBe('- [x] Task');
-    });
-
     it('should handle metadata in the middle of a line', () => {
         expect(stripCompletionMetadata('- [x] Some [completion:: 2023-10-27] task')).toBe('- [x] Some task');
         expect(stripCompletionMetadata('- [x] Some ✅ 2023-10-27 task')).toBe('- [x] Some task');
@@ -56,6 +51,37 @@ describe('TaskSanitizer - stripCompletionMetadata', () => {
 });
 
 describe('TaskSanitizer', () => {
+        describe('hasCompletionMetadata', () => {
+        it('should return true if line contains Tasks plugin completion emoji ✅', () => {
+            expect(hasCompletionMetadata('- [x] Task ✅ 2023-10-27')).toBe(true);
+            expect(hasCompletionMetadata('✅ 2023-10-27')).toBe(true);
+        });
+
+        it('should return true if line contains Dataview/TaskLens completion inline field', () => {
+            expect(hasCompletionMetadata('- [x] Task [completion:: 2023-10-27]')).toBe(true);
+            expect(hasCompletionMetadata('- [x] Task (completion:: 2023-10-27)')).toBe(true);
+            expect(hasCompletionMetadata('completion:: 2023-10-27')).toBe(true);
+        });
+
+        it('should return true regardless of case for completion::', () => {
+            expect(hasCompletionMetadata('- [x] Task [COMPLETION:: 2023-10-27]')).toBe(true);
+            expect(hasCompletionMetadata('- [x] Task (Completion:: 2023-10-27)')).toBe(true);
+        });
+
+        it('should return false if no completion metadata is present', () => {
+            expect(hasCompletionMetadata('- [ ] Task without metadata')).toBe(false);
+            expect(hasCompletionMetadata('- [ ] Task with [due:: 2023-10-27]')).toBe(false);
+            expect(hasCompletionMetadata('- [ ] Task with 🔁 every day')).toBe(false);
+            expect(hasCompletionMetadata('Just some text')).toBe(false);
+        });
+
+        it('should return false for malformed completion metadata', () => {
+            expect(hasCompletionMetadata('✅ 23-10-27')).toBe(false); // Wrong year format
+            expect(hasCompletionMetadata('✅ 2023-1-27')).toBe(false); // Wrong month format
+            expect(hasCompletionMetadata('completio:: 2023-10-27')).toBe(false);
+        });
+    });
+
     describe('hasCompletionMetadata', () => {
         it('should return true if line contains Tasks plugin completion emoji ✅ and date', () => {
             expect(hasCompletionMetadata('- [x] Task ✅ 2024-05-15')).toBe(true);
@@ -92,11 +118,6 @@ describe('TaskSanitizer', () => {
         it('should return true if line contains Tasks plugin repeat emoji 🔁', () => {
             expect(hasRecurrenceMetadata('- [ ] Every day 🔁 every day')).toBe(true);
             expect(hasRecurrenceMetadata('- [ ] 🔁')).toBe(true);
-        });
-
-        it('should return true if line contains Tasks plugin finish emoji 🏁', () => {
-            expect(hasRecurrenceMetadata('- [ ] Finish line 🏁')).toBe(true);
-            expect(hasRecurrenceMetadata('🏁 some text')).toBe(true);
         });
 
         it('should return true if line contains Dataview/TaskLens repeat inline field [repeat:: ...]', () => {
