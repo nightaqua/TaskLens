@@ -6,7 +6,7 @@ import { openTaskInEditor } from './TaskListComponent';
 
 export class BoardComponent {
     private draggedTaskGroup: TaskGroup | null = null;
-    private columns: Record<string, HTMLElement> = {};
+    private columns: Record<string, HTMLElement | undefined> = {};
 
     constructor(
         private readonly container: HTMLElement,
@@ -73,6 +73,10 @@ export class BoardComponent {
             if (status === TaskStatus.NoDate) status = TaskStatus.UpcomingWeek; // fallback NoDate to Active for display
 
             const col = this.columns[status];
+            if (!col) {
+                // This should not happen with current logic, but handle gracefully
+                return;
+            }
             this.renderTaskCard(col, group);
         });
     }

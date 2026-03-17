@@ -292,7 +292,7 @@ export class TaskManager extends Events {
     /**
      * Update a task's title and/or due date
      */
-    async updateTask(task: Task, newTitle: string, newDate: Date | null): Promise<void> {
+    async updateTask(task: Task, newTitle: string, newDate: Date | null | undefined): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
         if (!(file instanceof TFile)) return;
 
@@ -331,7 +331,7 @@ export class TaskManager extends Events {
             } else {
                 newBody = `${newBody} [due:: ${dateStr}]`;
             }
-        } else {
+        } else if (newDate === null) {
             // Strip the due:: tag entirely
             const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
             newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
