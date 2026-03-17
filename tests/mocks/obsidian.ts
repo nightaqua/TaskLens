@@ -15,3 +15,33 @@ export class Events {
     trigger(name: string, ...data: any[]): void {}
     tryTrigger(evt: any, args: any[]): void {}
 }
+
+export class Modal {
+    constructor() {}
+    open(): void {}
+    close(): void {}
+}
+
+export class SuggestModal<T> {
+    constructor() {}
+    open(): void {}
+    close(): void {}
+}
+
+export class ItemView {
+    getViewType(): string { return ''; }
+    getDisplayText(): string { return ''; }
+    getViewData(): unknown { return {}; }
+    setViewData(data: unknown, clear?: boolean): void {}
+}
+
+export class WorkspaceLeaf {
+    view: ItemView | null = null;
+}
+
+export class ViewStateResult {
+    data: unknown;
+    state: unknown;
+}
+
+export function setIcon(el: HTMLElement, iconId: string): void {}

@@ -73,7 +73,10 @@ export class BoardComponent {
             if (status === TaskStatus.NoDate) status = TaskStatus.UpcomingWeek; // fallback NoDate to Active for display
 
             const col = this.columns[status];
-            if (!col) return; // status has no column (e.g. open filter passes Completed tasks through)
+            if (!col) {
+                // This should not happen with current logic, but handle gracefully
+                return;
+            }
             this.renderTaskCard(col, group);
         });
     }

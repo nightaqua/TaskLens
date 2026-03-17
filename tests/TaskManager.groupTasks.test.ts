@@ -3,6 +3,7 @@ import { TaskManager } from '../src/services/TaskManager';
 import { TaskParser } from '../src/services/TaskParser';
 import { App, TFile } from 'obsidian';
 import { Task, TaskGroup } from '../src/models/Task';
+import { createMockFile } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -156,8 +157,7 @@ describe('TaskManager.updateTaskStatus', () => {
     let mockFile: TFile;
 
     beforeEach(() => {
-        mockFile = Object.create(TFile.prototype) as TFile;
-        mockFile.path = 'test.md';
+        mockFile = createMockFile('test.md');
 
         const content = '- [ ] My task [due:: 2026-03-10]\n';
         const mockApp = {

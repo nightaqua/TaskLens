@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TaskManager } from '../src/services/TaskManager';
 import { TaskParser } from '../src/services/TaskParser';
 import { App, TFile } from 'obsidian';
+import { createMockFile } from './helpers';
 
 describe('TaskManager', () => {
     // We can just cast empty objects since calculateNextDueDate doesn't use 'this'
@@ -226,9 +227,7 @@ describe('TaskManager.updateTask', () => {
         const mockApp = {
             vault: {
                 getAbstractFileByPath: vi.fn().mockImplementation((path) => {
-                    const file = Object.create(TFile.prototype);
-                    file.path = path;
-                    return file;
+                    return createMockFile(path);
                 }),
                 read: vi.fn().mockResolvedValue('- [ ] Complete assignment [due:: 2026-03-15]'),
                 modify: vi.fn().mockResolvedValue(undefined)

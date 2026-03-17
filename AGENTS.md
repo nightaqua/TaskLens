@@ -57,7 +57,7 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
 - **No unnecessary conditionals.** Do not check existence when TypeScript
   already guarantees it.
 - **No bare numbers in template literals.** Wrap with `String()`:
-  `\`value: ${String(n)}\``not`\`value: ${n}\``.
+  `` `value: ${String(n)}` `` not `` `value: ${n}` ``.
 - **No static-only classes.** Use exported module functions instead
   (`@typescript-eslint/no-extraneous-class`).
 - **British English** for internal method/variable names where relevant
@@ -81,6 +81,9 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
 
 ## 4. Obsidian API & DOM Best Practices
 
+- **Never use `innerHTML` or `insertAdjacentHTML`.** These are a security
+  violation (XSS risk) and a policy violation. Use only Obsidian DOM helpers:
+  `createEl()`, `createDiv()`, `createSpan()`, `el.setText()`, `el.empty()`.
 - **Never mutate `.style` directly.** Use CSS classes or
   `.setCssProps({ display: 'none' })`.
 - **State persistence.** Always merge with Obsidian's internal state:
@@ -89,13 +92,31 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
   ```
 - **Modal focus.** Capture `app.workspace.getActiveViewOfType(MarkdownView)` in
   the constructor, not in `onOpen()` — modals steal focus before `onOpen` runs.
+- **Path normalisation.** Every file/folder path taken from user input or
+  constructed programmatically must be passed through `normalizePath()` before
+  use in any Vault operation or string comparison. Never assume forward slashes
+  or absence of leading/trailing whitespace.
+- **File lookups by path.** Use `app.vault.getFileByPath()` or
+  `app.vault.getAbstractFileByPath()` for single-file lookups. Never iterate
+  `getMarkdownFiles()` to find a specific file by path — those cache-backed
+  methods are O(1); iteration is O(N).
+- **Command naming.** Obsidian automatically prepends the plugin name to every
+  command in the palette. Register commands with bare action descriptions:
+  `"Open dashboard"` not `"TaskLens: Open dashboard"`. The latter produces
+  `"TaskLens: TaskLens: Open dashboard"` in the palette.
 
 ---
 
 ## 5. Memory Management & Event Listeners
 
-- **Unregister in `onClose`.** Any listener registered on `app.workspace`,
-  `app.vault`, or `TaskManager` must be removed in `onClose()` with `.off()`.
+- **Use `registerEvent()` for vault and workspace events.** All subscriptions
+  to `app.vault`, `app.workspace`, or any Obsidian `Events` emitter must use
+  `this.registerEvent(...)`. This ensures automatic cleanup when the plugin
+  unloads. Manual `.on()` without a corresponding `.off()` in `onunload()` or
+  `onClose()` creates ghost listeners that persist after the plugin is disabled.
+- **Unregister in `onClose`.** Any listener registered on `TaskManager` (which
+  uses the Obsidian `Events` base class) must be explicitly removed in
+  `onClose()` with `.off()`.
 - **Arrow function handlers.** Use class arrow functions to avoid `this` scoping
   issues and satisfy `@typescript-eslint/unbound-method`:
   ```ts
@@ -105,6 +126,10 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
   // in onClose:
   this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
   ```
+- **Detach leaves on unload.** Any `WorkspaceLeaf` opened by the plugin persists
+  in the user's workspace even after the plugin is disabled unless explicitly
+  detached. `main.ts`'s `onunload()` must call `detach()` on all leaves the
+  plugin has opened (Dashboard, Timeline, Stats, TaskList views).
 
 ---
 
@@ -138,42 +163,114 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
 
 ## 8. UI & Copywriting Conventions
 
-- **Sentence case.** Write "Quick add task" not "Quick Add Task".
-- **Settings headings.** Never include the plugin name or the word "Settings"
-  in a section header. Use descriptive names: "Visuals & colours" not
-  "TaskLens Visual Settings".
+- **Sentence case.** All UI strings — button labels, setting names, column
+  headers, menu items, modal titles — must use sentence case.
+  Write `"Quick add task"` not `"Quick Add Task"`. Proper nouns and trademarks
+  (Markdown, PDF, TaskLens) stay capitalised.
+- **Settings headings.** Never include the plugin name or the words "Settings"
+  or "Options" in a section header. Use descriptive names: `"Visuals & colours"`
+  not `"TaskLens Visual Settings"`. The user is already in the plugin's settings
+  tab; repetition creates clutter.
+- **CSS cursors.** In Obsidian, `cursor: pointer` is reserved strictly for `<a>`
+  link elements. Buttons and interactive divs must use the default system cursor.
+  Do not add `cursor: pointer` to any non-link element.
+- **CSS variables.** Never use hard-coded hex colours or pixel values for
+  theme-dependent properties. Use Obsidian's CSS variables (`--background-primary`,
+  `--color-red`, `--text-muted`, etc.) so the plugin adapts automatically to
+  light/dark themes and user accent colours.
 
 ---
 
-## 9. Testing
+## 9. Mobile & Cross-Platform Compatibility
+
+- **No regex lookbehinds.** Lookbehind assertions (`(?<=...)`, `(?<!...)`) are
+  not supported on iOS < 16.4. Rewrite all regexes to use forward-scanning
+  alternatives. This applies to every regex in `TaskParser.ts` and
+  `TaskSanitizer.ts`.
+- **No Node.js / Electron APIs** unless `isDesktopOnly: true` is set in
+  `manifest.json`. APIs like `fs`, `path`, `crypto`, and `electron` are
+  unavailable on mobile. Use Obsidian's own abstractions (`normalizePath()`,
+  `Platform`, the Vault API) instead.
+
+---
+
+## 10. Testing
 
 Pure logic functions are safe to unit test — set up Vitest and target:
 
 - `TaskParser.parseTaskMetadata` — date formats, bracket variants, emoji
   fallback, title stripping
+- `TaskParser.getFilesToScan` — folder matching, recursive vs non-recursive,
+  edge cases (prefix collision, root `/`)
 - `TaskManager.calculateNextDueDate` — all recurrence rules, month overflow
+- `TaskManager.formatDisplayDate` / `formatCompletionDate` — padding, leap
+  year, time component ignored
 - `TaskSanitizer` — all metadata formats, strip idempotency
+- `TaskManager.processManualUpdate` — error path resets `isInternalChange`
 
 Do **not** attempt to test anything that calls the Obsidian API directly.
 There is no mock environment for `app.vault`, `app.workspace`, or `ItemView`.
 
 ---
 
-## 10. Commit Style
+## 11. Commit & PR Rules
 
-Conventional commits: `fix:`, `feat:`, `refactor:`, `test:`, `chore:`.
-Keep the subject line under 72 characters. Body lines under 100 characters.
+- **Conventional commits:** `fix:`, `feat:`, `refactor:`, `test:`, `chore:`.
+  Keep the subject line under 72 characters. Body lines under 100 characters.
+- **One squashed commit per PR.** Do not submit PRs with multiple commits
+  carrying identical or near-identical messages. Squash before opening the PR.
+- **No unrelated dependency bumps.** Do not include `package.json` or
+  `package-lock.json` version changes in a PR scoped to logic or tests. Deps
+  belong in a dedicated `chore: bump dependencies` PR.
+- **Never commit `main.js`.** It is a build artifact managed by CI and
+  attached to GitHub Releases. It must not appear in source-tree commits.
+  If it appears in your diff, remove it before submitting.
+- **No cosmetic-only refactors.** Do not open PRs that only rename files or
+  folders, reorganise directory structure, or reorder code without any
+  behavioural change. These create merge conflicts and history noise for zero
+  benefit.
 
 ---
 
-## 11. Mandatory Verification
+## 12. Performance — What Not to Optimise
+
+Do **not** open PRs for micro-optimisations on methods that run at most once
+per user interaction on realistic task counts (typically < 500 tasks):
+
+- `getStatistics` / `calculateStatistics` — single-pass rewrites are rejected.
+- `groupTasks` — any caching scheme beyond what exists is rejected.
+- `getTaskStatus` — date object allocation reduction is rejected.
+- `TaskParser` regex consolidation into a single-pass loop is rejected.
+
+If a change has no measurable effect on a real user's vault, it is not a
+performance improvement — it is readability debt. Do not benchmark synthetic
+10,000-task scenarios and present the result as justification.
+
+---
+
+## 13. Mandatory Verification
 
 Before finalising any task, successfully run:
 
 ```bash
 npm run build
 npx eslint .
+npm run test
 ```
 
-If either fails, fix the errors before concluding. Do not submit a PR with
-build errors or linter warnings.
+If any of these fail, fix the errors before concluding. Do not submit a PR with
+build errors, linter warnings, or failing tests.
+
+---
+
+## 14. Release Checklist (for maintainer reference)
+
+- `manifest.json` version matches `package.json` version exactly (no `v` prefix
+  anywhere).
+- `minAppVersion` in `manifest.json` reflects the oldest Obsidian version that
+  supports every API the plugin calls. Update this whenever a new API is adopted.
+- GitHub release name matches `manifest.json` version exactly.
+- `main.js`, `manifest.json`, and `styles.css` are attached as individual assets
+  on the GitHub Release — not inside a zip.
+- `main.js` and `styles.css` are listed in `.gitignore` and not present in the
+  source tree.

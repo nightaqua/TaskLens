@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import fs from "fs";
 
 const banner =
 	`/*
@@ -11,11 +12,20 @@ if you want to view the source, please visit the github repository instead
 
 const prod = (process.argv[2] === 'production');
 
+const copyStyles = {
+	name: 'copy-styles',
+	setup(build) {
+		build.onEnd(() => {
+			fs.copyFileSync('src/styles.css', 'styles.css');
+		});
+	}
+};
+
 const context = await esbuild.context({
 	banner: {
 		js: banner,
 	},
-	entryPoints: ['src/main.ts'], // <-- UPDATED ENTRY POINT
+	entryPoints: ['src/main.ts'],
 	bundle: true,
 	external: [
 		'obsidian',
@@ -38,6 +48,7 @@ const context = await esbuild.context({
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,
 	outfile: 'main.js',
+	plugins: [copyStyles],
 });
 
 if (prod) {
