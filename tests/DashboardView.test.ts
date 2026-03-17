@@ -76,11 +76,11 @@ describe('DashboardView DOM Helpers', () => {
         });
 
         it('does not throw when both arguments are null', () => {
-            expect(() => cleanUpViewDOM(null, null)).not.toThrow();
+            expect(() => { cleanUpViewDOM(null, null); }).not.toThrow();
         });
 
         it('does not throw when elements do not have the classes', () => {
-            expect(() => cleanUpViewDOM(leafRootEl, tabContainer)).not.toThrow();
+            expect(() => { cleanUpViewDOM(leafRootEl, tabContainer); }).not.toThrow();
 
             expect(leafRootEl.classList.contains(CLASS_CHROMELESS)).toBe(false);
             expect(tabContainer.classList.contains(CLASS_HIDE_TABS)).toBe(false);

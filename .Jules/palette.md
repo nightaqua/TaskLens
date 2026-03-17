@@ -1,9 +1,3 @@
-## 2024-05-10 - Icon-only buttons accessibility
-
-**Learning:** Obsidian plugins heavily use icon-only buttons via the `setIcon()` helper for visual cleanliness (especially in headers and toolbars), which by default lack context for assistive technology.
-**Action:** Always check newly added or existing icon-only buttons created with `setIcon` or similar helpers to ensure they also receive a descriptive `aria-label`.
-
-## 2024-05-16 - Accessible interactive elements with Obsidian DOM API
-
-**Learning:** Obsidian's DOM API helpers (`createDiv`, `createEl`) create non-semantic elements by default (e.g., plain `div`s). When these elements act as interactive components (like clickable stat cards or task items), they lack native keyboard accessibility and semantic meaning.
-**Action:** Always add manual `role="button"` (or other appropriate role), `tabindex="0"`, and `aria-label` to custom interactive elements created via DOM helpers. Additionally, attach `keydown` event listeners for the 'Enter' and ' ' (Space) keys to ensure full keyboard operability.
+## 2024-03-17 - Keyboard Accessibility for Custom Interactive Divs
+**Learning:** In Obsidian plugin development using native DOM manipulation (`createDiv`), interactive elements like task cards often start out purely mouse-driven (e.g., relying on `dblclick` or `drag` events). These `.board-task-card` elements are completely inaccessible to keyboard users because they lack semantic meaning (`role`), focusability (`tabindex`), screen reader labels (`aria-label`), and keydown event handlers. Furthermore, Obsidian's default stylesheet does not provide visual focus indicators for custom divs, making keyboard navigation invisible even if it is technically supported.
+**Action:** When implementing interactive non-native elements, always explicitly add `role="button"`, `tabindex="0"`, a descriptive `aria-label`, and a `keydown` listener that checks for `e.key === 'Enter' || e.key === ' '` to replicate the primary mouse action. Additionally, explicitly define a `:focus-visible` state in the CSS (e.g., `outline: 2px solid var(--text-accent); outline-offset: 2px;`) to ensure visual accessibility during keyboard navigation.

@@ -331,7 +331,7 @@ export class TaskManager extends Events {
             } else {
                 newBody = `${newBody} [due:: ${dateStr}]`;
             }
-        } else if (newDate === null) {
+        } else {
             // Strip the due:: tag entirely
             const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
             newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();

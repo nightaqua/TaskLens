@@ -73,10 +73,6 @@ export class BoardComponent {
             if (status === TaskStatus.NoDate) status = TaskStatus.UpcomingWeek; // fallback NoDate to Active for display
 
             const col = this.columns[status];
-            if (!col) {
-                // This should not happen with current logic, but handle gracefully
-                return;
-            }
             this.renderTaskCard(col, group);
         });
     }
@@ -204,6 +200,16 @@ export class BoardComponent {
         // Add double click to open in editor
         card.addEventListener('dblclick', () => {
             void openTaskInEditor(this.app, task);
+        });
+
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void openTaskInEditor(this.app, task);
+            }
         });
     }
 }

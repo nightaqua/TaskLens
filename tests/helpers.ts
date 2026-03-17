@@ -6,7 +6,9 @@ import { TFile } from 'obsidian';
 export const createMockFile = (path: string): TFile => {
     const file = Object.create(TFile.prototype);
     if (file instanceof TFile) {
-        file.path = path;
+        Object.assign(file, { path });
+        return file;
     }
-    return file;
+    // Should never reach here in tests given Object.create
+    throw new Error('Could not create mock TFile');
 };

@@ -11,12 +11,10 @@ vi.mock('obsidian', () => {
         },
         App: class {},
         Modal: class {
-            constructor() {}
             open() {}
             close() {}
         },
         SuggestModal: class {
-            constructor() {}
             open() {}
             close() {}
         },
@@ -40,12 +38,10 @@ if (typeof window !== 'undefined') {
             },
             App: class {},
             Modal: class {
-                constructor() {}
                 open() {}
                 close() {}
             },
             SuggestModal: class {
-                constructor() {}
                 open() {}
                 close() {}
             },
