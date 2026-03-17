@@ -3,6 +3,9 @@ import { Task } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
 
 export class TaskParser {
+    private cachedFiles: TFile[] | null = null;
+    private cachedFilePaths: string[] | null = null;
+
     // Matches both yyyy-mm-dd and dd-mm-yyyy after the key
     private static readonly DATE_PAT = '(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})';
 
@@ -57,36 +60,53 @@ export class TaskParser {
         return [];
     }
 
+    public clearCache(): void {
+        this.cachedFiles = null;
+        this.cachedFilePaths = null;
+    }
+
+    public getScannedFilePaths(): string[] {
+        if (this.cachedFilePaths) return this.cachedFilePaths;
+        this.cachedFilePaths = this.getFilesToScan().map(file => file.path);
+        return this.cachedFilePaths;
+    }
+
     // --- Private Helpers ---
 
     public getFilesToScan(): TFile[] {
+        if (this.cachedFiles) return this.cachedFiles;
+
         const allMarkdownFiles = this.app.vault.getMarkdownFiles();
 
+        let result: TFile[];
         if (this.settings.scanFolders.length === 0) {
-            return allMarkdownFiles;
+            result = allMarkdownFiles;
+        } else {
+            result = allMarkdownFiles.filter(file => {
+                return this.settings.scanFolders.some(folder => {
+                    const normalizedFolder = folder.replace(/^\/|\/$/g, '');
+                    const filePath = file.path;
+
+                    // 1. Direct File Match (e.g. user typed "Projects/Todo.md" or "Todo")
+                    if (filePath === normalizedFolder || filePath === `${normalizedFolder}.md`) {
+                        return true;
+                    }
+
+                    // 2. Folder Match
+                    if (this.settings.scanRecursively) {
+                        // The trailing slash prevents "Math" from matching a folder named "Maths/"
+                        return filePath.startsWith(normalizedFolder + '/');
+                    } else {
+                        // Match ONLY files directly inside this specific folder
+                        const fileFolder = file.parent?.path === '/' ? '' : (file.parent?.path || '');
+                        return fileFolder === normalizedFolder;
+                    }
+                });
+            });
         }
 
-        return allMarkdownFiles.filter(file => {
-            return this.settings.scanFolders.some(folder => {
-                const normalizedFolder = folder.replace(/^\/|\/$/g, '');
-                const filePath = file.path;
-
-                // 1. Direct File Match (e.g. user typed "Projects/Todo.md" or "Todo")
-                if (filePath === normalizedFolder || filePath === `${normalizedFolder}.md`) {
-                    return true;
-                }
-
-                // 2. Folder Match
-                if (this.settings.scanRecursively) {
-                    // The trailing slash prevents "Math" from matching a folder named "Maths/"
-                    return filePath.startsWith(normalizedFolder + '/');
-                } else {
-                    // Match ONLY files directly inside this specific folder
-                    const fileFolder = file.parent?.path === '/' ? '' : (file.parent?.path || '');
-                    return fileFolder === normalizedFolder;
-                }
-            });
-        });
+        this.cachedFiles = result;
+        return result;
     }
 
     private async parseTasksFromFile(file: TFile): Promise<Task[]> {

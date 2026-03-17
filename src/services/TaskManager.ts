@@ -13,15 +13,22 @@ export class TaskManager extends Events {
 
     private cachedStats: ReturnType<typeof this.calculateStatistics> | null = null;
     private lastTasksRef: Task[] | null = null;
+    private cachedAllGroups: TaskGroup[] | null = null;
 
     constructor(private readonly parser: TaskParser, private readonly app: App) {
         super();
     }
 
     async loadTasks(): Promise<void> {
+        this.parser.clearCache();
         this.tasks = await this.parser.findAllTasks();
+        this.invalidateCache();
         this.applyFiltersAndSort();
         this.trigger('tasks-updated');
+    }
+
+    private invalidateCache(): void {
+        this.cachedAllGroups = null;
     }
 
     public getIsInternalChange(): boolean { return this.isInternalChange; }
@@ -345,6 +352,7 @@ export class TaskManager extends Events {
         const fileTasks = await this.parser.getTasksFromFile(filePath);
         this.tasks = this.tasks.filter(t => t.filePath !== filePath);
         this.tasks.push(...fileTasks);
+        this.invalidateCache();
         this.applyFiltersAndSort();
         this.trigger('tasks-updated');
     }
@@ -414,11 +422,14 @@ export class TaskManager extends Events {
 
     /** For the timeline: all tasks (no status filter) collapsed into recurring groups. */
     public getAllGroupedTasks(): TaskGroup[] {
-        return this.groupTasks(this.tasks);
+        if (!this.cachedAllGroups) {
+            this.cachedAllGroups = this.groupTasks(this.tasks);
+        }
+        return this.cachedAllGroups;
     }
 
     getScannedFiles(): string[] {
-        return this.parser.getFilesToScan().map(file => file.path);
+        return this.parser.getScannedFilePaths();
     }
 
     getStatistics() {
