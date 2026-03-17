@@ -35,9 +35,6 @@ export function resolveActiveMarkdownView(app: App): MarkdownView | null {
 
         if (visibleMarkdownLeaf) {
             view = visibleMarkdownLeaf.view as MarkdownView;
-        } else if (markdownLeaves.length > 0 && markdownLeaves[0].view instanceof MarkdownView) {
-            // Fallback to the first Markdown leaf found if none are explicitly 'shown'
-            view = markdownLeaves[0].view;
         }
     }
 

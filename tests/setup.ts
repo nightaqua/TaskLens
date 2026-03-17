@@ -21,6 +21,11 @@ vi.mock('obsidian', () => {
         ItemView: class {},
         WorkspaceLeaf: class {},
         ViewStateResult: class {},
+        MarkdownView: class {
+            containerEl = { isShown: () => true };
+            editor = { replaceSelection: () => {} };
+            file = { path: '' };
+        },
         setIcon: vi.fn()
     };
 });
@@ -46,6 +51,11 @@ if (typeof window !== 'undefined') {
                 close() {}
             },
             ItemView: class {},
+            MarkdownView: class {
+                containerEl = { isShown: () => true };
+                editor = { replaceSelection: () => {} };
+                file = { path: '' };
+            },
             WorkspaceLeaf: class {},
             ViewStateResult: class {},
             setIcon: vi.fn()

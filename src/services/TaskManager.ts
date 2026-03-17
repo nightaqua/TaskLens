@@ -213,7 +213,6 @@ export class TaskManager extends Events {
         const lines = content.split('\n');
         const originalLine = lines[task.lineNumber];
 
-        // Fix: Removed redundant escape
         const isCurrentlyCompleted = /\[[xX]]/.test(originalLine);
 
         if (isCurrentlyCompleted) {

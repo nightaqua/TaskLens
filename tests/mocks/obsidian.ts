@@ -36,6 +36,12 @@ export class ItemView {
     setViewData(data: unknown, clear?: boolean): void {}
 }
 
+export class MarkdownView extends ItemView {
+    public containerEl: { isShown: () => boolean } = { isShown: () => true };
+    public editor: any = { replaceSelection: (text: string) => {} };
+    public file: any = { path: '' };
+}
+
 export class WorkspaceLeaf {
     view: ItemView | null = null;
 }

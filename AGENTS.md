@@ -104,6 +104,18 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
   command in the palette. Register commands with bare action descriptions:
   `"Open dashboard"` not `"TaskLens: Open dashboard"`. The latter produces
   `"TaskLens: TaskLens: Open dashboard"` in the palette.
+  - **`normalizePath()` on scan folder input.** The scan paths textarea
+    in `SettingsTab` splits user input on newlines and trims whitespace,
+    but does not call `normalizePath()` on each path before storing it.
+    Any code that processes `settings.scanFolders` entries should pass
+    them through `normalizePath()` before use. This is a known gap —
+    do not work around it by assuming clean input.
+
+- **`isDesktopOnly` in `manifest.json` — verify before release.**
+  TaskLens uses only the Vault API and no Node.js or Electron APIs,
+  so `isDesktopOnly` should be `false`. This has not been explicitly
+  verified. Before any community store submission, confirm no `fs`,
+  `path`, `crypto`, or `electron` imports exist anywhere in `src/`.
 
 ---
 
@@ -191,6 +203,12 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
   `manifest.json`. APIs like `fs`, `path`, `crypto`, and `electron` are
   unavailable on mobile. Use Obsidian's own abstractions (`normalizePath()`,
   `Platform`, the Vault API) instead.
+  - **`registerEvent()` audit pending.** Standalone views
+    (`TimelineView`, `StatsView`, `TaskListView`) had vault modify
+    handlers added in earlier sessions. It has not been confirmed
+    whether all of them use `this.registerEvent()` or raw `.on()`.
+    Raw `.on()` without a paired `.off()` in `onClose()` creates ghost
+    listeners. Any agent touching these files must verify this.
 
 ---
 

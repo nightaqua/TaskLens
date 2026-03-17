@@ -1,10 +1,10 @@
-# Organizing Courses & Topics
+# Organizing Tasks & Topics
 
 TaskLens doesn't just present a flat list of tasks; it intelligently groups them by their context. TaskLens works equally well for general project management and for university semesters.
 
-You can configure exactly how TaskLens identifies which "Course" (or Project) a task belongs to.
+You can configure exactly how TaskLens identifies which "Project" (or File) a task belongs to.
 
-## Course Detection Methods
+## Task Origin Detection Methods
 
 In the plugin settings, there are three methods to identify which course a task belongs to:
 
@@ -12,8 +12,8 @@ In the plugin settings, there are three methods to identify which course a task 
 
 This method uses the note's file name as the course name.
 
-* If you write tasks inside a file named `Mathematics 201.md`, TaskLens will group all those tasks under the label "Mathematics 201".
-* This is perfect for users who keep one running document per class or project.
+- If you write tasks inside a file named `Mathematics 201.md`, TaskLens will group all those tasks under the label "Mathematics 201".
+- This is perfect for users who keep one running document per class or project.
 
 ### 2. Per Folder
 
@@ -66,15 +66,15 @@ Introduced in version 1.1.0, TaskLens brings your dashboard to life with **Smart
 
 Tasks can now be dynamically color-coded based on their source file or topic. This allows you to visually distinguish between a "Physics" assignment and an "English" essay at a single glance.
 
-* You can customize the specific color palette via the plugin settings.
-* If you experience layout issues or theme conflicts, you can also change the **Color Scheme** to "Custom" to override your Obsidian theme's default colors.
+- You can customize the specific color palette via the plugin settings.
+- If you experience layout issues or theme conflicts, you can also change the **Color Scheme** to "Custom" to override your Obsidian theme's default colors.
 
 ## Filtering by Course
 
 Once your courses are detected, the Master Dashboard becomes incredibly powerful:
 
 1. **Course Focus:** Use the Course filter dropdown in the dashboard to select a specific class.
-2. The dashboard will instantly update to show *only* that course's tasks.
+2. The dashboard will instantly update to show _only_ that course's tasks.
 3. **Weekly Planning:** Combine this with the Status filter (e.g., "Upcoming Week") to see exactly what is due for a specific subject.
 
 ---
