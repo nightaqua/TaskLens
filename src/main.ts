@@ -89,6 +89,13 @@ export default class TaskLensPlugin extends Plugin {
         });
     }
 
+    onunload() {
+        // Sentinel: Detach leaves on unload — AGENTS.md §5
+        ALL_VIEW_TYPES.forEach(type => {
+            this.app.workspace.detachLeavesOfType(type);
+        });
+    }
+
     private setupRibbonIcon(): void {
         const ribbonIconEl = this.addRibbonIcon(ICON_NAME, 'Tasklens', async (evt: MouseEvent) => {
             ribbonIconEl.removeClass(CLASS_FEATURE_HIGHLIGHT);
