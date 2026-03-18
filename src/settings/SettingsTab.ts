@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { WelcomeModal } from '../modals/WelcomeModal';
 import { getTopicColor } from './Settings';
@@ -16,7 +16,9 @@ export class SettingsTab extends PluginSettingTab {
         this.plugin.settings.scanFolders = value
             .split('\n')
             .map(s => s.trim())
-            .filter(s => s.length > 0);
+            .filter(s => s.length > 0)
+            // Normalise slashes and whitespace for cross-platform compatibility
+            .map(s => normalizePath(s));
 
         await this.plugin.saveSettings();
         await this.plugin.taskManager.loadTasks();
