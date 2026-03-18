@@ -102,6 +102,11 @@
 
 .tasklens-dashboard-content .dashboard-title-wrapper:hover .edit-title-icon { opacity: 1; }
 
+.tasklens-dashboard-content .dashboard-title-wrapper:focus-visible {
+    outline: 2px solid var(--text-accent);
+    outline-offset: 2px;
+}
+
 .tasklens-dashboard-content .header-actions-left, .tasklens-dashboard-content .header-actions-right {
     display: flex;
     align-items: center;
@@ -257,6 +262,11 @@
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     background-color: var(--background-modifier-hover);
+}
+
+.tasklens-dashboard-content .stat-card.is-clickable:focus-visible {
+    outline: 2px solid var(--text-accent);
+    outline-offset: 2px;
 }
 
 .tasklens-dashboard-content .stat-value {
@@ -447,6 +457,11 @@
     word-break: break-word; /* Prevents unbreakable overflow */
     line-height: 1.3;
     width: 100%;
+}
+
+.tasklens-dashboard-content .task-title:focus-visible {
+    outline: 2px solid var(--text-accent);
+    outline-offset: 2px;
 }
 
 .tasklens-dashboard-content .task-meta {
