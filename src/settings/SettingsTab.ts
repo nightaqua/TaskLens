@@ -17,7 +17,7 @@ export class SettingsTab extends PluginSettingTab {
             .split('\n')
             .map(s => s.trim())
             .filter(s => s.length > 0)
-            // Sentinel: Path normalisation — AGENTS.md §4
+            // Normalise slashes and whitespace for cross-platform compatibility
             .map(s => normalizePath(s));
 
         await this.plugin.saveSettings();
