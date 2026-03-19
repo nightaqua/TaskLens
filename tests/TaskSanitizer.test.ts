@@ -48,6 +48,11 @@ describe('TaskSanitizer - stripCompletionMetadata', () => {
         expect(stripped1).toBe('- [x] Task');
         expect(stripped2).toBe('- [x] Task');
     });
+
+    it('should strip bare completion:: format (no brackets or parens)', () => {
+        expect(stripCompletionMetadata('- [x] Some task completion:: 2023-10-27')).toBe('- [x] Some task');
+        expect(stripCompletionMetadata('- [x] Some task completion:: 2023-10-27 15:30')).toBe('- [x] Some task');
+    });
 });
 
 describe('TaskSanitizer', () => {
@@ -133,6 +138,11 @@ describe('TaskSanitizer', () => {
             expect(hasRecurrenceMetadata('- [ ] Task with completion ✅ 2024-05-15')).toBe(false);
             expect(hasRecurrenceMetadata('- [ ] Task with due date due:: 2024-05-15')).toBe(false);
             expect(hasRecurrenceMetadata('No metadata here')).toBe(false);
+        });
+
+        it('should return true if line contains 🔄 recurrence emoji', () => {
+            expect(hasRecurrenceMetadata('- [ ] Every day 🔄 every day')).toBe(true);
+            expect(hasRecurrenceMetadata('🔄')).toBe(true);
         });
     });
 });
