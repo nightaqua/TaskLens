@@ -95,7 +95,10 @@ export class BoardComponent {
 
         const targetColumn = (e.currentTarget as HTMLElement).closest('.board-column');
         if (targetColumn instanceof HTMLElement) {
-            const newStatus = targetColumn.dataset.status as TaskStatus;
+            const rawStatus = targetColumn.dataset.status;
+            const validStatuses: string[] = Object.values(TaskStatus);
+            if (!rawStatus || !validStatuses.includes(rawStatus)) return;
+            const newStatus = rawStatus as TaskStatus; // safe after guard
 
             // Trigger update via TaskManager
             void this.taskManager.updateTaskStatus(this.draggedTaskGroup.representative, newStatus);
