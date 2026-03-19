@@ -88,22 +88,19 @@ export class BoardComponent {
         }
     };
 
-    private readonly onDrop = (e: DragEvent): void => {
-        e.preventDefault();
-
-        if (!this.draggedTaskGroup) return;
-
-        if (!(e.currentTarget instanceof HTMLElement)) return;
-        const targetColumn = e.currentTarget.closest('.board-column');
-        if (!(targetColumn instanceof HTMLElement)) return;
-
-        const newStatus = targetColumn.dataset.status;
-        if (newStatus && Object.values(TaskStatus).includes(newStatus as TaskStatus)) {
-            void this.taskManager.updateTaskStatus(this.draggedTaskGroup.representative, newStatus as TaskStatus);
-        }
-
-        this.draggedTaskGroup = null;
-    };
+private readonly onDrop = (e: DragEvent): void => {
+    e.preventDefault();
+    if (!this.draggedTaskGroup) return;
+    if (!(e.currentTarget instanceof HTMLElement)) return;
+    const targetColumn = e.currentTarget.closest('.board-column');
+    if (!(targetColumn instanceof HTMLElement)) return;
+    const rawStatus = targetColumn.dataset.status;
+    const validStatuses: string[] = Object.values(TaskStatus);
+    if (!rawStatus || !validStatuses.includes(rawStatus)) return;
+    const newStatus = rawStatus as TaskStatus; // safe after guard
+    void this.taskManager.updateTaskStatus(this.draggedTaskGroup.representative, newStatus);
+    this.draggedTaskGroup = null;
+};
 
     private renderTaskCard(container: HTMLElement, group: TaskGroup): void {
         const task = group.representative;

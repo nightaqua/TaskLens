@@ -34,7 +34,10 @@ export function resolveActiveMarkdownView(app: App): MarkdownView | null {
         );
 
         if (visibleMarkdownLeaf) {
-            view = visibleMarkdownLeaf.view as MarkdownView;
+            const leafView = visibleMarkdownLeaf.view;
+            if (leafView instanceof MarkdownView) {
+                view = leafView;
+            }
         }
     }
 
@@ -147,54 +150,56 @@ export class QuickAddModal extends Modal {
             .addButton(btn => btn
                 .setButtonText('Add task')
                 .setCta()
-                .onClick(async () => {
-                    // Guard: both a title and a destination are required.
-                    if (!this.title || !this.selectedFile) return;
-
-                    if (this.selectedFile === '__CURSOR__') {
-                        // -----------------------------------------------------
-                        // Cursor-insertion path
-                        // -----------------------------------------------------
-                        if (this.activeViewAtOpen) {
-                            // Build and insert the task line synchronously
-                            // BEFORE closing the modal. Closing first (even with
-                            // a setTimeout) risks losing the editor reference or
-                            // landing at a stale cursor position.
-                            const dateStr = this.date ? ` [due:: ${this.date}]` : '';
-                            const repeatStr = this.recurrence ? ` [repeat:: ${this.recurrence}]` : '';
-                            const taskLine = `- [ ] ${this.title}${dateStr}${repeatStr}\n`;
-
-                            this.activeViewAtOpen.editor.replaceSelection(taskLine);
-
-                            // Rescan so the TaskManager reflects the new entry
-                            // without waiting for the next background sweep.
-                            if (this.activeViewAtOpen.file) {
-                                await this.taskManager.refreshFileTask(this.activeViewAtOpen.file.path);
-                            }
-                        } else {
-                            // Fallback: the view was closed before the user submitted.
-                            // Append to the first available scanned file instead.
-                            // Do NOT pass '__CURSOR__' — addTask expects a real path.
-                            const fallbackFile = this.taskManager.getScannedFiles()[0];
-                            if (fallbackFile) {
-                                const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-                                await this.taskManager.addTask(this.title, dateObj, fallbackFile);
-                            }
-                        }
-                    } else {
-                        // -----------------------------------------------------
-                        // Append-to-file path
-                        //
-                        // Delegate entirely to TaskManager, which handles
-                        // formatting and writing to the end of the chosen file.
-                        // -----------------------------------------------------
-                        const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-                        await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
-                    }
-
-                    this.close();
-                }),
+                .onClick(() => { void this.handleSubmit(); }),
             );
+    }
+
+    private async handleSubmit(): Promise<void> {
+        // Guard: both a title and a destination are required.
+        if (!this.title || !this.selectedFile) return;
+
+        if (this.selectedFile === '__CURSOR__') {
+            // -----------------------------------------------------------------
+            // Cursor-insertion path
+            // -----------------------------------------------------------------
+            if (this.activeViewAtOpen) {
+                // Build and insert the task line synchronously
+                // BEFORE closing the modal. Closing first (even with
+                // a setTimeout) risks losing the editor reference or
+                // landing at a stale cursor position.
+                const dateStr = this.date ? ` [due:: ${this.date}]` : '';
+                const repeatStr = this.recurrence ? ` [repeat:: ${this.recurrence}]` : '';
+                const taskLine = `- [ ] ${this.title}${dateStr}${repeatStr}\n`;
+
+                this.activeViewAtOpen.editor.replaceSelection(taskLine);
+
+                // Rescan so the TaskManager reflects the new entry
+                // without waiting for the next background sweep.
+                if (this.activeViewAtOpen.file) {
+                    await this.taskManager.refreshFileTask(this.activeViewAtOpen.file.path);
+                }
+            } else {
+                // Fallback: the view was closed before the user submitted.
+                // Append to the first available scanned file instead.
+                // Do NOT pass '__CURSOR__' — addTask expects a real path.
+                const fallbackFile = this.taskManager.getScannedFiles()[0];
+                if (fallbackFile) {
+                    const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
+                    await this.taskManager.addTask(this.title, dateObj, fallbackFile);
+                }
+            }
+        } else {
+            // -----------------------------------------------------------------
+            // Append-to-file path
+            //
+            // Delegate entirely to TaskManager, which handles
+            // formatting and writing to the end of the chosen file.
+            // -----------------------------------------------------------------
+            const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
+            await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
+        }
+
+        this.close();
     }
 
     /** Cleans up the modal's DOM when it is closed. */

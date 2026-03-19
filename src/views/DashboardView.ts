@@ -10,6 +10,19 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 import { VIEW_TYPE_DASHBOARD, CLASS_CHROMELESS, CLASS_HIDE_TABS, CLASS_DASHBOARD_VIEW } from '../constants';
 
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object' && v !== null;
+}
+
+function isTaskStatus(v: unknown): v is TaskStatus {
+    if (typeof v !== 'string') return false;
+    return (Object.values(TaskStatus) as string[]).includes(v);
+}
+
+function isHeaderState(v: unknown): v is HeaderState {
+    return typeof v === 'object' && v !== null;
+}
+
 // Applies chromeless styling to the leaf and optionally hides tabs when the layout is locked
 export function setupViewDOM(
     containerEl: HTMLElement,
@@ -54,7 +67,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private statsCompletionFormat: 'all' | 'today' = 'all';
 
     private timelineDaysToShow: number = 10;
-    private renderTimer: NodeJS.Timeout | null = null;
+    private renderTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Tracks scroll position so re-renders don't jump the timeline,
     // unless a forced scroll-to-today is requested
@@ -113,29 +126,29 @@ export class DashboardView extends ItemView implements RefreshableView {
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
         await super.setState(state, result);
 
-        if (!state || typeof state !== 'object') {
+        if (!isRecord(state)) {
             this.render();
             return;
         }
 
         // Unwrap nested state object if present (Obsidian sometimes wraps it)
-        let s = state as Record<string, unknown>;
-        if (s.state && typeof s.state === 'object') {
-            s = s.state as Record<string, unknown>;
+        let s = state;
+        if (isRecord(s.state)) {
+            s = s.state;
         }
 
         if (Object.keys(s).length > 0) {
-            if (Object.prototype.hasOwnProperty.call(s, 'showControls')) this.showControls = s.showControls as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'showTimeline')) this.showTimeline = s.showTimeline as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'showList')) this.showList = s.showList as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'showStats')) this.showStats = s.showStats as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'showBoard')) this.showBoard = s.showBoard as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'zoomLevel')) this.timelineDaysToShow = s.zoomLevel as number;
-            if (Object.prototype.hasOwnProperty.call(s, 'statsCompletionFormat')) this.statsCompletionFormat = s.statsCompletionFormat as 'all' | 'today';
+            if (typeof s.showControls === 'boolean') this.showControls = s.showControls;
+            if (typeof s.showTimeline === 'boolean') this.showTimeline = s.showTimeline;
+            if (typeof s.showList === 'boolean') this.showList = s.showList;
+            if (typeof s.showStats === 'boolean') this.showStats = s.showStats;
+            if (typeof s.showBoard === 'boolean') this.showBoard = s.showBoard;
+            if (typeof s.zoomLevel === 'number') this.timelineDaysToShow = s.zoomLevel;
+            if (s.statsCompletionFormat === 'all' || s.statsCompletionFormat === 'today') this.statsCompletionFormat = s.statsCompletionFormat;
 
-            if (s.statusFilter) this.taskManager.setStatusFilter(s.statusFilter as TaskStatus);
-            if (s.courseFilter) this.taskManager.setCourseFilter(s.courseFilter as string);
-            if (s.headerState) this.headerState = s.headerState as HeaderState;
+            if (isTaskStatus(s.statusFilter)) this.taskManager.setStatusFilter(s.statusFilter);
+            if (typeof s.courseFilter === 'string') this.taskManager.setCourseFilter(s.courseFilter);
+            if (isHeaderState(s.headerState)) this.headerState = s.headerState;
         }
 
         this.render();
@@ -355,7 +368,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         // Determine which value to show based on user settings
         const showToday = this.statsCompletionFormat === 'today';
         const completionValue = showToday ? stats.completedToday : stats.completed;
-        const completionLabel = showToday ? 'Done Today' : 'Completed';
+        const completionLabel = showToday ? 'Done today' : 'Completed';
 
         const statCards = [
             { label: 'Total',     value: stats.total,      cls: 'stat-total',     filter: TaskStatus.All },
@@ -416,7 +429,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             '--color-orange': cols.urgent,
             '--color-green': cols.active,
             '--color-blue': cols.completed,
-            '--color-purple': '#7209b7',
+            '--color-purple': 'var(--color-purple)',
         });
     }
 
