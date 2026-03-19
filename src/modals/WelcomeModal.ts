@@ -14,7 +14,7 @@ export class WelcomeModal extends Modal {
 
         const header = contentEl.createDiv('welcome-header');
         header.setCssProps({ 'text-align': 'center', 'margin-bottom': '20px' });
-        header.createEl('h1', { text: 'Welcome to tasklens 🚀' });
+        header.createEl('h1', { text: 'Welcome to TaskLens 🚀' });
         header.createEl('p', { text: 'Your command center for tasks, timelines, and projects.', cls: 'text-muted' });
 
         const tutorial = contentEl.createDiv('welcome-tutorial');

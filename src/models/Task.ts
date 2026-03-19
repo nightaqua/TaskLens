@@ -3,7 +3,7 @@
  */
 export interface Task {
     /** Unique identifier (file path + line number) */
-    id: string;
+    readonly id: string;
 
     /** Task text (cleaned of metadata) */
     title: string;
@@ -12,13 +12,13 @@ export interface Task {
     completed: boolean;
 
     /** Source file path */
-    filePath: string;
+    readonly filePath: string;
 
     /** Source file name (without extension) */
-    fileName: string;
+    readonly fileName: string;
 
     /** Line number in the source file */
-    lineNumber: number;
+    readonly lineNumber: number;
 
     /** Start date (optional) */
     startDate?: Date;
@@ -36,7 +36,7 @@ export interface Task {
     notes?: string;
 
     /** Original task text (for reference) */
-    originalText: string;
+    readonly originalText: string;
 }
 
 /**
@@ -45,13 +45,13 @@ export interface Task {
  */
 export interface TaskGroup {
     /** The task to show: earliest-due open clone for recurring, the task itself otherwise. */
-    representative: Task;
+    readonly representative: Task;
     /** Number of open (uncompleted) clones in this series. */
     openCount: number;
     /** Number of completed clones in this series — how many cycles have been done. */
     doneCount: number;
     /** True when the task has a recurrence rule. */
-    isRecurring: boolean;
+    readonly isRecurring: boolean;
 }
 
 /**

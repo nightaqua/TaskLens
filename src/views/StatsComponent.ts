@@ -66,7 +66,7 @@ export class StatsComponent {
         nameDiv.setText(topic.name);
 
         const percent = Math.round(topic.ratio * 100);
-        card.createDiv('urgent-topic-ratio').setText(`${String(percent)}% Urgent`);
+        card.createDiv('urgent-topic-ratio').setText(`${String(percent)}% urgent`);
 
         card.createDiv('urgent-topic-details').setText(
             `${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`
