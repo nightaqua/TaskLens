@@ -1,4 +1,4 @@
-import { App, TFile, CachedMetadata } from 'obsidian';
+import { App, TFile, CachedMetadata, normalizePath } from 'obsidian';
 import { Task } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
 
@@ -21,8 +21,10 @@ export class TaskParser {
     private static readonly NOTES_REGEX = /\[?\(?notes::\s*([^\])]+)[\])]?/gi;
 
     // Fallback emoji regexes
-    private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u;
-    private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^[\u{1F4C5}\u2705]+/u;
+    // eslint-disable-next-line no-useless-escape
+    private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^\[\u{1F4C5}\u2705]+)/u;
+    // eslint-disable-next-line no-useless-escape
+    private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^\[\u{1F4C5}\u2705]+/u;
     private static readonly EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
     private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
 
@@ -53,7 +55,7 @@ export class TaskParser {
      * RENAMED: Matches TaskManager.refreshFileTask()
      */
     async getTasksFromFile(filePath: string): Promise<Task[]> {
-        const file = this.app.vault.getAbstractFileByPath(filePath);
+        const file = this.app.vault.getAbstractFileByPath(normalizePath(filePath));
         if (file instanceof TFile) {
             return this.parseTasksFromFile(file);
         }
@@ -153,7 +155,8 @@ export class TaskParser {
                 return file.parent?.name || file.basename;
             case 'frontmatter':
                 if (cache?.frontmatter) {
-                    const val = cache.frontmatter[this.settings.courseFrontmatterKey] as string | undefined;
+                    const raw: unknown = cache.frontmatter[this.settings.courseFrontmatterKey];
+                    const val = typeof raw === 'string' ? raw : undefined;
                     if (val) return val;
                 }
                 return file.basename;
