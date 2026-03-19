@@ -286,6 +286,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         const statusGroup = filtersDiv.createDiv('control-group');
         statusGroup.createEl('label', { text: 'Show:' });
         const statusSelect = statusGroup.createEl('select');
+        statusSelect.setAttribute('aria-label', 'Filter by status');
 
         const statusOptions = [
             { value: TaskStatus.Open, label: 'Active (All)' },
@@ -306,6 +307,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         const courseGroup = filtersDiv.createDiv('control-group');
         courseGroup.createEl('label', { text: 'Topic:' });
         const courseSelect = courseGroup.createEl('select');
+        courseSelect.setAttribute('aria-label', 'Filter by topic');
         courseSelect.createEl('option', { value: '', text: 'All topics' });
 
         this.taskManager.getCourseNames().forEach(course => {
@@ -319,6 +321,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         const completionGroup = filtersDiv.createDiv('control-group');
         completionGroup.createEl('label', { text: 'Completed:' });
         const completionSelect = completionGroup.createEl('select');
+        completionSelect.setAttribute('aria-label', 'Filter by completion date');
         [
             { value: 'all',   text: 'All-time' },
             { value: 'today', text: 'Today' },

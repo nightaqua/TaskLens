@@ -143,6 +143,32 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.notes).toBe('Requires review before submission');
         expect(result.recurrence).toBe('weekly');
     });
+
+    it('should produce Invalid Date for an out-of-range date like month 13, day 45', () => {
+        // parseDate returns Invalid Date for out-of-range values (new Date('2024-13-45T00:00:00'))
+        const result = parseTaskMetadata('Task [due:: 2024-13-45]');
+        expect(result.dueDate).toBeDefined();
+        const dueDate = result.dueDate as Date;
+        expect(isNaN(dueDate.getTime())).toBe(true);
+    });
+
+    it('should parse bare start date (no brackets or parens)', () => {
+        const result = parseTaskMetadata('Task start:: 2024-05-10');
+        expect(result.title).toBe('Task');
+        expect(result.startDate).toEqual(getLocalMidnight('2024-05-10'));
+    });
+
+    it('should parse bare completion date (no brackets or parens)', () => {
+        const result = parseTaskMetadata('Done task completion:: 2024-01-02');
+        expect(result.title).toBe('Done task');
+        expect(result.completionDate).toEqual(getLocalMidnight('2024-01-02'));
+    });
+
+    it('should parse due date with 📅 emoji and dd-mm-yyyy format', () => {
+        const result = parseTaskMetadata('Buy milk 📅 15-10-2023');
+        expect(result.title).toBe('Buy milk');
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
+    });
 });
 describe('TaskParser.getFilesToScan', () => {
     // Helper to create mock TFile objects
@@ -255,5 +281,19 @@ describe('TaskParser.getFilesToScan', () => {
         const paths = result.map(f => f.path);
         expect(paths).toContain('RootFile.md');
         expect(paths).toContain('ProjectsTodo.md');
+    });
+
+    it('should return files from multiple folders when scanRecursively is false', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects', 'OtherFolder'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('Projects/Todo.md');
+        expect(paths).toContain('OtherFolder/Notes.md');
     });
 });
