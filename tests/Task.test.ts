@@ -49,7 +49,7 @@ describe('getTaskStatus', () => {
             expect(getTaskStatus(mockTask)).toBe(TaskStatus.Urgent);
         });
 
-        it('returns Urgent when due date is exactly 3 days away', () => {
+        it('returns Urgent when due date is exactly 3 days away (boundary)', () => {
             mockTask.dueDate = new Date('2025-02-17T10:00:00Z');
             expect(getTaskStatus(mockTask)).toBe(TaskStatus.Urgent);
         });

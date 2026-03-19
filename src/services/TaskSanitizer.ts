@@ -24,11 +24,11 @@ export function hasCompletionMetadata(line: string): boolean {
 /**
  * True if the line already carries ANY recurrence marker (ours or external).
  * Used before writing a cloned recurring task line to prevent double-stamping
-* when the Tasks plugin's 🔁 emoji is already present.
+ * when the Tasks plugin's 🔁 or 🔄 emoji is already present.
  */
 export function hasRecurrenceMetadata(line: string): boolean {
-    // Tasks plugin repeat emoji (🔁 U+1F501)
-    return /\u{1F501}/u.test(line) || /repeat::/i.test(line);
+    // Tasks plugin repeat emojis: 🔁 (U+1F501) and 🔄 (U+1F504)
+    return /\u{1F501}|\u{1F504}/u.test(line) || /repeat::/i.test(line);
 }
 
 /**

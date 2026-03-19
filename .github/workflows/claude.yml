@@ -1,0 +1,85 @@
+name: Claude Code
+
+on:
+  # React when someone mentions @claude in a PR comment
+  issue_comment:
+    types: [created]
+
+  # React when someone mentions @claude in an inline review comment
+  pull_request_review_comment:
+    types: [created]
+
+  # React when someone mentions @claude in a PR review body
+  pull_request_review:
+    types: [submitted]
+
+  # Auto-review PRs targeting main only (not dev or feature branches)
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches:
+      - main
+
+jobs:
+  claude:
+    name: Claude Code
+    runs-on: ubuntu-latest
+
+    # Only run when:
+    #   - The triggering user is the repo owner or the Claude app itself
+    #   - AND one of: @claude mention in comment/review, or new non-draft PR
+    if: |
+      (
+        (
+          github.event_name == 'issue_comment' &&
+          github.event.issue.pull_request != null &&
+          contains(github.event.comment.body, '@claude')
+        ) || (
+          github.event_name == 'pull_request_review_comment' &&
+          contains(github.event.comment.body, '@claude')
+        ) || (
+          github.event_name == 'pull_request_review' &&
+          contains(github.event.review.body, '@claude')
+        ) || (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.draft == false
+        )
+      ) &&
+      (
+        github.event.sender.login == 'nightaqua' ||
+        github.event.sender.login == 'claude' ||
+        github.event.sender.login == 'app/claude-code-app'
+      )
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Scope Claude to code review, Q&A, and light fixes — no force-pushes
+          allowed_tools: >
+            Bash(git diff),
+            Bash(git log),
+            Bash(npm test),
+            Bash(npm run build),
+            Bash(npm run lint),
+            Read,
+            Grep,
+            Glob
+          # Project-specific context injected into every Claude call
+          custom_instructions: |
+            You are reviewing or assisting with the TaskLens Obsidian plugin.
+            Key rules from AGENTS.md:
+            - No `as HTMLElement` casts — use `instanceof` guards
+            - No `cursor: pointer` on non-<a> elements
+            - No hardcoded hex colours — use Obsidian CSS variables (var(--color-*))
+            - No innerHTML, no .style. property mutations
+            - `void` all floating promises
+            - One squashed conventional commit per PR (subject < 72 chars)
+            When auto-reviewing a new PR, check for violations of the above rules
+            and summarise what looks good and what needs fixing.

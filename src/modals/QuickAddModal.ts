@@ -136,7 +136,7 @@ export class QuickAddModal extends Modal {
         // --- 3.5 Recurrence input ---
         new Setting(contentEl)
             .setName('Repeat')
-            .setDesc('Example: daily, weekly, every two days')
+            .setDesc('Examples: daily, weekly, 2d, 3w, monthly+, 2w+')
             .addText(text => {
                 text.setPlaceholder('Optional...');
                 text.onChange(value => { this.recurrence = value; });

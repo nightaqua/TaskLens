@@ -93,12 +93,13 @@ export class BoardComponent {
 
         if (!this.draggedTaskGroup) return;
 
-        const targetColumn = (e.currentTarget as HTMLElement).closest('.board-column');
-        if (targetColumn instanceof HTMLElement) {
-            const newStatus = targetColumn.dataset.status as TaskStatus;
+        if (!(e.currentTarget instanceof HTMLElement)) return;
+        const targetColumn = e.currentTarget.closest('.board-column');
+        if (!(targetColumn instanceof HTMLElement)) return;
 
-            // Trigger update via TaskManager
-            void this.taskManager.updateTaskStatus(this.draggedTaskGroup.representative, newStatus);
+        const newStatus = targetColumn.dataset.status;
+        if (newStatus && Object.values(TaskStatus).includes(newStatus as TaskStatus)) {
+            void this.taskManager.updateTaskStatus(this.draggedTaskGroup.representative, newStatus as TaskStatus);
         }
 
         this.draggedTaskGroup = null;
