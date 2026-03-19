@@ -8,6 +8,13 @@ import { QuickAddModal } from '../modals/QuickAddModal';
 import { VIEW_TYPE_LIST, CLASS_DASHBOARD_VIEW } from '../constants';
 
 
+function isHeaderState(v: unknown): v is HeaderState {
+    if (typeof v !== 'object' || v === null) return false;
+    const rec = v as Record<string, unknown>;
+    return (rec.title === null || typeof rec.title === 'string')
+        && typeof rec.isCollapsed === 'boolean';
+}
+
 export class TaskListView extends ItemView {
     private leafRootEl: HTMLElement | null = null;
     private tabContainer: HTMLElement | null = null;
@@ -15,7 +22,7 @@ export class TaskListView extends ItemView {
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
-    private onTasksUpdated = () => {
+    private readonly onTasksUpdated = (): void => {
         if (!this.isOpen || !this.contentEl.isConnected) return;
         this.render();
     };
@@ -23,17 +30,24 @@ export class TaskListView extends ItemView {
     constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
         this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
+                    void this.plugin.taskManager.refreshFileTask(file.path);
+                }
+            })
+        );
     }
 
-    getViewType() { return VIEW_TYPE_LIST; }
-    getDisplayText() { return 'Task list'; }
-    getIcon() { return 'list-todo'; }
+    getViewType(): string { return VIEW_TYPE_LIST; }
+    getDisplayText(): string { return 'Task list'; }
+    getIcon(): string { return 'list-todo'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
         if (state && typeof state === 'object') {
             const s = state as Record<string, unknown>;
-            if (Object.prototype.hasOwnProperty.call(s, 'headerState')) {
-                this.headerState = s.headerState as HeaderState;
+            if (Object.prototype.hasOwnProperty.call(s, 'headerState') && isHeaderState(s.headerState)) {
+                this.headerState = s.headerState;
             }
         }
         await super.setState(state, result);
@@ -44,7 +58,7 @@ export class TaskListView extends ItemView {
         if (this.headerComponent) {
             this.headerState = this.headerComponent.getState();
         }
-        return { headerState: this.headerState as unknown } as Record<string, unknown>;
+        return Object.assign(super.getState(), { headerState: this.headerState });
     }
 
     onOpen(): Promise<void> {
@@ -58,15 +72,6 @@ export class TaskListView extends ItemView {
         this.isOpen = true;
         this.render();
 
-        // Keep the list live when the user edits tasks outside the dashboard
-        this.registerEvent(
-            this.app.vault.on('modify', (file) => {
-                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
-                    void this.plugin.taskManager.refreshFileTask(file.path);
-                }
-            })
-        );
-
         return Promise.resolve();
     }
 
@@ -77,7 +82,7 @@ export class TaskListView extends ItemView {
         return Promise.resolve();
     }
 
-    render() {
+    render(): void {
         if (!this.isOpen || !this.contentEl.isConnected) return;
 
         this.contentEl.empty();
