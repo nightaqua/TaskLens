@@ -1,0 +1,3 @@
+## 2026-03-19 - Full Audit Complete
+**Learning:** The `dev` branch is completely compliant with the rules outlined in `AGENTS.md`. Previous PRs have resolved all actionable issues, including `normalizePath()` usage, `registerEvent` wrapping for Vault/Workspace events, `readonly` constructor assignments, and UI text casing.
+**Action:** In future audits, when finding `this.plugin.taskManager.on()` and `off()` calls outside of `registerEvent()`, verify they are within `constructor` and `onClose()` paired logic. They are manually managed correctly and are not considered violations. Additionally, `as unknown as` assertions for accessing internal properties without `instanceof` (like `WorkspaceWithSplits`) are necessary and should not be flagged.
