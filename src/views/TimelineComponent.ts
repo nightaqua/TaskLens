@@ -123,6 +123,8 @@ export class TimelineComponent {
 
         const navHandle = navSection.createDiv('ribbon-handle ribbon-handle--nav');
         navHandle.setAttribute('aria-label', 'Navigate timeline');
+        navHandle.setAttribute('role', 'button');
+        navHandle.setAttribute('tabindex', '0');
         const navIconWrap = navHandle.createDiv('ribbon-handle-icon');
         setIcon(navIconWrap, 'calendar-range');
 
@@ -231,11 +233,18 @@ export class TimelineComponent {
             });
         }
 
-        navHandle.addEventListener('click', () => {
+        const toggleNav = () => {
             if (navSection.hasClass('is-open')) {
                 closeNav();
             } else {
                 openNav();
+            }
+        };
+        navHandle.addEventListener('click', toggleNav);
+        navHandle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleNav();
             }
         });
 
@@ -246,17 +255,34 @@ export class TimelineComponent {
 
         const syncHandle = syncSection.createDiv('ribbon-handle ribbon-handle--sync');
         syncHandle.setAttribute('aria-label', 'Scroll to today');
+        syncHandle.setAttribute('role', 'button');
+        syncHandle.setAttribute('tabindex', '0');
         const syncIconWrap = syncHandle.createDiv('ribbon-handle-icon');
         setIcon(syncIconWrap, 'rotate-ccw');
 
         // Floating expand — shown on section hover via CSS, positioned rightward
         const syncExpand = syncSection.createDiv('ribbon-sync-expand');
+        syncExpand.setAttribute('role', 'button');
+        syncExpand.setAttribute('tabindex', '0');
+        syncExpand.setAttribute('aria-label', 'Scroll to today');
         const syncExpandIcon = syncExpand.createDiv('ribbon-sync-expand-icon');
         setIcon(syncExpandIcon, 'rotate-ccw');
         syncExpand.createSpan({ cls: 'ribbon-sync-expand-label' }).setText('Today');
 
         syncHandle.addEventListener('click', () => { this.scrollToToday(); });
+        syncHandle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.scrollToToday();
+            }
+        });
         syncExpand.addEventListener('click', () => { this.scrollToToday(); });
+        syncExpand.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.scrollToToday();
+            }
+        });
     }
 
     public render(): void {
@@ -508,10 +534,22 @@ export class TimelineComponent {
 
     private createNavigationOverlay(direction: 'left' | 'right'): void {
         const overlay = this.container.createDiv(`timeline-nav-overlay nav-${direction}`);
+        overlay.setAttribute('role', 'button');
+        overlay.setAttribute('tabindex', '0');
+        overlay.setAttribute('aria-label', `Scroll ${direction}`);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
-        overlay.addEventListener('click', (e) => {
+
+        const triggerScroll = (e: Event) => {
             e.stopPropagation();
             this.scroll(direction);
+        };
+
+        overlay.addEventListener('click', triggerScroll);
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerScroll(e);
+            }
         });
     }
 
