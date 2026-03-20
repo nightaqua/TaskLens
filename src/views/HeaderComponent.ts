@@ -64,11 +64,21 @@ export class HeaderComponent {
         this.sidebarHandleEl = this.container.createDiv('dashboard-sidebar-handle is-hidden');
         setIcon(this.sidebarHandleEl, 'panel-left-open');
         this.sidebarHandleEl.setAttribute('aria-label', 'Show header');
+        this.sidebarHandleEl.setAttribute('role', 'button');
+        this.sidebarHandleEl.setAttribute('tabindex', '0');
 
-        this.sidebarHandleEl.addEventListener('click', () => {
+        const triggerShowHeader = () => {
             this.isCollapsed = false;
             this.updateVisibility();
             this.onStateChange();
+        };
+
+        this.sidebarHandleEl.addEventListener('click', triggerShowHeader);
+        this.sidebarHandleEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerShowHeader();
+            }
         });
     }
 
