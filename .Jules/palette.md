@@ -5,3 +5,8 @@
 ## 2025-02-14 - Floating UI Elements require explicit accessibility configuration
 **Learning:** Custom floating UI components (such as side navigation ribbons, tooltips, or scroll overlays) constructed using Obsidian's DOM APIs are often created via `createDiv` and rely on CSS for positioning and hover states. These elements inherently lack interactive semantics, `tabindex`, keyboard event listeners, and ARIA labels. They are completely invisible to keyboard and screen reader users unless explicitly configured.
 **Action:** Whenever introducing floating interactive UI elements (like handles or overlays), ensure they are assigned `role="button"`, `tabindex="0"`, an appropriate `aria-label`, and a `keydown` listener handling 'Enter' and 'Space' events to replicate click behavior, thus making them fully accessible.
+
+## 2024-05-18 - [Add full keyboard a11y support to custom button div elements]
+**Learning:** Adding `role="button"` and `tabindex="0"` to a non-button element (like a `div` or `span`) makes it identifiable and focusable by a screen reader. However, it *does not* automatically give it the built-in keyboard behavior of a real `<button>`. A real button triggers a `click` event when focused and the Enter or Space keys are pressed. A customized `div` requires explicit `keydown` event listeners to reproduce this native interaction and guarantee full keyboard accessibility.
+
+**Action:** Whenever converting a custom element into a button, always pair `role="button"` and `tabindex="0"` with a `keydown` listener that handles 'Enter' and ' ' (Space) alongside the regular `click` listener.
