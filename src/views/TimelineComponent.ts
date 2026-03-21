@@ -125,6 +125,8 @@ export class TimelineComponent {
         navHandle.setAttribute('aria-label', 'Navigate timeline');
         navHandle.setAttribute('role', 'button');
         navHandle.setAttribute('tabindex', '0');
+        navHandle.setAttribute('aria-expanded', this.ribbonNavOpen ? 'true' : 'false');
+        navHandle.setAttribute('aria-controls', 'timeline-nav-panel');
         const navIconWrap = navHandle.createDiv('ribbon-handle-icon');
         setIcon(navIconWrap, 'calendar-range');
 
@@ -132,11 +134,13 @@ export class TimelineComponent {
         navHoverLabel.setText('Navigate');
 
         const navPanel = navSection.createDiv('ribbon-panel');
+        navPanel.id = 'timeline-nav-panel';
 
         // Define open/close before anything that might call them ──────────────────
         const openNav = (): void => {
             this.ribbonNavOpen = true;
             navSection.addClass('is-open');
+            navHandle.setAttribute('aria-expanded', 'true');
             // Guard: don't double-register
             if (this.ribbonOutsideHandler) {
                 document.removeEventListener('mousedown', this.ribbonOutsideHandler);
@@ -148,6 +152,7 @@ export class TimelineComponent {
                 if (!navSection.contains(target)) {
                     this.ribbonNavOpen = false;
                     navSection.removeClass('is-open');
+                    navHandle.setAttribute('aria-expanded', 'false');
                     document.removeEventListener('mousedown', handler);
                     this.ribbonOutsideHandler = null;
                 }
@@ -159,6 +164,7 @@ export class TimelineComponent {
         const closeNav = (): void => {
             this.ribbonNavOpen = false;
             navSection.removeClass('is-open');
+            navHandle.setAttribute('aria-expanded', 'false');
             if (this.ribbonOutsideHandler) {
                 document.removeEventListener('mousedown', this.ribbonOutsideHandler);
                 this.ribbonOutsideHandler = null;
