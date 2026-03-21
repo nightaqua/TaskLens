@@ -66,6 +66,8 @@ export class HeaderComponent {
         this.sidebarHandleEl.setAttribute('aria-label', 'Show header');
         this.sidebarHandleEl.setAttribute('role', 'button');
         this.sidebarHandleEl.setAttribute('tabindex', '0');
+        this.sidebarHandleEl.setAttribute('aria-expanded', this.isCollapsed ? 'false' : 'true');
+        this.sidebarHandleEl.setAttribute('aria-controls', 'dashboard-header');
 
         const triggerShowHeader = () => {
             this.isCollapsed = false;
@@ -86,6 +88,7 @@ export class HeaderComponent {
         if (this.headerEl) this.headerEl.remove();
 
         this.headerEl = this.container.createDiv('dashboard-header');
+        this.headerEl.id = 'dashboard-header';
 
         const leftGroup = this.headerEl.createDiv('header-actions-left');
         if (this.onSettings) {
@@ -142,6 +145,8 @@ export class HeaderComponent {
         const hideBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
         setIcon(hideBtn, 'panel-top-close');
         hideBtn.setAttribute('aria-label', 'Hide header');
+        hideBtn.setAttribute('aria-expanded', this.isCollapsed ? 'false' : 'true');
+        hideBtn.setAttribute('aria-controls', 'dashboard-header');
         hideBtn.addEventListener('click', () => {
             this.isCollapsed = true;
             this.updateVisibility();
@@ -186,9 +191,11 @@ export class HeaderComponent {
         if (this.isCollapsed) {
             this.headerEl?.addClass('is-collapsed');
             this.sidebarHandleEl?.removeClass('is-hidden');
+            this.sidebarHandleEl?.setAttribute('aria-expanded', 'false');
         } else {
             this.headerEl?.removeClass('is-collapsed');
             this.sidebarHandleEl?.addClass('is-hidden');
+            this.sidebarHandleEl?.setAttribute('aria-expanded', 'true');
         }
     }
 
