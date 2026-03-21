@@ -20,7 +20,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.4",
-    "@eslint/json": "^1.1.0",
+    "@eslint/json": "^1.2.0",
     "@types/node": "^25.5.0",
     "@typescript-eslint/parser": "^8.57.0",
     "builtin-modules": "^5.0.0",
