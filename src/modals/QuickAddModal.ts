@@ -1,4 +1,4 @@
-import { App, Modal, Setting, MarkdownView } from 'obsidian';
+import { App, Modal, Setting, MarkdownView, ButtonComponent } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
 
 /**
@@ -85,6 +85,14 @@ export class QuickAddModal extends Modal {
 
         contentEl.createEl('h2', { text: 'Quick add task' });
 
+        // Handle Enter keypress for quick submission
+        const handleEnter = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                void this.handleSubmit();
+            }
+        };
+
         // --- 1. Task title input -------------------------------------------
         new Setting(contentEl)
             .setName('Task')
@@ -95,6 +103,7 @@ export class QuickAddModal extends Modal {
 
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
+                text.inputEl.addEventListener('keydown', handleEnter);
             });
 
         // --- 2. Destination dropdown ----------------------------------------
@@ -134,6 +143,7 @@ export class QuickAddModal extends Modal {
                 // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
                 text.onChange(value => { this.date = value; });
+                text.inputEl.addEventListener('keydown', handleEnter);
             });
 
         // --- 3.5 Recurrence input ---
@@ -143,26 +153,41 @@ export class QuickAddModal extends Modal {
             .addText(text => {
                 text.setPlaceholder('Optional...');
                 text.onChange(value => { this.recurrence = value; });
+                text.inputEl.addEventListener('keydown', handleEnter);
             });
 
         // --- 4. Submit button -----------------------------------------------
-        new Setting(contentEl)
-            .addButton(btn => btn
-                .setButtonText('Add task')
-                .setCta()
-                .onClick(() => { void this.handleSubmit(); }),
-            );
+        this.submitButton = new Setting(contentEl)
+            .addButton(btn => {
+                this.submitBtnComp = btn;
+                btn.setButtonText('Add task')
+                    .setCta()
+                    .onClick(() => { void this.handleSubmit(); });
+            });
     }
 
+    private submitButton: Setting | null = null;
+    private submitBtnComp: ButtonComponent | null = null;
+    private isSubmitting: boolean = false;
+
     private async handleSubmit(): Promise<void> {
+        if (this.isSubmitting) return;
+
         // Guard: both a title and a destination are required.
         if (!this.title || !this.selectedFile) return;
 
-        if (this.selectedFile === '__CURSOR__') {
-            // -----------------------------------------------------------------
-            // Cursor-insertion path
-            // -----------------------------------------------------------------
-            if (this.activeViewAtOpen) {
+        this.isSubmitting = true;
+        if (this.submitBtnComp) {
+            this.submitBtnComp.setButtonText('Adding...');
+            this.submitBtnComp.setDisabled(true);
+        }
+
+        try {
+            if (this.selectedFile === '__CURSOR__') {
+                // -----------------------------------------------------------------
+                // Cursor-insertion path
+                // -----------------------------------------------------------------
+                if (this.activeViewAtOpen) {
                 // Build and insert the task line synchronously
                 // BEFORE closing the modal. Closing first (even with
                 // a setTimeout) risks losing the editor reference or
@@ -188,18 +213,25 @@ export class QuickAddModal extends Modal {
                     await this.taskManager.addTask(this.title, dateObj, fallbackFile);
                 }
             }
-        } else {
-            // -----------------------------------------------------------------
-            // Append-to-file path
-            //
-            // Delegate entirely to TaskManager, which handles
-            // formatting and writing to the end of the chosen file.
-            // -----------------------------------------------------------------
-            const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-            await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
-        }
+            } else {
+                // -----------------------------------------------------------------
+                // Append-to-file path
+                //
+                // Delegate entirely to TaskManager, which handles
+                // formatting and writing to the end of the chosen file.
+                // -----------------------------------------------------------------
+                const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
+                await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
+            }
 
-        this.close();
+            this.close();
+        } finally {
+            this.isSubmitting = false;
+            if (this.submitBtnComp) {
+                this.submitBtnComp.setButtonText('Add task');
+                this.submitBtnComp.setDisabled(false);
+            }
+        }
     }
 
     /** Cleans up the modal's DOM when it is closed. */
