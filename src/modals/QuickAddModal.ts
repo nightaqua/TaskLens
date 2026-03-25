@@ -1,5 +1,5 @@
-import { App, Modal, Setting, MarkdownView } from 'obsidian';
-import { TaskManager } from '../services/TaskManager';
+import { App, Modal, Setting, MarkdownView, ButtonComponent } from "obsidian";
+import { TaskManager } from "../services/TaskManager";
 
 /**
  * QuickAddModal
@@ -22,188 +22,221 @@ import { TaskManager } from '../services/TaskManager';
  * finds the first visible Markdown leaf.
  */
 export function resolveActiveMarkdownView(app: App): MarkdownView | null {
-    // 1. First, try the standard active view (works for Ribbon clicks)
-    let view = app.workspace.getActiveViewOfType(MarkdownView);
+  // 1. First, try the standard active view (works for Ribbon clicks)
+  let view = app.workspace.getActiveViewOfType(MarkdownView);
 
-    // 2. If null (Dashboard button click), find the first visible Markdown leaf
-    if (!view) {
-        const markdownLeaves = app.workspace.getLeavesOfType('markdown');
+  // 2. If null (Dashboard button click), find the first visible Markdown leaf
+  if (!view) {
+    const markdownLeaves = app.workspace.getLeavesOfType("markdown");
 
-        const visibleMarkdownLeaf = markdownLeaves.find(leaf =>
-            leaf.view instanceof MarkdownView && (leaf.view.containerEl.isShown())
-        );
+    const visibleMarkdownLeaf = markdownLeaves.find(
+      (leaf) =>
+        leaf.view instanceof MarkdownView && leaf.view.containerEl.isShown(),
+    );
 
-        if (visibleMarkdownLeaf) {
-            const leafView = visibleMarkdownLeaf.view;
-            if (leafView instanceof MarkdownView) {
-                view = leafView;
-            }
-        }
+    if (visibleMarkdownLeaf) {
+      const leafView = visibleMarkdownLeaf.view;
+      if (leafView instanceof MarkdownView) {
+        view = leafView;
+      }
     }
+  }
 
-    return view;
+  return view;
 }
 
 export class QuickAddModal extends Modal {
-    /** Raw text entered by the user for the task title. */
-    private title: string = '';
+  /** Raw text entered by the user for the task title. */
+  private title: string = "";
 
-    /** ISO date string (YYYY-MM-DD) from the date picker, or empty string. */
-    private date: string = '';
+  /** ISO date string (YYYY-MM-DD) from the date picker, or empty string. */
+  private date: string = "";
 
-    private recurrence: string = '';
+  private recurrence: string = "";
 
-    /**
-     * Path of the chosen destination file, or the sentinel value
-     * `'__CURSOR__'` when the user wants to insert at the cursor position.
-     */
-    private selectedFile: string = '';
+  /**
+   * Path of the chosen destination file, or the sentinel value
+   * `'__CURSOR__'` when the user wants to insert at the cursor position.
+   */
+  private selectedFile: string = "";
 
-    /**
-     * The Markdown view that was active at the moment the modal was constructed.
-     *
-     * Captured in the constructor — not in onOpen() — because by the time
-     * onOpen() fires, Obsidian has already transferred focus to the modal's
-     * container element, causing getActiveViewOfType() to return null even
-     * though the editor is still visible behind the modal.
-     */
-    private readonly activeViewAtOpen: MarkdownView | null;
+  /**
+   * The Markdown view that was active at the moment the modal was constructed.
+   *
+   * Captured in the constructor — not in onOpen() — because by the time
+   * onOpen() fires, Obsidian has already transferred focus to the modal's
+   * container element, causing getActiveViewOfType() to return null even
+   * though the editor is still visible behind the modal.
+   */
+  private readonly activeViewAtOpen: MarkdownView | null;
 
-    constructor(app: App, private readonly taskManager: TaskManager) {
-        super(app);
+  private submitButton: ButtonComponent | null = null;
 
-        this.activeViewAtOpen = resolveActiveMarkdownView(this.app);
+  constructor(
+    app: App,
+    private readonly taskManager: TaskManager,
+  ) {
+    super(app);
+
+    this.activeViewAtOpen = resolveActiveMarkdownView(this.app);
+  }
+
+  // -------------------------------------------------------------------------
+  // Lifecycle
+  // -------------------------------------------------------------------------
+
+  /** Builds and renders the modal UI when it is opened. */
+  onOpen() {
+    const { contentEl } = this;
+
+    contentEl.createEl("h2", { text: "Quick add task" });
+
+    // --- 1. Task title input -------------------------------------------
+    new Setting(contentEl).setName("Task").addText((text) => {
+      text.setPlaceholder("Read chapter 4...").onChange((value) => {
+        this.title = value;
+      });
+
+      // Auto-focus so the user can start typing immediately.
+      text.inputEl.focus();
+    });
+
+    // --- 2. Destination dropdown ----------------------------------------
+    new Setting(contentEl).setName("Destination").addDropdown((drop) => {
+      // Always offer "insert at cursor" as the first option, so it is
+      // the most ergonomic choice when a Markdown file is already open.
+      drop.addOption("__CURSOR__", "Insert at cursor (active file)");
+
+      // Only show files the plugin has already scanned rather than
+      // every file in the vault, keeping the list focused and relevant.
+      const scannedFiles = this.taskManager.getScannedFiles();
+      scannedFiles.forEach((path) => {
+        // Strip the directory path and .md extension for a clean label.
+        const label = path.split("/").pop()?.replace(".md", "") || path;
+        drop.addOption(path, label);
+      });
+
+      // Pre-select a sensible default:
+      //   • Cursor mode if a Markdown file was open when the modal launched.
+      //   • Otherwise fall back to the first scanned file.
+      if (this.activeViewAtOpen) {
+        this.selectedFile = "__CURSOR__";
+      } else if (scannedFiles.length > 0) {
+        this.selectedFile = scannedFiles[0];
+      }
+
+      drop.setValue(this.selectedFile);
+      drop.onChange((value) => {
+        this.selectedFile = value;
+      });
+    });
+
+    // --- 3. Due date picker ---------------------------------------------
+    new Setting(contentEl).setName("Due date").addText((text) => {
+      // Render as a native HTML date input for a built-in calendar picker.
+      text.inputEl.type = "date";
+      text.onChange((value) => {
+        this.date = value;
+      });
+    });
+
+    // --- 3.5 Recurrence input ---
+    new Setting(contentEl)
+      .setName("Repeat")
+      .setDesc("Examples: daily, weekly, 2d, 3w, monthly+, 2w+")
+      .addText((text) => {
+        text.setPlaceholder("Optional...");
+        text.onChange((value) => {
+          this.recurrence = value;
+        });
+      });
+
+    // --- 4. Submit button -----------------------------------------------
+    new Setting(contentEl).addButton((btn) => {
+      this.submitButton = btn;
+      btn
+        .setButtonText("Add task")
+        .setCta()
+        .onClick(() => {
+          void this.handleSubmit();
+        });
+    });
+  }
+
+  private async handleSubmit(): Promise<void> {
+    // Guard: both a title and a destination are required.
+    if (!this.title || !this.selectedFile) return;
+
+    if (this.submitButton) {
+      this.submitButton.setDisabled(true);
+      this.submitButton.setButtonText("Adding...");
     }
 
-    // -------------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------------
+    try {
+      if (this.selectedFile === "__CURSOR__") {
+        // -----------------------------------------------------------------
+        // Cursor-insertion path
+        // -----------------------------------------------------------------
+        if (this.activeViewAtOpen) {
+          // Build and insert the task line synchronously
+          // BEFORE closing the modal. Closing first (even with
+          // a setTimeout) risks losing the editor reference or
+          // landing at a stale cursor position.
+          const dateStr = this.date ? ` [due:: ${this.date}]` : "";
+          const repeatStr = this.recurrence
+            ? ` [repeat:: ${this.recurrence}]`
+            : "";
+          const taskLine = `- [ ] ${this.title}${dateStr}${repeatStr}\n`;
 
-    /** Builds and renders the modal UI when it is opened. */
-    onOpen() {
-        const { contentEl } = this;
+          this.activeViewAtOpen.editor.replaceSelection(taskLine);
 
-        contentEl.createEl('h2', { text: 'Quick add task' });
-
-        // --- 1. Task title input -------------------------------------------
-        new Setting(contentEl)
-            .setName('Task')
-            .addText(text => {
-                text
-                    .setPlaceholder('Read chapter 4...')
-                    .onChange(value => { this.title = value; });
-
-                // Auto-focus so the user can start typing immediately.
-                text.inputEl.focus();
-            });
-
-        // --- 2. Destination dropdown ----------------------------------------
-        new Setting(contentEl)
-            .setName('Destination')
-            .addDropdown(drop => {
-                // Always offer "insert at cursor" as the first option, so it is
-                // the most ergonomic choice when a Markdown file is already open.
-                drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
-
-                // Only show files the plugin has already scanned rather than
-                // every file in the vault, keeping the list focused and relevant.
-                const scannedFiles = this.taskManager.getScannedFiles();
-                scannedFiles.forEach((path) => {
-                    // Strip the directory path and .md extension for a clean label.
-                    const label = path.split('/').pop()?.replace('.md', '') || path;
-                    drop.addOption(path, label);
-                });
-
-                // Pre-select a sensible default:
-                //   • Cursor mode if a Markdown file was open when the modal launched.
-                //   • Otherwise fall back to the first scanned file.
-                if (this.activeViewAtOpen) {
-                    this.selectedFile = '__CURSOR__';
-                } else if (scannedFiles.length > 0) {
-                    this.selectedFile = scannedFiles[0];
-                }
-
-                drop.setValue(this.selectedFile);
-                drop.onChange(value => { this.selectedFile = value; });
-            });
-
-        // --- 3. Due date picker ---------------------------------------------
-        new Setting(contentEl)
-            .setName('Due date')
-            .addText(text => {
-                // Render as a native HTML date input for a built-in calendar picker.
-                text.inputEl.type = 'date';
-                text.onChange(value => { this.date = value; });
-            });
-
-        // --- 3.5 Recurrence input ---
-        new Setting(contentEl)
-            .setName('Repeat')
-            .setDesc('Examples: daily, weekly, 2d, 3w, monthly+, 2w+')
-            .addText(text => {
-                text.setPlaceholder('Optional...');
-                text.onChange(value => { this.recurrence = value; });
-            });
-
-        // --- 4. Submit button -----------------------------------------------
-        new Setting(contentEl)
-            .addButton(btn => btn
-                .setButtonText('Add task')
-                .setCta()
-                .onClick(() => { void this.handleSubmit(); }),
+          // Rescan so the TaskManager reflects the new entry
+          // without waiting for the next background sweep.
+          if (this.activeViewAtOpen.file) {
+            await this.taskManager.refreshFileTask(
+              this.activeViewAtOpen.file.path,
             );
-    }
-
-    private async handleSubmit(): Promise<void> {
-        // Guard: both a title and a destination are required.
-        if (!this.title || !this.selectedFile) return;
-
-        if (this.selectedFile === '__CURSOR__') {
-            // -----------------------------------------------------------------
-            // Cursor-insertion path
-            // -----------------------------------------------------------------
-            if (this.activeViewAtOpen) {
-                // Build and insert the task line synchronously
-                // BEFORE closing the modal. Closing first (even with
-                // a setTimeout) risks losing the editor reference or
-                // landing at a stale cursor position.
-                const dateStr = this.date ? ` [due:: ${this.date}]` : '';
-                const repeatStr = this.recurrence ? ` [repeat:: ${this.recurrence}]` : '';
-                const taskLine = `- [ ] ${this.title}${dateStr}${repeatStr}\n`;
-
-                this.activeViewAtOpen.editor.replaceSelection(taskLine);
-
-                // Rescan so the TaskManager reflects the new entry
-                // without waiting for the next background sweep.
-                if (this.activeViewAtOpen.file) {
-                    await this.taskManager.refreshFileTask(this.activeViewAtOpen.file.path);
-                }
-            } else {
-                // Fallback: the view was closed before the user submitted.
-                // Append to the first available scanned file instead.
-                // Do NOT pass '__CURSOR__' — addTask expects a real path.
-                const fallbackFile = this.taskManager.getScannedFiles()[0];
-                if (fallbackFile) {
-                    const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-                    await this.taskManager.addTask(this.title, dateObj, fallbackFile);
-                }
-            }
+          }
         } else {
-            // -----------------------------------------------------------------
-            // Append-to-file path
-            //
-            // Delegate entirely to TaskManager, which handles
-            // formatting and writing to the end of the chosen file.
-            // -----------------------------------------------------------------
-            const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-            await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
+          // Fallback: the view was closed before the user submitted.
+          // Append to the first available scanned file instead.
+          // Do NOT pass '__CURSOR__' — addTask expects a real path.
+          const fallbackFile = this.taskManager.getScannedFiles()[0];
+          if (fallbackFile) {
+            const dateObj = this.date
+              ? new Date(`${this.date}T00:00:00`)
+              : null;
+            await this.taskManager.addTask(this.title, dateObj, fallbackFile);
+          }
         }
+      } else {
+        // -----------------------------------------------------------------
+        // Append-to-file path
+        //
+        // Delegate entirely to TaskManager, which handles
+        // formatting and writing to the end of the chosen file.
+        // -----------------------------------------------------------------
+        const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
+        await this.taskManager.addTask(
+          this.title,
+          dateObj,
+          this.selectedFile,
+          this.recurrence,
+        );
+      }
 
-        this.close();
+      this.close();
+    } catch (error) {
+      if (this.submitButton) {
+        this.submitButton.setDisabled(false);
+        this.submitButton.setButtonText("Add task");
+      }
+      throw error;
     }
+  }
 
-    /** Cleans up the modal's DOM when it is closed. */
-    onClose() {
-        this.contentEl.empty();
-    }
+  /** Cleans up the modal's DOM when it is closed. */
+  onClose() {
+    this.contentEl.empty();
+  }
 }
