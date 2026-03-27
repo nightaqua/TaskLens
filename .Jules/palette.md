@@ -10,3 +10,7 @@
 **Learning:** Adding `role="button"` and `tabindex="0"` to a non-button element (like a `div` or `span`) makes it identifiable and focusable by a screen reader. However, it *does not* automatically give it the built-in keyboard behavior of a real `<button>`. A real button triggers a `click` event when focused and the Enter or Space keys are pressed. A customized `div` requires explicit `keydown` event listeners to reproduce this native interaction and guarantee full keyboard accessibility.
 
 **Action:** Whenever converting a custom element into a button, always pair `role="button"` and `tabindex="0"` with a `keydown` listener that handles 'Enter' and ' ' (Space) alongside the regular `click` listener.
+
+## 2025-02-14 - Properly link labels and inputs programmatically
+**Learning:** When using Obsidian DOM helpers (`createEl`, `createDiv`) to create form elements like `<select>` dropdowns and their visual `<label>` counterparts, it's easy to forget to link them programmatically. Without explicit `id` and `for` attributes, screen readers may not correctly associate the label with the input, and clicking the label won't focus the input.
+**Action:** Always link visual labels to their corresponding form inputs by generating a unique `id` for the input and setting the `for` attribute on the label. This can be done by passing the `attr` property in the options object to `createEl`. Example: `createEl('label', { attr: { for: 'input-id' } })`.
