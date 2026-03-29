@@ -93,6 +93,13 @@ export class QuickAddModal extends Modal {
                     .setPlaceholder('Read chapter 4...')
                     .onChange(value => { this.title = value; });
 
+                text.inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void this.handleSubmit();
+                    }
+                });
+
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
             });
@@ -134,6 +141,13 @@ export class QuickAddModal extends Modal {
                 // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
                 text.onChange(value => { this.date = value; });
+
+                text.inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void this.handleSubmit();
+                    }
+                });
             });
 
         // --- 3.5 Recurrence input ---
@@ -143,12 +157,20 @@ export class QuickAddModal extends Modal {
             .addText(text => {
                 text.setPlaceholder('Optional...');
                 text.onChange(value => { this.recurrence = value; });
+
+                text.inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void this.handleSubmit();
+                    }
+                });
             });
 
         // --- 4. Submit button -----------------------------------------------
         new Setting(contentEl)
             .addButton(btn => btn
                 .setButtonText('Add task')
+                .setTooltip('Press enter to submit')
                 .setCta()
                 .onClick(() => { void this.handleSubmit(); }),
             );
