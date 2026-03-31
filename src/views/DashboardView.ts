@@ -284,8 +284,9 @@ export class DashboardView extends ItemView implements RefreshableView {
         filtersDiv.setCssProps({ display: 'flex', gap: '12px', 'flex-wrap': 'wrap' });
 
         const statusGroup = filtersDiv.createDiv('control-group');
-        statusGroup.createEl('label', { text: 'Show:' });
-        const statusSelect = statusGroup.createEl('select');
+        const statusId = 'filter-status-' + Math.random().toString(36).substring(2, 9);
+        statusGroup.createEl('label', { text: 'Show:', attr: { for: statusId } });
+        const statusSelect = statusGroup.createEl('select', { attr: { id: statusId } });
         statusSelect.setAttribute('aria-label', 'Filter by status');
 
         const statusOptions = [
@@ -305,8 +306,9 @@ export class DashboardView extends ItemView implements RefreshableView {
         });
 
         const courseGroup = filtersDiv.createDiv('control-group');
-        courseGroup.createEl('label', { text: 'Topic:' });
-        const courseSelect = courseGroup.createEl('select');
+        const courseId = 'filter-course-' + Math.random().toString(36).substring(2, 9);
+        courseGroup.createEl('label', { text: 'Topic:', attr: { for: courseId } });
+        const courseSelect = courseGroup.createEl('select', { attr: { id: courseId } });
         courseSelect.setAttribute('aria-label', 'Filter by topic');
         courseSelect.createEl('option', { value: '', text: 'All topics' });
 
@@ -319,8 +321,9 @@ export class DashboardView extends ItemView implements RefreshableView {
         });
 
         const completionGroup = filtersDiv.createDiv('control-group');
-        completionGroup.createEl('label', { text: 'Completed:' });
-        const completionSelect = completionGroup.createEl('select');
+        const completionId = 'filter-completion-' + Math.random().toString(36).substring(2, 9);
+        completionGroup.createEl('label', { text: 'Completed:', attr: { for: completionId } });
+        const completionSelect = completionGroup.createEl('select', { attr: { id: completionId } });
         completionSelect.setAttribute('aria-label', 'Filter by completion date');
         [
             { value: 'all',   text: 'All-time' },
