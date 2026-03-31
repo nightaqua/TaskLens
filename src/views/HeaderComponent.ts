@@ -154,7 +154,8 @@ export class HeaderComponent {
         const input = wrapper.createEl('input', {
             type: 'text',
             value: this.title,
-            cls: 'dashboard-title-input'
+            cls: 'dashboard-title-input',
+            attr: { 'aria-label': 'Edit title' }
         });
 
         input.focus();
