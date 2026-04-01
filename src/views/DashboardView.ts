@@ -284,8 +284,8 @@ export class DashboardView extends ItemView implements RefreshableView {
         filtersDiv.setCssProps({ display: 'flex', gap: '12px', 'flex-wrap': 'wrap' });
 
         const statusGroup = filtersDiv.createDiv('control-group');
-        statusGroup.createEl('label', { text: 'Show:', attr: { for: 'dashboard-status-filter' } });
-        const statusSelect = statusGroup.createEl('select', { attr: { id: 'dashboard-status-filter' } });
+        statusGroup.createEl('label', { text: 'Show:' });
+        const statusSelect = statusGroup.createEl('select');
         statusSelect.setAttribute('aria-label', 'Filter by status');
 
         const statusOptions = [
@@ -305,8 +305,8 @@ export class DashboardView extends ItemView implements RefreshableView {
         });
 
         const courseGroup = filtersDiv.createDiv('control-group');
-        courseGroup.createEl('label', { text: 'Topic:', attr: { for: 'dashboard-topic-filter' } });
-        const courseSelect = courseGroup.createEl('select', { attr: { id: 'dashboard-topic-filter' } });
+        courseGroup.createEl('label', { text: 'Topic:' });
+        const courseSelect = courseGroup.createEl('select');
         courseSelect.setAttribute('aria-label', 'Filter by topic');
         courseSelect.createEl('option', { value: '', text: 'All topics' });
 
@@ -319,8 +319,8 @@ export class DashboardView extends ItemView implements RefreshableView {
         });
 
         const completionGroup = filtersDiv.createDiv('control-group');
-        completionGroup.createEl('label', { text: 'Completed:', attr: { for: 'dashboard-completion-filter' } });
-        const completionSelect = completionGroup.createEl('select', { attr: { id: 'dashboard-completion-filter' } });
+        completionGroup.createEl('label', { text: 'Completed:' });
+        const completionSelect = completionGroup.createEl('select');
         completionSelect.setAttribute('aria-label', 'Filter by completion date');
         [
             { value: 'all',   text: 'All-time' },
