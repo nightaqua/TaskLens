@@ -464,9 +464,11 @@ export class DashboardView extends ItemView implements RefreshableView {
         const navControls = controls.createDiv('nav-controls');
         const scrollLeft = navControls.createEl('button', { cls: 'view-toggle-btn' });
         scrollLeft.setAttribute('aria-label', 'Scroll left');
+        scrollLeft.setAttribute('title', 'Scroll left');
         setIcon(scrollLeft, 'chevron-left');
         const scrollRight = navControls.createEl('button', { cls: 'view-toggle-btn' });
         scrollRight.setAttribute('aria-label', 'Scroll right');
+        scrollRight.setAttribute('title', 'Scroll right');
         setIcon(scrollRight, 'chevron-right');
 
         this.timelineComponent = new TimelineComponent(
