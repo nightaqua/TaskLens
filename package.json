@@ -24,7 +24,7 @@
     "@types/node": "^25.5.0",
     "@typescript-eslint/parser": "^8.57.0",
     "builtin-modules": "^5.0.0",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.0",
     "eslint": "^10.0.3",
     "eslint-plugin-obsidianmd": "^0.1.9",
     "obsidian": "^1.7.2",
