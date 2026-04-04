@@ -64,6 +64,7 @@ export class HeaderComponent {
         this.sidebarHandleEl = this.container.createDiv('dashboard-sidebar-handle is-hidden');
         setIcon(this.sidebarHandleEl, 'panel-left-open');
         this.sidebarHandleEl.setAttribute('aria-label', 'Show header');
+        this.sidebarHandleEl.setAttribute('title', 'Show header');
         this.sidebarHandleEl.setAttribute('role', 'button');
         this.sidebarHandleEl.setAttribute('tabindex', '0');
         this.sidebarHandleEl.setAttribute('aria-expanded', this.isCollapsed ? 'false' : 'true');
@@ -95,6 +96,7 @@ export class HeaderComponent {
             const settingsBtn = leftGroup.createEl('button', { cls: 'header-icon-btn' });
             setIcon(settingsBtn, 'settings');
             settingsBtn.setAttribute('aria-label', 'Settings');
+            settingsBtn.setAttribute('title', 'Settings');
             settingsBtn.addEventListener('click', () => { this.onSettings?.(); });
         }
 
@@ -123,6 +125,7 @@ export class HeaderComponent {
             if (this.highlightAddButton) addBtn.addClass(CLASS_FEATURE_HIGHLIGHT);
             setIcon(addBtn, 'plus');
             addBtn.setAttribute('aria-label', 'Quick add task');
+            addBtn.setAttribute('title', 'Quick add task');
             addBtn.addEventListener('click', () => {
                 if (this.highlightAddButton) {
                     this.highlightAddButton = false;
@@ -136,6 +139,7 @@ export class HeaderComponent {
         const refreshBtn = rightGroup.createEl('button', { cls: 'dashboard-refresh-btn header-icon-btn' });
         setIcon(refreshBtn, 'refresh-cw');
         refreshBtn.setAttribute('aria-label', 'Refresh data');
+        refreshBtn.setAttribute('title', 'Refresh data');
         refreshBtn.addEventListener('click', () => {
             refreshBtn.addClass('is-rotating');
             this.onRefresh();
@@ -145,6 +149,7 @@ export class HeaderComponent {
         const hideBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
         setIcon(hideBtn, 'panel-top-close');
         hideBtn.setAttribute('aria-label', 'Hide header');
+        hideBtn.setAttribute('title', 'Hide header');
         hideBtn.setAttribute('aria-expanded', this.isCollapsed ? 'false' : 'true');
         hideBtn.setAttribute('aria-controls', 'dashboard-header');
         hideBtn.addEventListener('click', () => {

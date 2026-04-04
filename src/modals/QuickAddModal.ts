@@ -99,7 +99,10 @@ export class QuickAddModal extends Modal {
             .addText(text => {
                 text
                     .setPlaceholder('Read chapter 4...')
-                    .onChange(value => { this.title = value; });
+                    .onChange(value => {
+                        this.title = value;
+                        this.updateSubmitButtonState();
+                    });
 
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
@@ -164,6 +167,20 @@ export class QuickAddModal extends Modal {
                     .setCta()
                     .onClick(() => { void this.handleSubmit(); });
             });
+
+        this.updateSubmitButtonState();
+    }
+
+    private updateSubmitButtonState(): void {
+        if (!this.submitBtnComp) return;
+
+        if (!this.title.trim()) {
+            this.submitBtnComp.setDisabled(true);
+            this.submitBtnComp.setTooltip('A task title is required');
+        } else {
+            this.submitBtnComp.setDisabled(false);
+            this.submitBtnComp.setTooltip('');
+        }
     }
 
     private submitButton: Setting | null = null;
