@@ -207,6 +207,7 @@ private readonly onDrop = (e: DragEvent): void => {
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+        card.setAttribute('title', `Open task in editor: ${task.title}`);
         card.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
