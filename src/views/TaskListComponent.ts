@@ -69,6 +69,7 @@ export class TaskListComponent {
         const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
         checkbox.checked = task.completed;
         checkbox.setAttribute('aria-label', `Toggle task: ${task.title}`);
+        checkbox.setAttribute('title', `Toggle task: ${task.title}`);
         checkbox.addEventListener('change', () => { this.callbacks.onToggle(task); });
 
         const content = taskEl.createDiv('task-content');
@@ -80,6 +81,7 @@ export class TaskListComponent {
         titleEl.setAttribute('role', 'button');
         titleEl.setAttribute('tabindex', '0');
         titleEl.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+        titleEl.setAttribute('title', `Open task in editor: ${task.title}`);
 
         const meta = viewMode.createDiv('task-meta');
 
@@ -103,7 +105,10 @@ export class TaskListComponent {
                 recurringChip.createSpan({
                     text: `×${String(group.doneCount)}`,
                     cls: 'task-recurrence-count',
-                    attr: { 'aria-label': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}` }
+                    attr: {
+                        'aria-label': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`,
+                        'title': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`
+                    }
                 });
             }
         }

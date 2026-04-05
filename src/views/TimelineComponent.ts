@@ -123,6 +123,7 @@ export class TimelineComponent {
 
         const navHandle = navSection.createDiv('ribbon-handle ribbon-handle--nav');
         navHandle.setAttribute('aria-label', 'Navigate timeline');
+        navHandle.setAttribute('title', 'Navigate timeline');
         navHandle.setAttribute('role', 'button');
         navHandle.setAttribute('tabindex', '0');
         navHandle.setAttribute('aria-expanded', this.ribbonNavOpen ? 'true' : 'false');
@@ -184,6 +185,7 @@ export class TimelineComponent {
         const prevBtn = navControls.createEl('button', { cls: 'vp-jump' });
         prevBtn.setText('‹‹');
         prevBtn.setAttribute('aria-label', 'Jump back 6 months');
+        prevBtn.setAttribute('title', 'Jump back 6 months');
         prevBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.ribbonNavOpen = true;
@@ -198,6 +200,7 @@ export class TimelineComponent {
         const nextBtn = navControls.createEl('button', { cls: 'vp-jump' });
         nextBtn.setText('››');
         nextBtn.setAttribute('aria-label', 'Jump forward 6 months');
+        nextBtn.setAttribute('title', 'Jump forward 6 months');
         nextBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.ribbonNavOpen = true;
@@ -231,6 +234,7 @@ export class TimelineComponent {
                 const countSuffix = count > 1 ? ` \xd7${String(count)}` : '';
                 chip.setText(isPast ? `\u2190 ${label}${countSuffix}` : `${label}${countSuffix} \u2192`);
                 chip.setAttribute('aria-label', `Jump to ${label}`);
+                chip.setAttribute('title', `Jump to ${label}`);
                 chip.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.ribbonNavOpen = true;
@@ -261,6 +265,7 @@ export class TimelineComponent {
 
         const syncHandle = syncSection.createDiv('ribbon-handle ribbon-handle--sync');
         syncHandle.setAttribute('aria-label', 'Scroll to today');
+        syncHandle.setAttribute('title', 'Scroll to today');
         syncHandle.setAttribute('role', 'button');
         syncHandle.setAttribute('tabindex', '0');
         const syncIconWrap = syncHandle.createDiv('ribbon-handle-icon');
@@ -271,6 +276,7 @@ export class TimelineComponent {
         syncExpand.setAttribute('role', 'button');
         syncExpand.setAttribute('tabindex', '0');
         syncExpand.setAttribute('aria-label', 'Scroll to today');
+        syncExpand.setAttribute('title', 'Scroll to today');
         const syncExpandIcon = syncExpand.createDiv('ribbon-sync-expand-icon');
         setIcon(syncExpandIcon, 'rotate-ccw');
         syncExpand.createSpan({ cls: 'ribbon-sync-expand-label' }).setText('Today');
@@ -451,6 +457,7 @@ export class TimelineComponent {
             bar.setAttribute('role', 'button');
             bar.setAttribute('tabindex', '0');
             bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+            bar.setAttribute('title', `Open task in editor: ${task.title}`);
             bar.setCssProps({
                 'grid-column-start': String(startIdx + 1),
                 'grid-column-end': `span ${String((dueIdx - startIdx) + 1)}`,
@@ -543,6 +550,7 @@ export class TimelineComponent {
         overlay.setAttribute('role', 'button');
         overlay.setAttribute('tabindex', '0');
         overlay.setAttribute('aria-label', `Scroll ${direction}`);
+        overlay.setAttribute('title', `Scroll ${direction}`);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
 
         const triggerScroll = (e: Event) => {

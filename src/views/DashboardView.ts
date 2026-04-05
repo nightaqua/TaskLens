@@ -287,6 +287,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         statusGroup.createEl('label', { text: 'Show:', attr: { for: 'dashboard-status-filter' } });
         const statusSelect = statusGroup.createEl('select', { attr: { id: 'dashboard-status-filter' } });
         statusSelect.setAttribute('aria-label', 'Filter by status');
+        statusSelect.setAttribute('title', 'Filter by status');
 
         const statusOptions = [
             { value: TaskStatus.Open, label: 'Active (All)' },
@@ -308,6 +309,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         courseGroup.createEl('label', { text: 'Topic:', attr: { for: 'dashboard-course-filter' } });
         const courseSelect = courseGroup.createEl('select', { attr: { id: 'dashboard-course-filter' } });
         courseSelect.setAttribute('aria-label', 'Filter by topic');
+        courseSelect.setAttribute('title', 'Filter by topic');
         courseSelect.createEl('option', { value: '', text: 'All topics' });
 
         this.taskManager.getCourseNames().forEach(course => {
@@ -322,6 +324,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         completionGroup.createEl('label', { text: 'Completed:', attr: { for: 'dashboard-completion-filter' } });
         const completionSelect = completionGroup.createEl('select', { attr: { id: 'dashboard-completion-filter' } });
         completionSelect.setAttribute('aria-label', 'Filter by completion date');
+        completionSelect.setAttribute('title', 'Filter by completion date');
         [
             { value: 'all',   text: 'All-time' },
             { value: 'today', text: 'Today' },
@@ -383,6 +386,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             card.setAttribute('role', 'button');
             card.setAttribute('tabindex', '0');
             card.setAttribute('aria-label', `Filter by ${stat.label} tasks`);
+            card.setAttribute('title', `Filter by ${stat.label} tasks`);
 
             const triggerFilter = () => { this.taskManager.setStatusFilter(stat.filter); };
             card.addEventListener('click', triggerFilter);
@@ -448,6 +452,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         const zoomOut = zoomControls.createEl('button', { text: '-', cls: 'view-toggle-btn' });
         zoomOut.setAttribute('aria-label', 'Zoom out timeline');
+        zoomOut.setAttribute('title', 'Zoom out timeline');
         zoomOut.addEventListener('click', () => {
             this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
             this.render();
@@ -455,6 +460,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} days ` });
         const zoomIn = zoomControls.createEl('button', { text: '+', cls: 'view-toggle-btn' });
         zoomIn.setAttribute('aria-label', 'Zoom in timeline');
+        zoomIn.setAttribute('title', 'Zoom in timeline');
         zoomIn.addEventListener('click', () => {
             this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);
             this.render();
@@ -464,9 +470,11 @@ export class DashboardView extends ItemView implements RefreshableView {
         const navControls = controls.createDiv('nav-controls');
         const scrollLeft = navControls.createEl('button', { cls: 'view-toggle-btn' });
         scrollLeft.setAttribute('aria-label', 'Scroll left');
+        scrollLeft.setAttribute('title', 'Scroll left');
         setIcon(scrollLeft, 'chevron-left');
         const scrollRight = navControls.createEl('button', { cls: 'view-toggle-btn' });
         scrollRight.setAttribute('aria-label', 'Scroll right');
+        scrollRight.setAttribute('title', 'Scroll right');
         setIcon(scrollRight, 'chevron-right');
 
         this.timelineComponent = new TimelineComponent(
