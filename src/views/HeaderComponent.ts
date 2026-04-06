@@ -100,6 +100,7 @@ export class HeaderComponent {
 
         const titleWrapper = this.headerEl.createDiv('dashboard-title-wrapper');
         titleWrapper.setAttribute('aria-label', 'Click to rename');
+        titleWrapper.setAttribute('title', 'Click to rename');
         titleWrapper.setAttribute('role', 'button');
         titleWrapper.setAttribute('tabindex', '0');
         titleWrapper.createEl('h2', { text: this.title });
