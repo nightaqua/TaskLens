@@ -10,3 +10,7 @@
 **Learning:** Adding `role="button"` and `tabindex="0"` to a non-button element (like a `div` or `span`) makes it identifiable and focusable by a screen reader. However, it *does not* automatically give it the built-in keyboard behavior of a real `<button>`. A real button triggers a `click` event when focused and the Enter or Space keys are pressed. A customized `div` requires explicit `keydown` event listeners to reproduce this native interaction and guarantee full keyboard accessibility.
 
 **Action:** Whenever converting a custom element into a button, always pair `role="button"` and `tabindex="0"` with a `keydown` listener that handles 'Enter' and ' ' (Space) alongside the regular `click` listener.
+
+## 2025-05-19 - Ensure both a11y and discoverability for icon-only elements
+**Learning:** Adding an `aria-label` to an icon-only button ensures it is accessible to screen readers. However, mouse users get no visual feedback when hovering, reducing discoverability. The native browser `title` attribute must be added alongside the `aria-label` to provide built-in tooltips.
+**Action:** When creating icon-only buttons or interactive elements, always set both `aria-label` (for screen readers) and `title` (for mouse hover tooltips) with descriptive text.
