@@ -130,6 +130,14 @@ export class SettingsTab extends PluginSettingTab {
                     });
                 }));
 
+        new Setting(uiDetails)
+            .setName('Show task action buttons')
+            .setDesc('Show edit and delete buttons on task hover in the task list.')
+            .addToggle(t => t.setValue(this.plugin.settings.showTaskActions).onChange(v => {
+                this.plugin.settings.showTaskActions = v;
+                void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
+            }));
+
         const colorPickersContainer = uiDetails.createDiv();
         this.renderColorPickers(colorPickersContainer);
 

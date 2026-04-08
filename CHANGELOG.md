@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0]
+
+### New features
+
+- **Task notes in list view.** Tasks with `[notes:: ...]` metadata now display their notes below the meta row in the task list. The CSS stub was already present; the DOM element is now built.
+- **Task action buttons.** Edit (pencil) and delete (trash) buttons now appear on hover for each task in the list view. Hidden by default — enable via **Settings → Appearance → Show task action buttons**.
+- **Edit modal.** The edit button opens `QuickAddModal` in edit mode, pre-populated with the task's existing title, due date, start date, and recurrence.
+- **Start date field in QuickAdd.** The Quick Add modal now includes a start date picker alongside the existing due date field.
+- **Recurrence dropdown.** The recurrence input in QuickAdd is now a dropdown (daily, weekly, biweekly, monthly, quarterly, yearly) instead of free text.
+
+### Bug fixes
+
+- **Stats boxes now respect topic filter.** The statistics cards in the Dashboard correctly update when a topic filter is applied, rather than always showing all-task counts.
+- **Stat box highlight colors restored.** The "Upcoming" stat box was using class `stat-upcoming` which had no CSS rule; corrected to `stat-active`. The "Total" box was referencing an undefined `--color-purple` variable; corrected to `var(--interactive-accent)`.
+- **Custom metadata keys now respected.** Plugin settings allow changing `start::` and `due::` to custom key names. These were previously ignored — `TaskParser.ts` regexes and all write paths in `TaskManager.ts` and `QuickAddModal.ts` now use the values from settings dynamically.
+- **StatsView color theme.** The standalone Stats view now applies the same color-theme CSS variables as the Dashboard, so stat box borders are consistent.
+
+### Accessibility
+
+- `aria-expanded` and `aria-controls` on collapsible sidebar/timeline menus (PR #54).
+- Filter dropdowns linked to labels via `for`/`id` attributes (PR #60).
+- QuickAdd modal supports Enter key submission from any field (PR #62).
+
+---
+
 ## [1.2.2]
 
 ### Bug fixes

@@ -1,5 +1,7 @@
 import { App, Modal, Setting, MarkdownView, ButtonComponent } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
+import { Task } from '../models/Task';
+import { SemesterSettings } from '../settings/Settings';
 
 /**
  * QuickAddModal
@@ -51,6 +53,9 @@ export class QuickAddModal extends Modal {
     /** ISO date string (YYYY-MM-DD) from the date picker, or empty string. */
     private date: string = '';
 
+    /** ISO date string (YYYY-MM-DD) for the start date picker, or empty string. */
+    private startDate: string = '';
+
     private recurrence: string = '';
 
     /**
@@ -69,7 +74,7 @@ export class QuickAddModal extends Modal {
      */
     private readonly activeViewAtOpen: MarkdownView | null;
 
-    constructor(app: App, private readonly taskManager: TaskManager) {
+    constructor(app: App, private readonly taskManager: TaskManager, private readonly editTask?: Task, private readonly settings?: SemesterSettings) {
         super(app);
 
         this.activeViewAtOpen = resolveActiveMarkdownView(this.app);
@@ -83,7 +88,28 @@ export class QuickAddModal extends Modal {
     onOpen() {
         const { contentEl } = this;
 
-        contentEl.createEl('h2', { text: 'Quick add task' });
+        const heading = this.editTask ? 'Edit task' : 'Quick add task';
+        contentEl.createEl('h2', { text: heading });
+
+        // Pre-populate fields if editing
+        if (this.editTask) {
+            this.title = this.editTask.title;
+            if (this.editTask.dueDate) {
+                const y = String(this.editTask.dueDate.getFullYear());
+                const m = String(this.editTask.dueDate.getMonth() + 1).padStart(2, '0');
+                const d = String(this.editTask.dueDate.getDate()).padStart(2, '0');
+                this.date = `${y}-${m}-${d}`;
+            }
+            if (this.editTask.startDate) {
+                const y = String(this.editTask.startDate.getFullYear());
+                const m = String(this.editTask.startDate.getMonth() + 1).padStart(2, '0');
+                const d = String(this.editTask.startDate.getDate()).padStart(2, '0');
+                this.startDate = `${y}-${m}-${d}`;
+            }
+            if (this.editTask.recurrence) {
+                this.recurrence = this.editTask.recurrence;
+            }
+        }
 
         // Handle Enter keypress for quick submission
         const handleEnter = (e: KeyboardEvent) => {
@@ -99,6 +125,7 @@ export class QuickAddModal extends Modal {
             .addText(text => {
                 text
                     .setPlaceholder('Read chapter 4...')
+                    .setValue(this.title)
                     .onChange(value => { this.title = value; });
 
                 // Auto-focus so the user can start typing immediately.
@@ -106,35 +133,40 @@ export class QuickAddModal extends Modal {
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
-        // --- 2. Destination dropdown ----------------------------------------
-        new Setting(contentEl)
-            .setName('Destination')
-            .addDropdown(drop => {
-                // Always offer "insert at cursor" as the first option, so it is
-                // the most ergonomic choice when a Markdown file is already open.
-                drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
+        // --- 2. Destination dropdown (hidden in edit mode) --------
+        if (!this.editTask) {
+            new Setting(contentEl)
+                .setName('Destination')
+                .addDropdown(drop => {
+                    // Always offer "insert at cursor" as the first option, so it is
+                    // the most ergonomic choice when a Markdown file is already open.
+                    drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
 
-                // Only show files the plugin has already scanned rather than
-                // every file in the vault, keeping the list focused and relevant.
-                const scannedFiles = this.taskManager.getScannedFiles();
-                scannedFiles.forEach((path) => {
-                    // Strip the directory path and .md extension for a clean label.
-                    const label = path.split('/').pop()?.replace('.md', '') || path;
-                    drop.addOption(path, label);
+                    // Only show files the plugin has already scanned rather than
+                    // every file in the vault, keeping the list focused and relevant.
+                    const scannedFiles = this.taskManager.getScannedFiles();
+                    scannedFiles.forEach((path) => {
+                        // Strip the directory path and .md extension for a clean label.
+                        const label = path.split('/').pop()?.replace('.md', '') || path;
+                        drop.addOption(path, label);
+                    });
+
+                    // Pre-select a sensible default:
+                    //   • Cursor mode if a Markdown file was open when the modal launched.
+                    //   • Otherwise fall back to the first scanned file.
+                    if (this.activeViewAtOpen) {
+                        this.selectedFile = '__CURSOR__';
+                    } else if (scannedFiles.length > 0) {
+                        this.selectedFile = scannedFiles[0];
+                    }
+
+                    drop.setValue(this.selectedFile);
+                    drop.onChange(value => { this.selectedFile = value; });
                 });
-
-                // Pre-select a sensible default:
-                //   • Cursor mode if a Markdown file was open when the modal launched.
-                //   • Otherwise fall back to the first scanned file.
-                if (this.activeViewAtOpen) {
-                    this.selectedFile = '__CURSOR__';
-                } else if (scannedFiles.length > 0) {
-                    this.selectedFile = scannedFiles[0];
-                }
-
-                drop.setValue(this.selectedFile);
-                drop.onChange(value => { this.selectedFile = value; });
-            });
+        } else {
+            // In edit mode, pre-set selectedFile to the task's file
+            this.selectedFile = this.editTask.filePath;
+        }
 
         // --- 3. Due date picker ---------------------------------------------
         new Setting(contentEl)
@@ -142,25 +174,50 @@ export class QuickAddModal extends Modal {
             .addText(text => {
                 // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
+                text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
-        // --- 3.5 Recurrence input ---
+        // --- 3.5 Start date picker ---
         new Setting(contentEl)
-            .setName('Repeat')
-            .setDesc('Examples: daily, weekly, 2d, 3w, monthly+, 2w+')
+            .setName('Start date')
             .addText(text => {
-                text.setPlaceholder('Optional...');
-                text.onChange(value => { this.recurrence = value; });
+                // Render as a native HTML date input for a built-in calendar picker.
+                text.inputEl.type = 'date';
+                text.setValue(this.startDate);
+                text.onChange(value => { this.startDate = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
-        // --- 4. Submit button -----------------------------------------------
+        // --- 4. Recurrence input (dropdown) ---
+        new Setting(contentEl)
+            .setName('Repeat')
+            .setDesc('Select a recurrence pattern.')
+            .addDropdown(drop => {
+                drop.addOption('', 'None');
+                drop.addOption('daily', 'Daily');
+                drop.addOption('weekly', 'Weekly');
+                drop.addOption('biweekly', 'Biweekly');
+                drop.addOption('monthly', 'Monthly');
+                drop.addOption('quarterly', 'Quarterly');
+                drop.addOption('yearly', 'Yearly');
+
+                // If editTask has a recurrence not in dropdown, still show it
+                if (this.editTask && this.editTask.recurrence && !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', ''].includes(this.editTask.recurrence)) {
+                    drop.addOption(this.editTask.recurrence, this.editTask.recurrence);
+                }
+
+                drop.setValue(this.recurrence);
+                drop.onChange(value => { this.recurrence = value; });
+            });
+
+        // --- 5. Submit button -----------------------------------------------
         this.submitButton = new Setting(contentEl)
             .addButton(btn => {
                 this.submitBtnComp = btn;
-                btn.setButtonText('Add task')
+                const buttonText = this.editTask ? 'Save changes' : 'Add task';
+                btn.setButtonText(buttonText)
                     .setCta()
                     .onClick(() => { void this.handleSubmit(); });
             });

@@ -41,8 +41,9 @@ coverage/
 tmp/
 temp/
 
-# Jules internal notes (AI agent working files)
-# .Jules/ let it create notes for now
+# Jules/AI agent working files — excluded from repo
+.Jules/
+.iloom/
 
 # TypeScript incremental build info
 tsconfig.tsbuildinfo

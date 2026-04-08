@@ -61,9 +61,21 @@ export class StatsView extends ItemView {
 
         this.contentEl.empty();
         this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
+        this.applyColorTheme();
         this.render();
 
         return Promise.resolve();
+    }
+
+    private applyColorTheme(): void {
+        const cols = this.plugin.settings.colors;
+        this.contentEl.setCssProps({
+            '--color-red': cols.overdue,
+            '--color-orange': cols.urgent,
+            '--color-green': cols.active,
+            '--color-blue': cols.completed,
+            '--color-purple': 'var(--interactive-accent)',
+        });
     }
 
     onClose(): Promise<void> {

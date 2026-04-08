@@ -1,6 +1,7 @@
 import { TFile, Events, App, normalizePath } from 'obsidian';
 import { Task, TaskGroup, TaskStatus, getTaskStatus } from '../models/Task';
 import { TaskParser } from './TaskParser';
+import { SemesterSettings, DEFAULT_SETTINGS } from '../settings/Settings';
 import { hasCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
 
 export class TaskManager extends Events {
@@ -13,10 +14,15 @@ export class TaskManager extends Events {
 
     private cachedStats: ReturnType<typeof this.calculateStatistics> | null = null;
     private lastTasksRef: Task[] | null = null;
+    private lastStatsCourseFilter: string | null = null;
     private cachedAllGroups: TaskGroup[] | null = null;
 
-    constructor(private readonly parser: TaskParser, private readonly app: App) {
+    constructor(private readonly parser: TaskParser, private readonly app: App, private readonly settings: SemesterSettings = DEFAULT_SETTINGS) {
         super();
+    }
+
+    private escapeRegex(s: string): string {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     async loadTasks(): Promise<void> {
@@ -96,7 +102,8 @@ export class TaskManager extends Events {
 
         if (task.dueDate) {
             // Advance due:: to next occurrence
-            const dueRegex = /(\[?due::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+            const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
+            const dueRegex = new RegExp(`(\\[?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
             clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
 
             // If start:: is also present, advance it by the same interval so the
@@ -104,12 +111,14 @@ export class TaskManager extends Events {
             if (task.startDate) {
                 const windowMs = task.dueDate.getTime() - task.startDate.getTime();
                 const nextStart = new Date(nextDate.getTime() - windowMs);
-                const startRegex = /(\[?start::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+                const startKey = this.escapeRegex(this.settings.startDateKey || 'start');
+                const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
                 clonedLine = clonedLine.replace(startRegex, `$1${this.formatDate(nextStart)}$3`);
             }
         } else if (task.startDate) {
             // start:: is the only anchor — advance it to the next occurrence
-            const startRegex = /(\[?start::\s*)(\d{4}-\d{2}-\d{2})([\])]?)/i;
+            const startKey = this.escapeRegex(this.settings.startDateKey || 'start');
+            const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
             clonedLine = clonedLine.replace(startRegex, `$1${dateStr}$3`);
         }
         // Neither date: clone is created with no date, identical to original body.
@@ -341,15 +350,17 @@ export class TaskManager extends Events {
             // Update, append, or explicitly remove the due:: field
             if (newDate) {
                 const dateStr = this.formatDate(newDate);
-                const dueRegex = /(\[?\(?due::\s*)(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})([\])]?)/i;
+                const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
+                const dueRegex = new RegExp(`(\\[?\\(?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
                 if (dueRegex.test(newBody)) {
                     newBody = newBody.replace(dueRegex, `$1${dateStr}$3`);
                 } else {
-                    newBody = `${newBody} [due:: ${dateStr}]`;
+                    newBody = `${newBody} [${this.settings.dueDateKey || 'due'}:: ${dateStr}]`;
                 }
             } else if (newDate === null) {
                 // Strip the due:: tag entirely
-                const dueRegex = /\[?\(?due::\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\])]?/i;
+                const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
+                const dueRegex = new RegExp(`\\[?\\(?${dueKey}::\\s*(?:\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})[\\])]?`, 'i');
                 newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
             }
 
@@ -445,18 +456,24 @@ export class TaskManager extends Events {
     }
 
     getStatistics() {
-        if (this.lastTasksRef === this.tasks && this.cachedStats) {
+        if (this.lastTasksRef === this.tasks && this.lastStatsCourseFilter === this.currentCourseFilter && this.cachedStats) {
             return this.cachedStats;
         }
 
         this.cachedStats = this.calculateStatistics();
         this.lastTasksRef = this.tasks;
+        this.lastStatsCourseFilter = this.currentCourseFilter;
         return this.cachedStats;
     }
 
     private calculateStatistics() {
+        // Filter by course if a filter is applied, then group
+        const tasksToAnalyze = this.currentCourseFilter
+            ? this.tasks.filter(t => t.fileName === this.currentCourseFilter)
+            : this.tasks;
+
         // Group first so recurring clones count as one work item, not N lines.
-        const groups = this.groupTasks(this.tasks);
+        const groups = this.groupTasks(tasksToAnalyze, this.tasks);
 
         const now = new Date();
         const todayStr = this.formatDate(now);
@@ -465,7 +482,7 @@ export class TaskManager extends Events {
         // 7-day trailing velocity
         const velocity7Days = [0, 0, 0, 0, 0, 0, 0];
 
-        for (const task of this.tasks) {
+        for (const task of tasksToAnalyze) {
             if (task.completed && task.completionDate) {
                 const compDate = new Date(task.completionDate);
                 compDate.setHours(0, 0, 0, 0);
@@ -481,7 +498,7 @@ export class TaskManager extends Events {
         // Topic urgency analysis
         const topicStats = new Map<string, { totalOpen: number, urgent: number }>();
 
-        for (const task of this.tasks) {
+        for (const task of tasksToAnalyze) {
             if (!task.completed) {
                 const stats = topicStats.get(task.fileName) ?? { totalOpen: 0, urgent: 0 };
                 stats.totalOpen++;
@@ -508,7 +525,7 @@ export class TaskManager extends Events {
         return {
             total: groups.length,
             completed: groups.filter(g => g.representative.completed).length,
-            completedToday: this.tasks.filter(t =>
+            completedToday: tasksToAnalyze.filter(t =>
                 t.completed && t.completionDate && this.formatDate(t.completionDate) === todayStr
             ).length,
             overdue: groups.filter(g => getTaskStatus(g.representative) === TaskStatus.Overdue).length,
@@ -552,7 +569,7 @@ export class TaskManager extends Events {
         try {
             const content = await this.app.vault.read(file);
             let taskLine = `\n- [ ] ${title}`;
-            if (date) taskLine += ` [due:: ${this.formatDate(date)}]`;
+            if (date) taskLine += ` [${this.settings.dueDateKey || 'due'}:: ${this.formatDate(date)}]`;
             if (recurrence) taskLine += ` [repeat:: ${recurrence}]`;
 
             await this.app.vault.modify(file, content + taskLine);

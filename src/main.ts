@@ -50,7 +50,7 @@ export default class TaskLensPlugin extends Plugin {
         }
 
         const parser = new TaskParser(this.app, this.settings);
-        this.taskManager = new TaskManager(parser, this.app);
+        this.taskManager = new TaskManager(parser, this.app, this.settings);
 
         this.registerEvent(
             this.app.vault.on('modify', async (file) => {
@@ -117,7 +117,7 @@ export default class TaskLensPlugin extends Plugin {
                 item
                     .setTitle('Quick add task')
                     .setIcon('plus-circle')
-                    .onClick(() => { new QuickAddModal(this.app, this.taskManager).open(); })
+                    .onClick(() => { new QuickAddModal(this.app, this.taskManager, undefined, this.settings).open(); })
             );
 
             menu.addSeparator();
@@ -159,7 +159,7 @@ export default class TaskLensPlugin extends Plugin {
         this.addCommand({
             id: 'quick-add-task',
             name: 'Quick add task',
-            callback: () => { new QuickAddModal(this.app, this.taskManager).open(); },
+            callback: () => { new QuickAddModal(this.app, this.taskManager, undefined, this.settings).open(); },
         });
 
         this.addCommand({

@@ -9,16 +9,28 @@ export class TaskParser {
     // Matches both yyyy-mm-dd and dd-mm-yyyy after the key
     private static readonly DATE_PAT = '(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})';
 
-    // 1. START DATE
-    private static readonly START_REGEX = new RegExp(`\\[?\\(?start::\\s*${TaskParser.DATE_PAT}[\\])]?`, 'gi');
-    // 2. DUE DATE
-    private static readonly DUE_REGEX = new RegExp(`\\[?\\(?due::\\s*${TaskParser.DATE_PAT}[\\])]?`, 'gi');
     // 3. COMPLETION DATE (also supports HH:mm suffix)
     private static readonly COMP_REGEX = new RegExp(`\\[?\\(?completion::\\s*(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})(?:\\s\\d{2}:\\d{2})?[\\])]?`, 'gi');
     // 4. RECURRENCE — TaskLens format: [repeat:: weekly]
     private static readonly REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
     // 5. NOTES — TaskLens format: [notes:: ...]
     private static readonly NOTES_REGEX = /\[?\(?notes::\s*([^\])]+)[\])]?/gi;
+
+    private escapeRegex(s: string): string {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // 1. START DATE — instance getter using configured key
+    private get START_REGEX(): RegExp {
+        const key = this.settings.startDateKey || 'start';
+        return new RegExp(`\\[?\\(?${this.escapeRegex(key)}::\\s*${TaskParser.DATE_PAT}[\\])]?`, 'gi');
+    }
+
+    // 2. DUE DATE — instance getter using configured key
+    private get DUE_REGEX(): RegExp {
+        const key = this.settings.dueDateKey || 'due';
+        return new RegExp(`\\[?\\(?${this.escapeRegex(key)}::\\s*${TaskParser.DATE_PAT}[\\])]?`, 'gi');
+    }
 
     // Fallback emoji regexes
     // eslint-disable-next-line no-useless-escape
@@ -187,19 +199,19 @@ export class TaskParser {
         };
 
         // 1. START DATE
-        TaskParser.START_REGEX.lastIndex = 0;
-        const startMatch = TaskParser.START_REGEX.exec(taskText);
+        const startRegex = this.START_REGEX;
+        const startMatch = startRegex.exec(taskText);
         if (startMatch) {
             startDate = parseDate(startMatch[1]);
-            title = title.replace(TaskParser.START_REGEX, '');
+            title = title.replace(this.START_REGEX, '');
         }
 
         // 2. DUE DATE
-        TaskParser.DUE_REGEX.lastIndex = 0;
-        const dueMatch = TaskParser.DUE_REGEX.exec(taskText);
+        const dueRegex = this.DUE_REGEX;
+        const dueMatch = dueRegex.exec(taskText);
         if (dueMatch) {
             dueDate = parseDate(dueMatch[1]);
-            title = title.replace(TaskParser.DUE_REGEX, '');
+            title = title.replace(this.DUE_REGEX, '');
         }
 
         // 3. COMPLETION DATE (also supports HH:mm suffix)

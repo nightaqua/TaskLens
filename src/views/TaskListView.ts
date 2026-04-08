@@ -120,8 +120,8 @@ export class TaskListView extends ItemView {
 
         const list = new TaskListComponent(this.contentEl, this.app, {
             onToggle: (t: Task) => { void this.plugin.taskManager.toggleTaskCompletion(t); },
-            onEdit: (t: Task, newTitle: string, newDate: Date | null) => {
-                void this.plugin.taskManager.updateTask(t, newTitle, newDate);
+            onEdit: (t: Task) => {
+                new QuickAddModal(this.app, this.plugin.taskManager, t, this.plugin.settings).open();
             },
             onDelete: (t: Task) => {
                 void this.plugin.taskManager.deleteTask(t);

@@ -250,7 +250,7 @@ export class DashboardView extends ItemView implements RefreshableView {
                     this.render();
                 },
                 onAdd: () => {
-                    new QuickAddModal(this.app, this.taskManager).open();
+                    new QuickAddModal(this.app, this.taskManager, undefined, this.plugin.settings).open();
                 }
             },
             {
@@ -372,7 +372,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         const statCards = [
             { label: 'Total',     value: stats.total,      cls: 'stat-total',     filter: TaskStatus.All },
-            { label: 'Upcoming',  value: stats.upcoming,   cls: 'stat-upcoming',  filter: TaskStatus.UpcomingWeek },
+            { label: 'Upcoming',  value: stats.upcoming,   cls: 'stat-active',    filter: TaskStatus.UpcomingWeek },
             { label: 'Urgent',    value: stats.urgent,     cls: 'stat-urgent',    filter: TaskStatus.Urgent },
             { label: 'Overdue',   value: stats.overdue,    cls: 'stat-overdue',   filter: TaskStatus.Overdue },
             { label: completionLabel, value: completionValue, cls: 'stat-completed', filter: TaskStatus.Completed },
@@ -415,7 +415,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         const list = new TaskListComponent(container, this.app, {
             onToggle: (t) => { void this.taskManager.toggleTaskCompletion(t); },
-            onEdit: (t, newTitle, newDate) => { void this.taskManager.updateTask(t, newTitle, newDate); },
+            onEdit: (t) => { new QuickAddModal(this.app, this.taskManager, t, this.plugin.settings).open(); },
             onDelete: (t) => { void this.taskManager.deleteTask(t); },
         }, this.plugin.settings);
 
@@ -429,7 +429,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             '--color-orange': cols.urgent,
             '--color-green': cols.active,
             '--color-blue': cols.completed,
-            '--color-purple': 'var(--color-purple)',
+            '--color-purple': 'var(--interactive-accent)',
         });
     }
 

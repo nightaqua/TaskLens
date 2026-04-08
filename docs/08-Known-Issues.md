@@ -13,22 +13,22 @@ These are confirmed observations that require attention in future patches.
   layout, scroll state, task positioning and tooltip management are
   tightly coupled. Manual refactor only.
 
-## `notes` field not surfaced in task list view
+## ~~`notes` field not surfaced in task list view~~ ✅ Resolved in v1.3.0
 
-PR #25 (rich timeline tooltips) added `task.notes` parsing and
-displays it in the timeline tooltip only. It was accepted with a
-follow-up note that `notes` should also appear in the task list
-view before the next release. Not yet implemented.
+`task.notes` is now displayed below the meta row in the task list view
+when present. The `.task-notes` CSS was already in place; the DOM
+element is now built in `TaskListComponent.renderTaskItem()`.
 
-## `task-actions` DOM element not implemented
+## ~~`task-actions` DOM element not implemented~~ ✅ Resolved in v1.3.0
 
-A CSS stub for `.task-actions` exists in `styles.css` but the
-actual DOM element is not present in `TaskListComponent.ts`.
-The CSS is dead until the element is built.
+Edit and delete buttons are now built in `TaskListComponent.renderTaskItem()`
+and wired to the existing `onEdit`/`onDelete` callbacks. The buttons are
+hidden by default and can be enabled via **Settings → Appearance → Show task
+action buttons**. The edit button opens `QuickAddModal` in edit mode,
+pre-populated with the task's current data.
 
-## iOS regex compatibility — lookbehinds not audited
+## ~~iOS regex compatibility — lookbehinds not audited~~ ✅ Resolved
 
-`TaskParser.ts` contains multiple complex static regexes. These have
-not been audited for lookbehind assertions (`(?<=...)`, `(?<!...)`),
-which are unsupported on iOS Safari < 16.4. A scan is needed before
-the plugin is marked mobile-compatible.
+A full grep of `src/` confirmed zero lookbehind assertions (`(?<=...)`,
+`(?<!...)`) anywhere in the codebase. All regexes use standard capturing
+groups and are iOS Safari-compatible.
