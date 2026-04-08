@@ -10,3 +10,7 @@
 **Learning:** Adding `role="button"` and `tabindex="0"` to a non-button element (like a `div` or `span`) makes it identifiable and focusable by a screen reader. However, it *does not* automatically give it the built-in keyboard behavior of a real `<button>`. A real button triggers a `click` event when focused and the Enter or Space keys are pressed. A customized `div` requires explicit `keydown` event listeners to reproduce this native interaction and guarantee full keyboard accessibility.
 
 **Action:** Whenever converting a custom element into a button, always pair `role="button"` and `tabindex="0"` with a `keydown` listener that handles 'Enter' and ' ' (Space) alongside the regular `click` listener.
+
+## 2024-04-08 - Added title attribute matching aria-label on icon-only buttons
+**Learning:** Some screen readers or mouse users might not benefit fully from only an `aria-label` when interacting with icon-only buttons created via Obsidian's DOM API. Providing a native hover tooltip using the `title` attribute enhances discoverability and general usability for mouse users who can't see the aria-label text natively.
+**Action:** When creating icon-only buttons and adding an `aria-label` attribute, always pair it with a `title` attribute containing the same descriptive text to ensure both screen reader compatibility and native tooltips for mouse users.
