@@ -31,8 +31,9 @@ data.json
 *.swp
 *.swo
 
-# Private maintainer notes
-00-ForMe.md
+# Private maintainer notes and release drafts (local only — never commit)
+docs/00-ForMe.md
+docs/announcement-*.md
 
 # --- Testing ---
 coverage/
@@ -41,8 +42,8 @@ coverage/
 tmp/
 temp/
 
-# Jules/AI agent working files — excluded from repo
-.Jules/
+# AI agent working files
+# .Jules/ is tracked on dev so Jules retains context between sessions
 .iloom/
 
 # TypeScript incremental build info

@@ -39,6 +39,9 @@ Do not create a `utils/` or `helpers/` directory.
 - `TaskSanitizer` — exported module functions (no class).
 - Views (`DashboardView`, `TaskListView`, `TimelineView`, `StatsView`) — never
   write to files directly; always call `TaskManager` methods.
+- `BoardComponent` — sub-component of `DashboardView`; renders the Kanban board
+  and calls `TaskManager.updateTaskStatus()` for drag-drop status changes. Never
+  write to files directly from this component.
 
 ---
 
@@ -104,12 +107,7 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
   command in the palette. Register commands with bare action descriptions:
   `"Open dashboard"` not `"TaskLens: Open dashboard"`. The latter produces
   `"TaskLens: TaskLens: Open dashboard"` in the palette.
-  - **`normalizePath()` on scan folder input.** The scan paths textarea
-    in `SettingsTab` splits user input on newlines and trims whitespace,
-    but does not call `normalizePath()` on each path before storing it.
-    Any code that processes `settings.scanFolders` entries should pass
-    them through `normalizePath()` before use. This is a known gap —
-    do not work around it by assuming clean input.
+  - **`normalizePath()` on scan folder input.** `SettingsTab` now calls `normalizePath()` on each scan folder path before storing it (resolved in v1.3.0). Any new code that reads `settings.scanFolders` can trust the paths are already normalized, but defensive normalization before Vault API calls is still encouraged.
 
 - **`isDesktopOnly` in `manifest.json` — verify before release.**
   TaskLens uses only the Vault API and no Node.js or Electron APIs,
@@ -203,12 +201,7 @@ This project enforces a **zero-tolerance policy** for linter warnings. Run
   `manifest.json`. APIs like `fs`, `path`, `crypto`, and `electron` are
   unavailable on mobile. Use Obsidian's own abstractions (`normalizePath()`,
   `Platform`, the Vault API) instead.
-  - **`registerEvent()` audit pending.** Standalone views
-    (`TimelineView`, `StatsView`, `TaskListView`) had vault modify
-    handlers added in earlier sessions. It has not been confirmed
-    whether all of them use `this.registerEvent()` or raw `.on()`.
-    Raw `.on()` without a paired `.off()` in `onClose()` creates ghost
-    listeners. Any agent touching these files must verify this.
+  - **`registerEvent()` audit — partially resolved.** `StatsView` was updated in v1.3.0 to move its `vault.modify` handler into the constructor via `this.registerEvent()`. `TimelineView` and `TaskListView` still require verification — any agent touching these files must confirm their modify handlers use `registerEvent()` and not raw `.on()`.
 
 ---
 

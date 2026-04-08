@@ -45,6 +45,20 @@ If you prefer a more visual style, or if you use other plugins that rely on emoj
 - [ ] Call mom 📅 2024-05-20
 ```
 
+## Task notes
+
+You can attach a short note to any task using the `notes::` key. The note is displayed as a secondary line beneath the task in the list view — useful for quick context, links, or reminders that you do not want cluttering the title.
+
+```markdown
+- [ ] Write project intro [due:: 2024-05-20] [notes:: Check outline doc first]
+- [ ] Call supervisor (due:: 2024-05-22) (notes:: Ask about deadline extension)
+```
+
+> [!tip] Notes are display-only
+> The notes field is read-only from the dashboard. To edit the note, open the source file or use the task edit modal.
+
+---
+
 ## Metadata written by TaskLens
 
 When TaskLens writes metadata automatically (on task completion or recurrence), it uses the **bracketed inline-field format**:

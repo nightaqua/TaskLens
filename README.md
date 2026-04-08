@@ -6,21 +6,26 @@ TaskLens is a native, widget-based dashboard that turns Obsidian into a powerful
 
 ## Key Features
 
-- **The Dashboard:** A unified, customizable workspace view combining an interactive Timeline, Task List, and Statistics
-- **Smart Timeline:** Tasks dynamically span multiple days from start to finish. Features a sticky month header, vertical month dividers, hover tooltips, and click-to-open behavior
+- **The Dashboard:** A unified, customizable workspace combining an interactive Timeline, Task List, Kanban Board, and Statistics — all in one view
+- **Smart Timeline:** Tasks dynamically span multiple days from start to finish. Features a sticky month header, vertical month dividers, rich hover tooltips, and click-to-open behavior
+- **Kanban Board View:** Group tasks into status columns (Active, Upcoming, Urgent, Overdue, Completed). Drag cards between columns to reschedule tasks — changes are written straight back to your Markdown files
+- **Task Actions:** Inline edit and delete buttons on each task card let you update any task without leaving the dashboard. Enable them in Settings
 - **Dynamic Topic Colors:** Assign unique colors to different projects or folders. TaskLens automatically color-codes your entire dashboard based on your custom palette
 - **Focus Mode:** Instantly hide all TaskLens widgets and collapse your sidebars to focus purely on writing. Click again to restore your exact window layout perfectly
-- **Quick Add:** A unified ribbon menu allows you to inject a new task directly at your current text cursor, or append it to any specific file in your vault
+- **Quick Add & Edit:** The Quick Add modal lets you inject a new task at the cursor or into any file in your vault — with start date, due date, and a recurrence dropdown. The same modal opens pre-populated when editing an existing task
 
 ## Task Format
 
-TaskLens uses standard markdown checkboxes. It scans for inline dates, supporting both `YYYY-MM-DD` and `DD-MM-YYYY` formats. You can customize the `start` and `due` keys in the settings.
+TaskLens uses standard markdown checkboxes. It scans for inline dates, supporting both `YYYY-MM-DD` and `DD-MM-YYYY` formats. You can customize the `start` and `due` keys in settings.
 
 ```markdown
 - [ ] Read Chapter 4 (due:: 2024-05-15)
 - [ ] Submit assignment [start:: 10-05-2024 due:: 15-05-2024]
 - [ ] Call mom 📅 2024-05-20
+- [ ] Write intro [due:: 2024-05-20] [notes:: Check outline from last week]
 ```
+
+Optional `[notes:: ...]` metadata appears beneath the task in the list view.
 
 ## Usage
 

@@ -69,12 +69,15 @@ Tasks can now be dynamically color-coded based on their source file or topic. Th
 - You can customize the specific color palette via the plugin settings.
 - If you experience layout issues or theme conflicts, you can also change the **Color Scheme** to "Custom" to override your Obsidian theme's default colors.
 
-## Filtering by Course
+## Filtering by topic
 
-Once your courses are detected, the Master Dashboard becomes incredibly powerful:
+Once your topics are detected, the dashboard becomes your course-by-course command centre:
 
-1. **Course Focus:** Use the Course filter dropdown in the dashboard to select a specific class.
-2. The dashboard will instantly update to show _only_ that course's tasks.
-3. **Weekly Planning:** Combine this with the Status filter (e.g., "Upcoming Week") to see exactly what is due for a specific subject.
+1. **Topic Focus:** Use the Course/Topic filter dropdown in the dashboard to select a specific subject or project.
+2. The timeline, task list, board, **and statistics cards** all update instantly to show only that topic's tasks.
+3. **Weekly Planning:** Combine the Topic filter with the Status filter (e.g., "Upcoming") to see exactly what is due for a specific subject this week.
+
+> [!tip] Stats respect the filter
+> From v1.3.0, the statistics cards (total, completed, overdue, upcoming) are all scoped to the currently selected topic. Switching to "All" restores the vault-wide count.
 
 ---
