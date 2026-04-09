@@ -34,8 +34,18 @@ When you need to write without distractions, you can instantly hide all TaskLens
 
 ## Dashboard Views
 
-* **Statistics Cards:** Provides an overview of total tasks, completed, overdue, upcoming, and course counts at a glance.
-* **Timeline View:** A grid where tasks dynamically span multiple days. It features a sticky month header, vertical month dividers, hover tooltips, and click-to-open behavior.
-* **Task List:** Render task list with edit/delete/toggle functionality. Clicking a task title now opens the source file natively.
+* **Statistics Cards:** Provides an overview of total tasks, completed, overdue, upcoming, and course counts at a glance. The cards respect the active topic filter — switch topics and the stats update instantly. The Stats widget also surfaces a 7-day completion velocity and highlights the topic with the highest proportion of urgent tasks.
+* **Timeline View:** A grid where tasks dynamically span multiple days from `start::` to `due::`. Features a sticky month header, vertical month dividers, rich hover tooltips, and click-to-open behavior.
+* **Board View (Kanban):** Groups tasks into status columns — Active, Upcoming, Urgent, Overdue, and Completed. Enable it via **Settings → Show board view**. Drag a card to a different column to reschedule the task; the change is written directly to the source Markdown file.
+* **Task List:** Displays tasks with completion toggle, status chips, date chips, recurrence badges, and optional notes. Clicking the title opens the source file. With **Show task action buttons** enabled in Settings, each row also shows an edit (pencil) and delete (trash) button on hover.
+
+### Task action buttons
+
+When enabled (**Settings → Appearance → Show task action buttons**), a pencil and trash icon appear on every task row:
+
+- **Pencil (edit):** Opens the Quick Add / Edit modal pre-populated with the task's current title, start date, due date, and recurrence. Changes are written back to the source file.
+- **Trash (delete):** Removes the task line from the source file immediately.
+
+Buttons are hidden by default to keep the UI clean for users who prefer to edit tasks directly in Markdown.
 
 ---

@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0]
+
+### New features
+
+- **Kanban board view.** A new Board widget groups tasks by status (Active, Upcoming, Urgent, Overdue, Completed) in a drag-friendly column layout. Enable it via **Settings → Show board view**. Dragging a card between columns writes the corresponding date change back to the source Markdown file.
+- **Task notes in list view.** Tasks with `[notes:: ...]` metadata now display their notes below the meta row in the task list. The CSS stub was already present; the DOM element is now built.
+- **Task action buttons.** Edit (pencil) and delete (trash) buttons now appear on hover for each task in the list view. Hidden by default — enable via **Settings → Appearance → Show task action buttons**.
+- **Edit modal.** The edit button opens `QuickAddModal` in edit mode, pre-populated with the task's existing title, due date, start date, and recurrence.
+- **Start date field in Quick Add.** The Quick Add / Edit modal now includes a start date picker alongside the existing due date field.
+- **Recurrence dropdown.** The recurrence input in Quick Add is now a structured dropdown (daily, weekly, biweekly, monthly, quarterly, yearly) instead of a free-text field.
+- **7-day velocity histogram.** `getStatistics()` now returns a `velocity7Days` array with daily completion counts for the past seven days, ready for charting.
+- **Topic urgency analysis.** Statistics now expose `mostUrgentTopic` — the course or folder with the highest ratio of urgent-to-total tasks — surfaced in the Stats widget.
+
+### Bug fixes
+
+- **Stats boxes now respect topic filter.** The statistics cards in the Dashboard correctly update when a topic filter is applied, rather than always showing all-task counts.
+- **Stat box highlight colors restored.** The "Upcoming" stat box was using class `stat-upcoming` which had no CSS rule; corrected to `stat-active`. The "Total" box was referencing an undefined `--color-purple` variable; corrected to `var(--interactive-accent)`.
+- **Custom metadata keys now respected.** Plugin settings allow changing `start::` and `due::` to custom key names. These were previously ignored — `TaskParser.ts` regexes and all write paths in `TaskManager.ts` and `QuickAddModal.ts` now use the configured values dynamically.
+- **StatsView color theme.** The standalone Stats view now applies the same color-theme CSS variables as the Dashboard, so stat box borders and highlights are visually consistent.
+- **Date timezone off-by-one.** `QuickAddModal` was constructing dates as `new Date(isoString)` which parsed as UTC midnight and shifted the displayed day by ±1 in non-UTC timezones. Fixed to `new Date('YYYY-MM-DDT00:00:00')`.
+
+### Accessibility
+
+- `title` attributes added to every icon-only button across all components (Timeline, Board, Header, Task list, Dashboard) so native browser tooltips describe each button on hover.
+- `aria-label: 'Edit dashboard title'` added to the inline title-editing input in the header.
+- `aria-expanded` and `aria-controls` on collapsible sidebar/timeline menus (PR #54).
+- Filter dropdowns linked to their labels via `for`/`id` attributes (PR #60).
+- Quick Add modal supports Enter key submission from any field (PR #62).
+
+### Performance
+
+- Statistics, grouped task lists, and scanned file paths are now cached and invalidated lazily. Repeated calls to `getStatistics()` and `getAllGroupedTasks()` within a single render cycle hit the cache instead of reprocessing the full task list.
+
+### Dependencies
+
+- esbuild `0.27` → `0.28`
+- eslint `10.0` → `10.2`
+- @typescript-eslint `8.57` → `8.58`
+- vitest `4.1.0` → `4.1.2`
+- Added `jsdom` for Vitest DOM test support.
+
+---
+
 ## [1.2.2]
 
 ### Bug fixes

@@ -29,7 +29,7 @@ export class TaskListComponent {
         private readonly app: App,
         private readonly callbacks: {
             onToggle: (t: Task) => void,
-            onEdit: (t: Task, newTitle: string, newDate: Date | null) => void,
+            onEdit: (t: Task) => void,
             onDelete: (t: Task) => void
         },
         private readonly settings: SemesterSettings
@@ -69,6 +69,7 @@ export class TaskListComponent {
         const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
         checkbox.checked = task.completed;
         checkbox.setAttribute('aria-label', `Toggle task: ${task.title}`);
+        checkbox.setAttribute('title', `Toggle task: ${task.title}`);
         checkbox.addEventListener('change', () => { this.callbacks.onToggle(task); });
 
         const content = taskEl.createDiv('task-content');
@@ -80,6 +81,7 @@ export class TaskListComponent {
         titleEl.setAttribute('role', 'button');
         titleEl.setAttribute('tabindex', '0');
         titleEl.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+        titleEl.setAttribute('title', `Open task in editor: ${task.title}`);
 
         const meta = viewMode.createDiv('task-meta');
 
@@ -106,6 +108,31 @@ export class TaskListComponent {
                     attr: { 'aria-label': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}` }
                 });
             }
+        }
+
+        // Notes display
+        if (task.notes) {
+            const notesEl = meta.createDiv('task-notes');
+            notesEl.setText(task.notes);
+        }
+
+        // Task actions (gated by showTaskActions setting)
+        if (this.settings.showTaskActions) {
+            const actionsEl = meta.createDiv('task-actions');
+            const editBtn = actionsEl.createEl('button', { cls: 'task-action-btn' });
+            setIcon(editBtn, 'pencil');
+            editBtn.setAttribute('aria-label', 'Edit task');
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.callbacks.onEdit(task);
+            });
+            const deleteBtn = actionsEl.createEl('button', { cls: ['task-action-btn', 'btn-danger'] });
+            setIcon(deleteBtn, 'trash-2');
+            deleteBtn.setAttribute('aria-label', 'Delete task');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.callbacks.onDelete(task);
+            });
         }
 
         titleEl.addEventListener('click', () => { void openTaskInEditor(this.app, task); });

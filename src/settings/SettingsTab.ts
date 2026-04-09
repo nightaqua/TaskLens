@@ -1,11 +1,17 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { WelcomeModal } from '../modals/WelcomeModal';
 import { getTopicColor } from './Settings';
 import { CLASS_SETTINGS } from '../constants';
 
+const validSortModes = ['status', 'course'] as const;
+type SortMode = typeof validSortModes[number];
+function isSortMode(v: unknown): v is SortMode {
+    return validSortModes.includes(v as SortMode);
+}
+
 export class SettingsTab extends PluginSettingTab {
-    readonly plugin: TaskLensPlugin;
+    private readonly plugin: TaskLensPlugin;
 
     constructor(app: App, plugin: TaskLensPlugin) {
         super(app, plugin);
@@ -16,7 +22,9 @@ export class SettingsTab extends PluginSettingTab {
         this.plugin.settings.scanFolders = value
             .split('\n')
             .map(s => s.trim())
-            .filter(s => s.length > 0);
+            .filter(s => s.length > 0)
+            // Normalise slashes and whitespace for cross-platform compatibility
+            .map(s => normalizePath(s));
 
         await this.plugin.saveSettings();
         await this.plugin.taskManager.loadTasks();
@@ -115,12 +123,20 @@ export class SettingsTab extends PluginSettingTab {
                 .addOption('course', 'By topic (file palette)')
                 .setValue(this.plugin.settings.colorMode)
                 .onChange((v) => {
-                    this.plugin.settings.colorMode = v as 'status' | 'course';
+                    if (isSortMode(v)) this.plugin.settings.colorMode = v;
                     void this.plugin.saveSettings().then(() => {
                         this.plugin.refreshViews();
                         this.renderColorPickers(colorPickersContainer);
                     });
                 }));
+
+        new Setting(uiDetails)
+            .setName('Show task action buttons')
+            .setDesc('Show edit and delete buttons on task hover in the task list.')
+            .addToggle(t => t.setValue(this.plugin.settings.showTaskActions).onChange(v => {
+                this.plugin.settings.showTaskActions = v;
+                void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
+            }));
 
         const colorPickersContainer = uiDetails.createDiv();
         this.renderColorPickers(colorPickersContainer);

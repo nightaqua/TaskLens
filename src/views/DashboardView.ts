@@ -4,10 +4,24 @@ import { TaskManager } from '../services/TaskManager';
 import TaskLensPlugin, { RefreshableView } from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { TaskListComponent } from './TaskListComponent';
+import { BoardComponent } from './BoardComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { QuickAddModal } from '../modals/QuickAddModal';
 import { VIEW_TYPE_DASHBOARD, CLASS_CHROMELESS, CLASS_HIDE_TABS, CLASS_DASHBOARD_VIEW } from '../constants';
 
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object' && v !== null;
+}
+
+function isTaskStatus(v: unknown): v is TaskStatus {
+    if (typeof v !== 'string') return false;
+    return (Object.values(TaskStatus) as string[]).includes(v);
+}
+
+function isHeaderState(v: unknown): v is HeaderState {
+    return typeof v === 'object' && v !== null;
+}
 
 // Applies chromeless styling to the leaf and optionally hides tabs when the layout is locked
 export function setupViewDOM(
@@ -37,6 +51,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private tabContainer: HTMLElement | null = null;
     private taskManager: TaskManager;
     private timelineComponent: TimelineComponent | null = null;
+    private boardComponent: BoardComponent | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
@@ -45,13 +60,14 @@ export class DashboardView extends ItemView implements RefreshableView {
     private showTimeline: boolean = true;
     private showList: boolean = true;
     private showStats: boolean = true;
+    private showBoard: boolean = false;
 
     // Per-view stats display preference — persisted via getState/setState
     // Removed from global Settings so each dashboard widget can have its own value.
     private statsCompletionFormat: 'all' | 'today' = 'all';
 
     private timelineDaysToShow: number = 10;
-    private renderTimer: NodeJS.Timeout | null = null;
+    private renderTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Tracks scroll position so re-renders don't jump the timeline,
     // unless a forced scroll-to-today is requested
@@ -110,28 +126,29 @@ export class DashboardView extends ItemView implements RefreshableView {
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
         await super.setState(state, result);
 
-        if (!state || typeof state !== 'object') {
+        if (!isRecord(state)) {
             this.render();
             return;
         }
 
         // Unwrap nested state object if present (Obsidian sometimes wraps it)
-        let s = state as Record<string, unknown>;
-        if (s.state && typeof s.state === 'object') {
-            s = s.state as Record<string, unknown>;
+        let s = state;
+        if (isRecord(s.state)) {
+            s = s.state;
         }
 
         if (Object.keys(s).length > 0) {
-            if (Object.prototype.hasOwnProperty.call(s, 'showControls')) this.showControls = s.showControls as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'showTimeline')) this.showTimeline = s.showTimeline as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'showList')) this.showList = s.showList as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'showStats')) this.showStats = s.showStats as boolean;
-            if (Object.prototype.hasOwnProperty.call(s, 'zoomLevel')) this.timelineDaysToShow = s.zoomLevel as number;
-            if (Object.prototype.hasOwnProperty.call(s, 'statsCompletionFormat')) this.statsCompletionFormat = s.statsCompletionFormat as 'all' | 'today';
+            if (typeof s.showControls === 'boolean') this.showControls = s.showControls;
+            if (typeof s.showTimeline === 'boolean') this.showTimeline = s.showTimeline;
+            if (typeof s.showList === 'boolean') this.showList = s.showList;
+            if (typeof s.showStats === 'boolean') this.showStats = s.showStats;
+            if (typeof s.showBoard === 'boolean') this.showBoard = s.showBoard;
+            if (typeof s.zoomLevel === 'number') this.timelineDaysToShow = s.zoomLevel;
+            if (s.statsCompletionFormat === 'all' || s.statsCompletionFormat === 'today') this.statsCompletionFormat = s.statsCompletionFormat;
 
-            if (s.statusFilter) this.taskManager.setStatusFilter(s.statusFilter as TaskStatus);
-            if (s.courseFilter) this.taskManager.setCourseFilter(s.courseFilter as string);
-            if (s.headerState) this.headerState = s.headerState as HeaderState;
+            if (isTaskStatus(s.statusFilter)) this.taskManager.setStatusFilter(s.statusFilter);
+            if (typeof s.courseFilter === 'string') this.taskManager.setCourseFilter(s.courseFilter);
+            if (isHeaderState(s.headerState)) this.headerState = s.headerState;
         }
 
         this.render();
@@ -150,6 +167,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             showTimeline: this.showTimeline,
             showList: this.showList,
             showStats: this.showStats,
+            showBoard: this.showBoard,
             zoomLevel: this.timelineDaysToShow,
             statsCompletionFormat: this.statsCompletionFormat,
             statusFilter: filters.status,
@@ -185,6 +203,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     onClose(): Promise<void> {
         this.taskManager.off('tasks-updated', this.onTasksUpdated);
         this.timelineComponent?.destroy();
+        this.boardComponent?.destroy();
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
@@ -197,6 +216,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         }
         // Clean up out-of-container DOM nodes before wiping contentEl
         this.timelineComponent?.destroy();
+        this.boardComponent?.destroy();
 
         this.contentEl.empty();
 
@@ -230,7 +250,7 @@ export class DashboardView extends ItemView implements RefreshableView {
                     this.render();
                 },
                 onAdd: () => {
-                    new QuickAddModal(this.app, this.taskManager).open();
+                    new QuickAddModal(this.app, this.taskManager, undefined, this.plugin.settings).open();
                 }
             },
             {
@@ -246,9 +266,10 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.renderControls();
 
         // Render sections in order; each is gated by its visibility toggle
-        ['stats', 'timeline', 'list'].forEach(component => {
+        ['stats', 'timeline', 'board', 'list'].forEach(component => {
             if (component === 'stats' && this.showStats) this.renderStatistics();
             if (component === 'timeline' && this.showTimeline) this.renderTimeline();
+            if (component === 'board' && this.showBoard) this.renderBoard();
             if (component === 'list' && this.showList) this.renderTaskList();
         });
     }
@@ -263,13 +284,18 @@ export class DashboardView extends ItemView implements RefreshableView {
         filtersDiv.setCssProps({ display: 'flex', gap: '12px', 'flex-wrap': 'wrap' });
 
         const statusGroup = filtersDiv.createDiv('control-group');
-        statusGroup.createEl('label', { text: 'Show:' });
-        const statusSelect = statusGroup.createEl('select');
+        statusGroup.createEl('label', { text: 'Show:', attr: { for: 'dashboard-status-filter' } });
+        const statusSelect = statusGroup.createEl('select', { attr: { id: 'dashboard-status-filter' } });
+        statusSelect.setAttribute('aria-label', 'Filter by status');
+        statusSelect.setAttribute('title', 'Filter by status');
 
         const statusOptions = [
-            { value: TaskStatus.Open, label: 'Active' },
-            { value: TaskStatus.All, label: 'All tasks' },
+            { value: TaskStatus.Open, label: 'Active (All)' },
+            { value: TaskStatus.UpcomingWeek, label: 'Upcoming' },
+            { value: TaskStatus.Urgent, label: 'Urgent' },
+            { value: TaskStatus.Overdue, label: 'Overdue' },
             { value: TaskStatus.Completed, label: 'Completed' },
+            { value: TaskStatus.All, label: 'All tasks' },
         ];
         statusOptions.forEach(opt => {
             const option = statusSelect.createEl('option', { value: opt.value, text: opt.label });
@@ -280,8 +306,10 @@ export class DashboardView extends ItemView implements RefreshableView {
         });
 
         const courseGroup = filtersDiv.createDiv('control-group');
-        courseGroup.createEl('label', { text: 'Topic:' });
-        const courseSelect = courseGroup.createEl('select');
+        courseGroup.createEl('label', { text: 'Topic:', attr: { for: 'dashboard-course-filter' } });
+        const courseSelect = courseGroup.createEl('select', { attr: { id: 'dashboard-course-filter' } });
+        courseSelect.setAttribute('aria-label', 'Filter by topic');
+        courseSelect.setAttribute('title', 'Filter by topic');
         courseSelect.createEl('option', { value: '', text: 'All topics' });
 
         this.taskManager.getCourseNames().forEach(course => {
@@ -293,8 +321,10 @@ export class DashboardView extends ItemView implements RefreshableView {
         });
 
         const completionGroup = filtersDiv.createDiv('control-group');
-        completionGroup.createEl('label', { text: 'Completed:' });
-        const completionSelect = completionGroup.createEl('select');
+        completionGroup.createEl('label', { text: 'Completed:', attr: { for: 'dashboard-completion-filter' } });
+        const completionSelect = completionGroup.createEl('select', { attr: { id: 'dashboard-completion-filter' } });
+        completionSelect.setAttribute('aria-label', 'Filter by completion date');
+        completionSelect.setAttribute('title', 'Filter by completion date');
         [
             { value: 'all',   text: 'All-time' },
             { value: 'today', text: 'Today' },
@@ -314,6 +344,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         const toggles = [
             { label: 'Timeline', getter: () => this.showTimeline, setter: (v: boolean) => { this.showTimeline = v; } },
+            { label: 'Board', getter: () => this.showBoard, setter: (v: boolean) => { this.showBoard = v; } },
             { label: 'List', getter: () => this.showList, setter: (v: boolean) => { this.showList = v; } },
             { label: 'Stats', getter: () => this.showStats, setter: (v: boolean) => { this.showStats = v; } },
         ];
@@ -340,11 +371,11 @@ export class DashboardView extends ItemView implements RefreshableView {
         // Determine which value to show based on user settings
         const showToday = this.statsCompletionFormat === 'today';
         const completionValue = showToday ? stats.completedToday : stats.completed;
-        const completionLabel = showToday ? 'Done Today' : 'Completed';
+        const completionLabel = showToday ? 'Done today' : 'Completed';
 
         const statCards = [
             { label: 'Total',     value: stats.total,      cls: 'stat-total',     filter: TaskStatus.All },
-            { label: 'Upcoming',  value: stats.upcoming,   cls: 'stat-upcoming',  filter: TaskStatus.UpcomingWeek },
+            { label: 'Upcoming',  value: stats.upcoming,   cls: 'stat-active',    filter: TaskStatus.UpcomingWeek },
             { label: 'Urgent',    value: stats.urgent,     cls: 'stat-urgent',    filter: TaskStatus.Urgent },
             { label: 'Overdue',   value: stats.overdue,    cls: 'stat-overdue',   filter: TaskStatus.Overdue },
             { label: completionLabel, value: completionValue, cls: 'stat-completed', filter: TaskStatus.Completed },
@@ -355,6 +386,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             card.setAttribute('role', 'button');
             card.setAttribute('tabindex', '0');
             card.setAttribute('aria-label', `Filter by ${stat.label} tasks`);
+            card.setAttribute('title', `Filter by ${stat.label} tasks`);
 
             const triggerFilter = () => { this.taskManager.setStatusFilter(stat.filter); };
             card.addEventListener('click', triggerFilter);
@@ -370,12 +402,24 @@ export class DashboardView extends ItemView implements RefreshableView {
         });
     }
 
+    private renderBoard(): void {
+        const container = this.contentEl.createDiv();
+
+        this.boardComponent = new BoardComponent(
+            container,
+            this.app,
+            this.taskManager,
+            this.plugin.settings
+        );
+        this.boardComponent.render(this.taskManager.getGroupedFilteredTasks());
+    }
+
     private renderTaskList(): void {
         const container = this.contentEl.createDiv();
 
         const list = new TaskListComponent(container, this.app, {
             onToggle: (t) => { void this.taskManager.toggleTaskCompletion(t); },
-            onEdit: (t, newTitle, newDate) => { void this.taskManager.updateTask(t, newTitle, newDate); },
+            onEdit: (t) => { new QuickAddModal(this.app, this.taskManager, t, this.plugin.settings).open(); },
             onDelete: (t) => { void this.taskManager.deleteTask(t); },
         }, this.plugin.settings);
 
@@ -389,7 +433,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             '--color-orange': cols.urgent,
             '--color-green': cols.active,
             '--color-blue': cols.completed,
-            '--color-purple': '#7209b7',
+            '--color-purple': 'var(--interactive-accent)',
         });
     }
 
@@ -408,6 +452,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         const zoomOut = zoomControls.createEl('button', { text: '-', cls: 'view-toggle-btn' });
         zoomOut.setAttribute('aria-label', 'Zoom out timeline');
+        zoomOut.setAttribute('title', 'Zoom out timeline');
         zoomOut.addEventListener('click', () => {
             this.timelineDaysToShow = Math.min(30, this.timelineDaysToShow + 1);
             this.render();
@@ -415,6 +460,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         zoomControls.createSpan({ text: ` ${String(this.timelineDaysToShow)} days ` });
         const zoomIn = zoomControls.createEl('button', { text: '+', cls: 'view-toggle-btn' });
         zoomIn.setAttribute('aria-label', 'Zoom in timeline');
+        zoomIn.setAttribute('title', 'Zoom in timeline');
         zoomIn.addEventListener('click', () => {
             this.timelineDaysToShow = Math.max(3, this.timelineDaysToShow - 1);
             this.render();
@@ -424,9 +470,11 @@ export class DashboardView extends ItemView implements RefreshableView {
         const navControls = controls.createDiv('nav-controls');
         const scrollLeft = navControls.createEl('button', { cls: 'view-toggle-btn' });
         scrollLeft.setAttribute('aria-label', 'Scroll left');
+        scrollLeft.setAttribute('title', 'Scroll left');
         setIcon(scrollLeft, 'chevron-left');
         const scrollRight = navControls.createEl('button', { cls: 'view-toggle-btn' });
         scrollRight.setAttribute('aria-label', 'Scroll right');
+        scrollRight.setAttribute('title', 'Scroll right');
         setIcon(scrollRight, 'chevron-right');
 
         this.timelineComponent = new TimelineComponent(

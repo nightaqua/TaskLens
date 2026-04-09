@@ -123,6 +123,11 @@ export class TimelineComponent {
 
         const navHandle = navSection.createDiv('ribbon-handle ribbon-handle--nav');
         navHandle.setAttribute('aria-label', 'Navigate timeline');
+        navHandle.setAttribute('title', 'Navigate timeline');
+        navHandle.setAttribute('role', 'button');
+        navHandle.setAttribute('tabindex', '0');
+        navHandle.setAttribute('aria-expanded', this.ribbonNavOpen ? 'true' : 'false');
+        navHandle.setAttribute('aria-controls', 'timeline-nav-panel');
         const navIconWrap = navHandle.createDiv('ribbon-handle-icon');
         setIcon(navIconWrap, 'calendar-range');
 
@@ -130,11 +135,13 @@ export class TimelineComponent {
         navHoverLabel.setText('Navigate');
 
         const navPanel = navSection.createDiv('ribbon-panel');
+        navPanel.id = 'timeline-nav-panel';
 
         // Define open/close before anything that might call them ──────────────────
         const openNav = (): void => {
             this.ribbonNavOpen = true;
             navSection.addClass('is-open');
+            navHandle.setAttribute('aria-expanded', 'true');
             // Guard: don't double-register
             if (this.ribbonOutsideHandler) {
                 document.removeEventListener('mousedown', this.ribbonOutsideHandler);
@@ -146,6 +153,7 @@ export class TimelineComponent {
                 if (!navSection.contains(target)) {
                     this.ribbonNavOpen = false;
                     navSection.removeClass('is-open');
+                    navHandle.setAttribute('aria-expanded', 'false');
                     document.removeEventListener('mousedown', handler);
                     this.ribbonOutsideHandler = null;
                 }
@@ -157,6 +165,7 @@ export class TimelineComponent {
         const closeNav = (): void => {
             this.ribbonNavOpen = false;
             navSection.removeClass('is-open');
+            navHandle.setAttribute('aria-expanded', 'false');
             if (this.ribbonOutsideHandler) {
                 document.removeEventListener('mousedown', this.ribbonOutsideHandler);
                 this.ribbonOutsideHandler = null;
@@ -176,6 +185,7 @@ export class TimelineComponent {
         const prevBtn = navControls.createEl('button', { cls: 'vp-jump' });
         prevBtn.setText('‹‹');
         prevBtn.setAttribute('aria-label', 'Jump back 6 months');
+        prevBtn.setAttribute('title', 'Jump back 6 months');
         prevBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.ribbonNavOpen = true;
@@ -190,6 +200,7 @@ export class TimelineComponent {
         const nextBtn = navControls.createEl('button', { cls: 'vp-jump' });
         nextBtn.setText('››');
         nextBtn.setAttribute('aria-label', 'Jump forward 6 months');
+        nextBtn.setAttribute('title', 'Jump forward 6 months');
         nextBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.ribbonNavOpen = true;
@@ -223,6 +234,7 @@ export class TimelineComponent {
                 const countSuffix = count > 1 ? ` \xd7${String(count)}` : '';
                 chip.setText(isPast ? `\u2190 ${label}${countSuffix}` : `${label}${countSuffix} \u2192`);
                 chip.setAttribute('aria-label', `Jump to ${label}`);
+                chip.setAttribute('title', `Jump to ${label}`);
                 chip.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.ribbonNavOpen = true;
@@ -231,11 +243,18 @@ export class TimelineComponent {
             });
         }
 
-        navHandle.addEventListener('click', () => {
+        const toggleNav = () => {
             if (navSection.hasClass('is-open')) {
                 closeNav();
             } else {
                 openNav();
+            }
+        };
+        navHandle.addEventListener('click', toggleNav);
+        navHandle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleNav();
             }
         });
 
@@ -246,17 +265,36 @@ export class TimelineComponent {
 
         const syncHandle = syncSection.createDiv('ribbon-handle ribbon-handle--sync');
         syncHandle.setAttribute('aria-label', 'Scroll to today');
+        syncHandle.setAttribute('title', 'Scroll to today');
+        syncHandle.setAttribute('role', 'button');
+        syncHandle.setAttribute('tabindex', '0');
         const syncIconWrap = syncHandle.createDiv('ribbon-handle-icon');
         setIcon(syncIconWrap, 'rotate-ccw');
 
         // Floating expand — shown on section hover via CSS, positioned rightward
         const syncExpand = syncSection.createDiv('ribbon-sync-expand');
+        syncExpand.setAttribute('role', 'button');
+        syncExpand.setAttribute('tabindex', '0');
+        syncExpand.setAttribute('aria-label', 'Scroll to today');
+        syncExpand.setAttribute('title', 'Scroll to today');
         const syncExpandIcon = syncExpand.createDiv('ribbon-sync-expand-icon');
         setIcon(syncExpandIcon, 'rotate-ccw');
         syncExpand.createSpan({ cls: 'ribbon-sync-expand-label' }).setText('Today');
 
         syncHandle.addEventListener('click', () => { this.scrollToToday(); });
+        syncHandle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.scrollToToday();
+            }
+        });
         syncExpand.addEventListener('click', () => { this.scrollToToday(); });
+        syncExpand.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.scrollToToday();
+            }
+        });
     }
 
     public render(): void {
@@ -416,6 +454,10 @@ export class TimelineComponent {
 
             const bar = grid.createDiv('timeline-task-bar');
             bar.setText(barLabel);
+            bar.setAttribute('role', 'button');
+            bar.setAttribute('tabindex', '0');
+            bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+            bar.setAttribute('title', `Open task in editor: ${task.title}`);
             bar.setCssProps({
                 'grid-column-start': String(startIdx + 1),
                 'grid-column-end': `span ${String((dueIdx - startIdx) + 1)}`,
@@ -445,6 +487,13 @@ export class TimelineComponent {
             bar.addEventListener('click', (e) => {
                 e.stopPropagation();
                 void openTaskInEditor(this.app, task);
+            });
+            bar.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void openTaskInEditor(this.app, task);
+                }
             });
         });
 
@@ -498,10 +547,22 @@ export class TimelineComponent {
 
     private createNavigationOverlay(direction: 'left' | 'right'): void {
         const overlay = this.container.createDiv(`timeline-nav-overlay nav-${direction}`);
+        overlay.setAttribute('role', 'button');
+        overlay.setAttribute('tabindex', '0');
+        overlay.setAttribute('aria-label', `Scroll ${direction}`);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
-        overlay.addEventListener('click', (e) => {
+
+        const triggerScroll = (e: Event) => {
             e.stopPropagation();
             this.scroll(direction);
+        };
+
+        overlay.addEventListener('click', triggerScroll);
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerScroll(e);
+            }
         });
     }
 
@@ -544,15 +605,30 @@ export class TimelineComponent {
         if (isRecurring) {
             this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 recurring');
         }
+        if (task.notes) {
+            this.tooltipEl.createDiv('tooltip-notes').setText(task.notes);
+        }
         this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
     }
 
     private moveTooltip(e: MouseEvent): void {
         if (this.tooltipEl) {
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+
+            // Bounds checking against viewport
+            const width = this.tooltipEl.offsetWidth || 0;
+            const height = this.tooltipEl.offsetHeight || 0;
+            const maxLeft = window.innerWidth - width - 15;
+            const maxTop = window.innerHeight - height - 15;
+
+            if (left > maxLeft) left = Math.max(0, e.clientX - width - 15);
+            if (top > maxTop) top = Math.max(0, e.clientY - height - 15);
+
             this.tooltipEl.setCssProps({
-                top: `${String(e.clientY + 15)}px`,
-                left: `${String(e.clientX + 15)}px`
+                top: `${String(top)}px`,
+                left: `${String(left)}px`
             });
         }
     }
@@ -563,6 +639,7 @@ export class TimelineComponent {
 
     /** Removes DOM nodes owned by this component that live outside its container. */
     public destroy(): void {
+        this.hideTooltip();
         this.tooltipEl?.remove();
         this.tooltipEl = null;
         if (this.ribbonOutsideHandler) {

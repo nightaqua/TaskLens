@@ -6,9 +6,16 @@ import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
 import { VIEW_TYPE_STATS, CLASS_DASHBOARD_VIEW } from '../constants';
 
 
+function isHeaderState(v: unknown): v is HeaderState {
+    if (typeof v !== 'object' || v === null) return false;
+    const rec = v as Record<string, unknown>;
+    return (rec.title === null || typeof rec.title === 'string')
+        && typeof rec.isCollapsed === 'boolean';
+}
+
 export class StatsView extends ItemView {
-    private leafRootEl: Element | null = null;
-    private tabContainer: Element | null = null;
+    private leafRootEl: HTMLElement | null = null;
+    private tabContainer: HTMLElement | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
     private readonly onTasksUpdated = (): void => { this.render(); };
@@ -16,6 +23,13 @@ export class StatsView extends ItemView {
     constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
         this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
+                    void this.plugin.taskManager.refreshFileTask(file.path);
+                }
+            })
+        );
     }
 
     getViewType(): string { return VIEW_TYPE_STATS; }
@@ -25,8 +39,8 @@ export class StatsView extends ItemView {
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
         if (state && typeof state === 'object') {
             const s = state as Record<string, unknown>;
-            if (Object.prototype.hasOwnProperty.call(s, 'headerState')) {
-                this.headerState = s.headerState as HeaderState;
+            if (Object.prototype.hasOwnProperty.call(s, 'headerState') && isHeaderState(s.headerState)) {
+                this.headerState = s.headerState;
             }
         }
         await super.setState(state, result);
@@ -47,25 +61,26 @@ export class StatsView extends ItemView {
 
         this.contentEl.empty();
         this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
+        this.applyColorTheme();
         this.render();
-
-        // Keep stats live when the user edits tasks outside the dashboard
-        this.registerEvent(
-            this.app.vault.on('modify', (file) => {
-                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
-                    void this.plugin.taskManager.refreshFileTask(file.path);
-                }
-            })
-        );
 
         return Promise.resolve();
     }
 
+    private applyColorTheme(): void {
+        const cols = this.plugin.settings.colors;
+        this.contentEl.setCssProps({
+            '--color-red': cols.overdue,
+            '--color-orange': cols.urgent,
+            '--color-green': cols.active,
+            '--color-blue': cols.completed,
+            '--color-purple': 'var(--interactive-accent)',
+        });
+    }
+
     onClose(): Promise<void> {
         this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
-        const root = this.leafRootEl instanceof HTMLElement ? this.leafRootEl : null;
-        const tabs = this.tabContainer instanceof HTMLElement ? this.tabContainer : null;
-        cleanUpViewDOM(root, tabs);
+        cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
 
