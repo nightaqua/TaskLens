@@ -547,9 +547,11 @@ export class TimelineComponent {
 
     private createNavigationOverlay(direction: 'left' | 'right'): void {
         const overlay = this.container.createDiv(`timeline-nav-overlay nav-${direction}`);
+        const label = `Scroll ${direction}`;
         overlay.setAttribute('role', 'button');
         overlay.setAttribute('tabindex', '0');
-        overlay.setAttribute('aria-label', `Scroll ${direction}`);
+        overlay.setAttribute('aria-label', label);
+        overlay.setAttribute('title', label);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
 
         const triggerScroll = (e: Event) => {

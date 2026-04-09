@@ -102,10 +102,14 @@ export class TaskListComponent {
             const icon = recurringChip.createSpan({ cls: 'task-recurring-icon' });
             setIcon(icon, 'repeat');
             if (group.doneCount > 0) {
+                const label = `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`;
                 recurringChip.createSpan({
                     text: `×${String(group.doneCount)}`,
                     cls: 'task-recurrence-count',
-                    attr: { 'aria-label': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}` }
+                    attr: {
+                        'aria-label': label,
+                        'title': label
+                    }
                 });
             }
         }
@@ -122,6 +126,7 @@ export class TaskListComponent {
             const editBtn = actionsEl.createEl('button', { cls: 'task-action-btn' });
             setIcon(editBtn, 'pencil');
             editBtn.setAttribute('aria-label', 'Edit task');
+            editBtn.setAttribute('title', 'Edit task');
             editBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.callbacks.onEdit(task);
@@ -129,6 +134,7 @@ export class TaskListComponent {
             const deleteBtn = actionsEl.createEl('button', { cls: ['task-action-btn', 'btn-danger'] });
             setIcon(deleteBtn, 'trash-2');
             deleteBtn.setAttribute('aria-label', 'Delete task');
+            deleteBtn.setAttribute('title', 'Delete task');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.callbacks.onDelete(task);
