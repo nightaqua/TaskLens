@@ -192,6 +192,13 @@ private readonly onDrop = (e: DragEvent): void => {
                 padding: '2px 6px',
                 'border-radius': '4px'
             });
+
+            const tooltipText = group.doneCount > 0
+                ? `Recurring task (completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'})`
+                : 'Recurring task';
+            recurringChip.setAttribute('aria-label', tooltipText);
+            recurringChip.setAttribute('title', tooltipText);
+
             const icon = recurringChip.createSpan();
             setIcon(icon, 'repeat');
             if (group.doneCount > 0) {
