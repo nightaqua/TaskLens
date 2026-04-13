@@ -9,7 +9,6 @@ export interface SemesterSettings {
     dueDateKey: string;
 
     // Visuals & UI
-    colorScheme: 'inherit' | 'custom';
     colorMode: ColorMode;
 
     // Status Colours
@@ -24,7 +23,6 @@ export interface SemesterSettings {
 
     topicColors: Record<string, string>;
 
-    showBoard: boolean;
     showTaskActions: boolean;
     hasSeenWelcome: boolean;
     hasClickedRibbonIcon: boolean;
@@ -47,7 +45,6 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
     startDateKey: 'start',
     dueDateKey: 'due',
 
-    colorScheme: 'inherit',
     colorMode: 'status',
     colors: {
         overdue: '#e63946',
@@ -60,7 +57,6 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
 
     appWideAutomation: true,
 
-    showBoard: false,
     showTaskActions: false,
     hasSeenWelcome: false,
     hasClickedRibbonIcon: false,

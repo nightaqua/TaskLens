@@ -21,7 +21,7 @@ export default defineConfig([
             },
         },
         rules: {
-            "obsidianmd/ui/sentence-case": ["warn", { ignoreWords: ["TaskLens"] }],
+            "obsidianmd/ui/sentence-case": ["error", { brands: ["TaskLens"], enforceCamelCaseLower: true }],
             "obsidianmd/no-static-styles-assignment": "warn",
         },
     },
