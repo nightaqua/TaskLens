@@ -108,6 +108,23 @@ export class SettingsTab extends PluginSettingTab {
                 void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
             }));
 
+        new Setting(parserDetails)
+            .setName('Course detection')
+            .setDesc('How to determine a task\'s course or topic name.')
+            .addDropdown(d => d
+                .addOption('per-file', 'File name')
+                .addOption('per-folder', 'Folder name')
+                .addOption('frontmatter', 'Frontmatter field')
+                .setValue(this.plugin.settings.courseDetection)
+                .onChange((v) => {
+                    this.plugin.settings.courseDetection = v as 'per-file' | 'per-folder' | 'frontmatter';
+                    void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                    this.renderFrontmatterKeyField(frontmatterKeyContainer);
+                }));
+
+        const frontmatterKeyContainer = parserDetails.createDiv();
+        this.renderFrontmatterKeyField(frontmatterKeyContainer);
+
         const uiDetails = containerEl.createEl('details');
         uiDetails.open = this.plugin.settings.settingsTabState.uiOpen;
         uiDetails.createEl('summary', { text: 'Appearance & colors' });
@@ -170,6 +187,23 @@ export class SettingsTab extends PluginSettingTab {
         bmcImg.setAttribute('src', 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png');
         bmcImg.setAttribute('width', '200');
         bmcImg.setAttribute('alt', 'Buy Me A Coffee');
+    }
+
+    private renderFrontmatterKeyField(container: HTMLElement): void {
+        container.empty();
+
+        if (this.plugin.settings.courseDetection === 'frontmatter') {
+            new Setting(container)
+                .setName('Frontmatter key')
+                .setDesc('Frontmatter field name to read the course name from.')
+                .addText(t => t
+                    .setPlaceholder('Course')
+                    .setValue(this.plugin.settings.courseFrontmatterKey)
+                    .onChange(v => {
+                        this.plugin.settings.courseFrontmatterKey = v;
+                        void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                    }));
+        }
     }
 
     private renderColorPickers(container: HTMLElement): void {
