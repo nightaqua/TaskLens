@@ -183,7 +183,13 @@ private readonly onDrop = (e: DragEvent): void => {
         }
 
         if (group.isRecurring) {
+            const label = group.doneCount > 0
+                ? `Recurring task, Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`
+                : 'Recurring task';
+
             const recurringChip = meta.createDiv('board-task-recurring-chip');
+            recurringChip.setAttribute('aria-label', label);
+            recurringChip.setAttribute('title', label);
             recurringChip.setCssProps({
                 display: 'flex',
                 'align-items': 'center',

@@ -98,14 +98,20 @@ export class TaskListComponent {
         // Recurring chip: icon always shown for recurring tasks.
         // ×N badge shows completed cycle count when at least one cycle has been done.
         if (group.isRecurring) {
+            const label = group.doneCount > 0
+                ? `Recurring task, Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`
+                : 'Recurring task';
+
             const recurringChip = meta.createDiv('task-recurring-chip');
+            recurringChip.setAttribute('aria-label', label);
+            recurringChip.setAttribute('title', label);
+
             const icon = recurringChip.createSpan({ cls: 'task-recurring-icon' });
             setIcon(icon, 'repeat');
             if (group.doneCount > 0) {
                 recurringChip.createSpan({
                     text: `×${String(group.doneCount)}`,
-                    cls: 'task-recurrence-count',
-                    attr: { 'aria-label': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}` }
+                    cls: 'task-recurrence-count'
                 });
             }
         }
@@ -122,6 +128,7 @@ export class TaskListComponent {
             const editBtn = actionsEl.createEl('button', { cls: 'task-action-btn' });
             setIcon(editBtn, 'pencil');
             editBtn.setAttribute('aria-label', 'Edit task');
+            editBtn.setAttribute('title', 'Edit task');
             editBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.callbacks.onEdit(task);
@@ -129,6 +136,7 @@ export class TaskListComponent {
             const deleteBtn = actionsEl.createEl('button', { cls: ['task-action-btn', 'btn-danger'] });
             setIcon(deleteBtn, 'trash-2');
             deleteBtn.setAttribute('aria-label', 'Delete task');
+            deleteBtn.setAttribute('title', 'Delete task');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.callbacks.onDelete(task);
