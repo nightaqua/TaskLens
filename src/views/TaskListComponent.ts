@@ -98,18 +98,20 @@ export class TaskListComponent {
         // Recurring chip: icon always shown for recurring tasks.
         // ×N badge shows completed cycle count when at least one cycle has been done.
         if (group.isRecurring) {
+            const label = group.doneCount > 0
+                ? `Recurring task, Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`
+                : 'Recurring task';
+
             const recurringChip = meta.createDiv('task-recurring-chip');
+            recurringChip.setAttribute('aria-label', label);
+            recurringChip.setAttribute('title', label);
+
             const icon = recurringChip.createSpan({ cls: 'task-recurring-icon' });
             setIcon(icon, 'repeat');
             if (group.doneCount > 0) {
-                const label = `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`;
                 recurringChip.createSpan({
                     text: `×${String(group.doneCount)}`,
-                    cls: 'task-recurrence-count',
-                    attr: {
-                        'aria-label': label,
-                        'title': label
-                    }
+                    cls: 'task-recurrence-count'
                 });
             }
         }
