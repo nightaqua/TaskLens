@@ -165,6 +165,8 @@ export class QuickAddModal extends Modal {
 
                     drop.setValue(this.selectedFile);
                     drop.onChange(value => { this.selectedFile = value; });
+
+                    drop.selectEl.setAttribute('aria-label', 'Destination file');
                 });
         } else {
             // In edit mode, pre-set selectedFile to the task's file
@@ -210,6 +212,8 @@ export class QuickAddModal extends Modal {
                 if (this.editTask && this.editTask.recurrence && !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', ''].includes(this.editTask.recurrence)) {
                     drop.addOption(this.editTask.recurrence, this.editTask.recurrence);
                 }
+
+                drop.selectEl.setAttribute('aria-label', 'Recurrence pattern');
 
                 drop.setValue(this.recurrence);
                 drop.onChange(value => { this.recurrence = value; });

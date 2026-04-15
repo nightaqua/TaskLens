@@ -8,3 +8,6 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-04-15 - Aria labels for addDropdown inner selects
+**Learning:** Setting.addDropdown() components contain a native <select> element which can be accessed via `d.selectEl` for screen reader accessibility enhancements.
+**Action:** When adding dropdowns to settings, manually apply an aria-label via `d.selectEl.setAttribute('aria-label', 'Description')` to provide better context.
