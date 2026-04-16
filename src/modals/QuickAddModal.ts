@@ -141,6 +141,9 @@ export class QuickAddModal extends Modal {
             new Setting(contentEl)
                 .setName('Destination')
                 .addDropdown(drop => {
+                    drop.selectEl.setAttribute('aria-label', 'Destination file');
+                    drop.selectEl.setAttribute('title', 'Destination file');
+
                     // Always offer "insert at cursor" as the first option, so it is
                     // the most ergonomic choice when a Markdown file is already open.
                     drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
@@ -198,6 +201,8 @@ export class QuickAddModal extends Modal {
             .setName('Repeat')
             .setDesc('Select a recurrence pattern.')
             .addDropdown(drop => {
+                drop.selectEl.setAttribute('aria-label', 'Recurrence pattern');
+                drop.selectEl.setAttribute('title', 'Recurrence pattern');
                 drop.addOption('', 'None');
                 drop.addOption('daily', 'Daily');
                 drop.addOption('weekly', 'Weekly');

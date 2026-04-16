@@ -111,16 +111,19 @@ export class SettingsTab extends PluginSettingTab {
         new Setting(parserDetails)
             .setName('Course detection')
             .setDesc('How to determine a task\'s course or topic name.')
-            .addDropdown(d => d
-                .addOption('per-file', 'File name')
-                .addOption('per-folder', 'Folder name')
-                .addOption('frontmatter', 'Frontmatter field')
-                .setValue(this.plugin.settings.courseDetection)
-                .onChange((v) => {
+            .addDropdown(d => {
+                d.selectEl.setAttribute('aria-label', 'Course detection');
+                d.selectEl.setAttribute('title', 'Course detection');
+                d.addOption('per-file', 'File name')
+                 .addOption('per-folder', 'Folder name')
+                 .addOption('frontmatter', 'Frontmatter field')
+                 .setValue(this.plugin.settings.courseDetection)
+                 .onChange((v) => {
                     this.plugin.settings.courseDetection = v as 'per-file' | 'per-folder' | 'frontmatter';
                     void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
                     this.renderFrontmatterKeyField(frontmatterKeyContainer);
-                }));
+                 });
+            });
 
         const frontmatterKeyContainer = parserDetails.createDiv();
         this.renderFrontmatterKeyField(frontmatterKeyContainer);
@@ -135,17 +138,20 @@ export class SettingsTab extends PluginSettingTab {
 
         new Setting(uiDetails)
             .setName('Color mode')
-            .addDropdown(d => d
-                .addOption('status', 'By urgency (overdue, active)')
-                .addOption('course', 'By topic (file palette)')
-                .setValue(this.plugin.settings.colorMode)
-                .onChange((v) => {
-                    if (isSortMode(v)) this.plugin.settings.colorMode = v;
-                    void this.plugin.saveSettings().then(() => {
-                        this.plugin.refreshViews();
-                        this.renderColorPickers(colorPickersContainer);
-                    });
-                }));
+            .addDropdown(d => {
+                d.selectEl.setAttribute('aria-label', 'Color mode');
+                d.selectEl.setAttribute('title', 'Color mode');
+                d.addOption('status', 'By urgency (overdue, active)')
+                 .addOption('course', 'By topic (file palette)')
+                 .setValue(this.plugin.settings.colorMode)
+                 .onChange((v) => {
+                     if (isSortMode(v)) this.plugin.settings.colorMode = v;
+                     void this.plugin.saveSettings().then(() => {
+                         this.plugin.refreshViews();
+                         this.renderColorPickers(colorPickersContainer);
+                     });
+                 });
+            });
 
         new Setting(uiDetails)
             .setName('Show task action buttons')
