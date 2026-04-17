@@ -134,6 +134,8 @@ export class QuickAddModal extends Modal {
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
                 text.inputEl.addEventListener('keydown', handleEnter);
+                text.inputEl.setAttribute('aria-label', 'Task title');
+                text.inputEl.setAttribute('title', 'Task title');
             });
 
         // --- 2. Destination dropdown (hidden in edit mode) --------
@@ -141,6 +143,8 @@ export class QuickAddModal extends Modal {
             new Setting(contentEl)
                 .setName('Destination')
                 .addDropdown(drop => {
+                    drop.selectEl.setAttribute('aria-label', 'Destination note');
+                    drop.selectEl.setAttribute('title', 'Destination note');
                     // Always offer "insert at cursor" as the first option, so it is
                     // the most ergonomic choice when a Markdown file is already open.
                     drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
@@ -180,6 +184,8 @@ export class QuickAddModal extends Modal {
                 text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
+                text.inputEl.setAttribute('aria-label', 'Due date');
+                text.inputEl.setAttribute('title', 'Due date');
             });
 
         // --- 3.5 Start date picker ---
@@ -191,6 +197,8 @@ export class QuickAddModal extends Modal {
                 text.setValue(this.startDate);
                 text.onChange(value => { this.startDate = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
+                text.inputEl.setAttribute('aria-label', 'Start date');
+                text.inputEl.setAttribute('title', 'Start date');
             });
 
         // --- 4. Recurrence input (dropdown) ---
@@ -198,6 +206,8 @@ export class QuickAddModal extends Modal {
             .setName('Repeat')
             .setDesc('Select a recurrence pattern.')
             .addDropdown(drop => {
+                drop.selectEl.setAttribute('aria-label', 'Repeat pattern');
+                drop.selectEl.setAttribute('title', 'Repeat pattern');
                 drop.addOption('', 'None');
                 drop.addOption('daily', 'Daily');
                 drop.addOption('weekly', 'Weekly');
