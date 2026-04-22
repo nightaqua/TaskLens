@@ -131,6 +131,10 @@ export class QuickAddModal extends Modal {
                         this.updateSubmitButtonState();
                     });
 
+                // Set accessibility attributes directly on the input element
+                text.inputEl.setAttribute('aria-label', 'Task title');
+                text.inputEl.setAttribute('title', 'Task title');
+
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
                 text.inputEl.addEventListener('keydown', handleEnter);
@@ -141,6 +145,9 @@ export class QuickAddModal extends Modal {
             new Setting(contentEl)
                 .setName('Destination')
                 .addDropdown(drop => {
+                    drop.selectEl.setAttribute('aria-label', 'Destination file');
+                    drop.selectEl.setAttribute('title', 'Destination file');
+
                     // Always offer "insert at cursor" as the first option, so it is
                     // the most ergonomic choice when a Markdown file is already open.
                     drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
@@ -177,6 +184,8 @@ export class QuickAddModal extends Modal {
             .addText(text => {
                 // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
+                text.inputEl.setAttribute('aria-label', 'Due date');
+                text.inputEl.setAttribute('title', 'Due date');
                 text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
@@ -188,6 +197,8 @@ export class QuickAddModal extends Modal {
             .addText(text => {
                 // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
+                text.inputEl.setAttribute('aria-label', 'Start date');
+                text.inputEl.setAttribute('title', 'Start date');
                 text.setValue(this.startDate);
                 text.onChange(value => { this.startDate = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
@@ -198,6 +209,9 @@ export class QuickAddModal extends Modal {
             .setName('Repeat')
             .setDesc('Select a recurrence pattern.')
             .addDropdown(drop => {
+                drop.selectEl.setAttribute('aria-label', 'Repeat recurrence pattern');
+                drop.selectEl.setAttribute('title', 'Repeat recurrence pattern');
+
                 drop.addOption('', 'None');
                 drop.addOption('daily', 'Daily');
                 drop.addOption('weekly', 'Weekly');
