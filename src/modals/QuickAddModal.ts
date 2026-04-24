@@ -138,34 +138,43 @@ export class QuickAddModal extends Modal {
 
         // --- 2. Destination dropdown (hidden in edit mode) --------
         if (!this.editTask) {
-            new Setting(contentEl)
-                .setName('Destination')
-                .addDropdown(drop => {
-                    // Always offer "insert at cursor" as the first option, so it is
-                    // the most ergonomic choice when a Markdown file is already open.
-                    drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
+            const scannedFiles = this.taskManager.getScannedFiles();
 
-                    // Only show files the plugin has already scanned rather than
-                    // every file in the vault, keeping the list focused and relevant.
-                    const scannedFiles = this.taskManager.getScannedFiles();
-                    scannedFiles.forEach((path) => {
-                        // Strip the directory path and .md extension for a clean label.
-                        const label = path.split('/').pop()?.replace('.md', '') || path;
-                        drop.addOption(path, label);
+            // Display a warning if there is no active view and no scanned files
+            if (!this.activeViewAtOpen && scannedFiles.length === 0) {
+                new Setting(contentEl)
+                    .setName('No destination available')
+                    .setDesc('Please open a markdown file or configure a destination before adding tasks.')
+                    .setClass('setting-error');
+            } else {
+                new Setting(contentEl)
+                    .setName('Destination')
+                    .addDropdown(drop => {
+                        // Always offer "insert at cursor" as the first option, so it is
+                        // the most ergonomic choice when a Markdown file is already open.
+                        drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
+
+                        // Only show files the plugin has already scanned rather than
+                        // every file in the vault, keeping the list focused and relevant.
+                        scannedFiles.forEach((path) => {
+                            // Strip the directory path and .md extension for a clean label.
+                            const label = path.split('/').pop()?.replace('.md', '') || path;
+                            drop.addOption(path, label);
+                        });
+
+                        // Pre-select a sensible default:
+                        //   • Cursor mode if a Markdown file was open when the modal launched.
+                        //   • Otherwise fall back to the first scanned file.
+                        if (this.activeViewAtOpen) {
+                            this.selectedFile = '__CURSOR__';
+                        } else if (scannedFiles.length > 0) {
+                            this.selectedFile = scannedFiles[0];
+                        }
+
+                        drop.setValue(this.selectedFile);
+                        drop.onChange(value => { this.selectedFile = value; });
                     });
-
-                    // Pre-select a sensible default:
-                    //   • Cursor mode if a Markdown file was open when the modal launched.
-                    //   • Otherwise fall back to the first scanned file.
-                    if (this.activeViewAtOpen) {
-                        this.selectedFile = '__CURSOR__';
-                    } else if (scannedFiles.length > 0) {
-                        this.selectedFile = scannedFiles[0];
-                    }
-
-                    drop.setValue(this.selectedFile);
-                    drop.onChange(value => { this.selectedFile = value; });
-                });
+            }
         } else {
             // In edit mode, pre-set selectedFile to the task's file
             this.selectedFile = this.editTask.filePath;
@@ -230,7 +239,13 @@ export class QuickAddModal extends Modal {
 
     private updateSubmitButtonState(): void {
         if (!this.submitBtnComp) return;
-        if (!this.title.trim()) {
+
+        const noDestination = !this.editTask && !this.activeViewAtOpen && this.taskManager.getScannedFiles().length === 0;
+
+        if (noDestination) {
+            this.submitBtnComp.setDisabled(true);
+            this.submitBtnComp.setTooltip('No destination available to add the task.');
+        } else if (!this.title.trim()) {
             this.submitBtnComp.setDisabled(true);
             this.submitBtnComp.setTooltip('A task title is required');
         } else {
