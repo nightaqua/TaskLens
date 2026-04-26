@@ -8,3 +8,7 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+
+## 2026-04-26 - [Missing accessible names for Setting inputs]
+**Learning:** Obsidian's `Setting` components do not automatically link their visual name (`.setName()`) to the rendered input element (`<input>`, `<select>`, `<textarea>`) via standard HTML `<label>` semantics. This leaves the inputs without an accessible name for screen readers and native tooltips for mouse users.
+**Action:** When creating inputs via `Setting.addText()`, `Setting.addTextArea()`, or `Setting.addDropdown()`, always manually add `aria-label` and `title` attributes to the exposed `inputEl` or `selectEl` to maintain accessibility.
