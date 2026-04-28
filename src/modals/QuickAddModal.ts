@@ -131,6 +131,9 @@ export class QuickAddModal extends Modal {
                         this.updateSubmitButtonState();
                     });
 
+                text.inputEl.setAttribute('aria-label', 'Task title');
+                text.inputEl.setAttribute('title', 'Task title');
+
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
                 text.inputEl.addEventListener('keydown', handleEnter);
@@ -163,6 +166,9 @@ export class QuickAddModal extends Modal {
                         this.selectedFile = scannedFiles[0];
                     }
 
+                    drop.selectEl.setAttribute('aria-label', 'Task destination file');
+                    drop.selectEl.setAttribute('title', 'Task destination file');
+
                     drop.setValue(this.selectedFile);
                     drop.onChange(value => { this.selectedFile = value; });
                 });
@@ -179,6 +185,8 @@ export class QuickAddModal extends Modal {
                 text.inputEl.type = 'date';
                 text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
+                text.inputEl.setAttribute('aria-label', 'Task due date');
+                text.inputEl.setAttribute('title', 'Task due date');
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -190,6 +198,8 @@ export class QuickAddModal extends Modal {
                 text.inputEl.type = 'date';
                 text.setValue(this.startDate);
                 text.onChange(value => { this.startDate = value; });
+                text.inputEl.setAttribute('aria-label', 'Task start date');
+                text.inputEl.setAttribute('title', 'Task start date');
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -210,6 +220,9 @@ export class QuickAddModal extends Modal {
                 if (this.editTask && this.editTask.recurrence && !['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', ''].includes(this.editTask.recurrence)) {
                     drop.addOption(this.editTask.recurrence, this.editTask.recurrence);
                 }
+
+                drop.selectEl.setAttribute('aria-label', 'Task repeat frequency');
+                drop.selectEl.setAttribute('title', 'Task repeat frequency');
 
                 drop.setValue(this.recurrence);
                 drop.onChange(value => { this.recurrence = value; });
