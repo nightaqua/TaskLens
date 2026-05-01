@@ -8,3 +8,6 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-05-01 - Screen Reader Support for Obsidian Setting Components
+**Learning:** Obsidian's `Setting` components do not automatically add `aria-label` or `title` attributes to internal input elements (like `.addText()`, `.addTextArea()`, `.addDropdown()`), breaking accessibility for screen readers and missing native hover tooltips.
+**Action:** When adding form fields using Obsidian's `Setting` API, explicitly set `aria-label` and `title` on the underlying DOM elements (`text.inputEl` or `drop.selectEl`) to ensure accessibility compliance.
