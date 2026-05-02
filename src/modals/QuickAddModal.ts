@@ -131,6 +131,10 @@ export class QuickAddModal extends Modal {
                         this.updateSubmitButtonState();
                     });
 
+                // Set ARIA label and title for screen readers and tooltips
+                text.inputEl.setAttribute('aria-label', 'Task title');
+                text.inputEl.setAttribute('title', 'Task title');
+
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
                 text.inputEl.addEventListener('keydown', handleEnter);
@@ -165,6 +169,10 @@ export class QuickAddModal extends Modal {
 
                     drop.setValue(this.selectedFile);
                     drop.onChange(value => { this.selectedFile = value; });
+
+                    // Set ARIA label and title for screen readers and tooltips
+                    drop.selectEl.setAttribute('aria-label', 'Task destination');
+                    drop.selectEl.setAttribute('title', 'Task destination');
                 });
         } else {
             // In edit mode, pre-set selectedFile to the task's file
@@ -180,6 +188,10 @@ export class QuickAddModal extends Modal {
                 text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
+
+                // Set ARIA label and title
+                text.inputEl.setAttribute('aria-label', 'Due date');
+                text.inputEl.setAttribute('title', 'Due date');
             });
 
         // --- 3.5 Start date picker ---
@@ -191,6 +203,10 @@ export class QuickAddModal extends Modal {
                 text.setValue(this.startDate);
                 text.onChange(value => { this.startDate = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
+
+                // Set ARIA label and title
+                text.inputEl.setAttribute('aria-label', 'Start date');
+                text.inputEl.setAttribute('title', 'Start date');
             });
 
         // --- 4. Recurrence input (dropdown) ---
@@ -213,6 +229,10 @@ export class QuickAddModal extends Modal {
 
                 drop.setValue(this.recurrence);
                 drop.onChange(value => { this.recurrence = value; });
+
+                // Set ARIA label and title
+                drop.selectEl.setAttribute('aria-label', 'Recurrence pattern');
+                drop.selectEl.setAttribute('title', 'Recurrence pattern');
             });
 
         // --- 5. Submit button -----------------------------------------------
