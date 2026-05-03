@@ -8,3 +8,7 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+
+## 2026-05-03 - [Destructive Action Confirmation]
+**Learning:** Destructive actions like deleting tasks happen instantly and without warning. When users accidentally click delete buttons, they have no way to recover the lost data.
+**Action:** Always add a confirmation step for destructive actions. A `ConfirmModal` component provides a reusable pattern for this across the app.
