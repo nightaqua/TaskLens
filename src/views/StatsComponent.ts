@@ -20,7 +20,9 @@ export class StatsComponent {
         statCards.forEach(stat => {
             const card = containerDiv.createDiv({ cls: ['stat-card', stat.cls] });
             card.setAttribute('role', 'status');
-            card.setAttribute('aria-label', `${stat.label} tasks: ${String(stat.value)}`);
+            const accessibleText = `${stat.label} tasks: ${String(stat.value)}`;
+            card.setAttribute('aria-label', accessibleText);
+            card.setAttribute('title', accessibleText);
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
@@ -33,6 +35,8 @@ export class StatsComponent {
 
     private renderPacingAnalysis(velocity: number[]): void {
         const wrapper = this.container.createDiv('dashboard-pacing-analysis');
+        wrapper.setAttribute('role', 'group');
+        wrapper.setAttribute('aria-label', '7-day pacing analysis');
         wrapper.createEl('h3', { text: '7-day pacing analysis' });
 
         const maxVal = Math.max(...velocity, 1);
@@ -43,6 +47,11 @@ export class StatsComponent {
 
         velocity.forEach((val, i) => {
             const barWrapper = histogramContainer.createDiv('histogram-bar-wrapper');
+            barWrapper.setAttribute('role', 'status');
+            const accessibleText = `${String(val)} tasks completed ${days[i]}`;
+            barWrapper.setAttribute('aria-label', accessibleText);
+            barWrapper.setAttribute('title', accessibleText);
+
             const percent = (val / maxVal) * 100;
 
             const bar = barWrapper.createDiv('histogram-bar');
@@ -61,11 +70,17 @@ export class StatsComponent {
         wrapper.createEl('h3', { text: 'Most urgent topic' });
 
         const card = wrapper.createDiv({ cls: ['stat-card', 'stat-urgent-topic'] });
+        card.setAttribute('role', 'status');
 
         const nameDiv = card.createDiv('urgent-topic-name');
         nameDiv.setText(topic.name);
 
         const percent = Math.round(topic.ratio * 100);
+
+        const accessibleText = `Most urgent topic: ${topic.name}, ${String(percent)}% urgent, ${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`;
+        card.setAttribute('aria-label', accessibleText);
+        card.setAttribute('title', accessibleText);
+
         card.createDiv('urgent-topic-ratio').setText(`${String(percent)}% urgent`);
 
         card.createDiv('urgent-topic-details').setText(
