@@ -7,6 +7,7 @@ import { TaskListComponent } from './TaskListComponent';
 import { BoardComponent } from './BoardComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { QuickAddModal } from '../modals/QuickAddModal';
+import { ConfirmModal } from '../modals/ConfirmModal';
 import { VIEW_TYPE_DASHBOARD, CLASS_CHROMELESS, CLASS_HIDE_TABS, CLASS_DASHBOARD_VIEW } from '../constants';
 
 
@@ -420,7 +421,15 @@ export class DashboardView extends ItemView implements RefreshableView {
         const list = new TaskListComponent(container, this.app, {
             onToggle: (t) => { void this.taskManager.toggleTaskCompletion(t); },
             onEdit: (t) => { new QuickAddModal(this.app, this.taskManager, t, this.plugin.settings).open(); },
-            onDelete: (t) => { void this.taskManager.deleteTask(t); },
+            onDelete: (t) => {
+                new ConfirmModal(
+                    this.app,
+                    'Delete task',
+                    `Are you sure you want to delete "${t.title}"?`,
+                    () => { void this.taskManager.deleteTask(t); },
+                    'Delete'
+                ).open();
+            },
         }, this.plugin.settings);
 
         list.render(this.taskManager.getGroupedFilteredTasks());

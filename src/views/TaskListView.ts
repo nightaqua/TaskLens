@@ -5,6 +5,7 @@ import { Task } from '../models/Task';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
 import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
 import { QuickAddModal } from '../modals/QuickAddModal';
+import { ConfirmModal } from '../modals/ConfirmModal';
 import { VIEW_TYPE_LIST, CLASS_DASHBOARD_VIEW } from '../constants';
 
 
@@ -124,7 +125,13 @@ export class TaskListView extends ItemView {
                 new QuickAddModal(this.app, this.plugin.taskManager, t, this.plugin.settings).open();
             },
             onDelete: (t: Task) => {
-                void this.plugin.taskManager.deleteTask(t);
+                new ConfirmModal(
+                    this.app,
+                    'Delete task',
+                    `Are you sure you want to delete "${t.title}"?`,
+                    () => { void this.plugin.taskManager.deleteTask(t); },
+                    'Delete'
+                ).open();
             }
         }, this.plugin.settings);
         list.render(this.plugin.taskManager.getGroupedFilteredTasks());

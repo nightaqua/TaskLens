@@ -8,3 +8,6 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-05-11 - Added ConfirmModal for destructive actions
+**Learning:** Reusable UX patterns like modals for destructive actions (deleting tasks) are highly effective at preventing accidental data loss while maintaining visual consistency by leveraging native UI classes like `.setWarning()`.
+**Action:** Always implement a confirmation step for any action that permanently deletes or significantly alters user data without an easy undo path.
