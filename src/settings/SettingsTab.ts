@@ -59,6 +59,8 @@ export class SettingsTab extends PluginSettingTab {
             .setName('Scan paths')
             .setDesc('Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
             .addTextArea(text => {
+                text.inputEl.setAttribute('aria-label', 'Scan paths');
+                text.inputEl.setAttribute('title', 'Scan paths');
                 text.setPlaceholder('Projects\nUni/History\nTo-Do.md')
                     .setValue(this.plugin.settings.scanFolders.join('\n'))
                     .onChange((value) => {
@@ -95,24 +97,34 @@ export class SettingsTab extends PluginSettingTab {
         new Setting(parserDetails)
             .setName('Start key')
             .setDesc('Inline text used to find the start date. Example: [start:: 2026-02-02]')
-            .addText(t => t.setValue(this.plugin.settings.startDateKey).onChange(v => {
-                this.plugin.settings.startDateKey = v;
-                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
-            }));
+            .addText(t => {
+                t.inputEl.setAttribute('aria-label', 'Start key');
+                t.inputEl.setAttribute('title', 'Start key');
+                t.setValue(this.plugin.settings.startDateKey).onChange(v => {
+                    this.plugin.settings.startDateKey = v;
+                    void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                });
+            });
 
         new Setting(parserDetails)
             .setName('Due key')
             .setDesc('Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]')
-            .addText(t => t.setValue(this.plugin.settings.dueDateKey).onChange(v => {
-                this.plugin.settings.dueDateKey = v;
-                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
-            }));
+            .addText(t => {
+                t.inputEl.setAttribute('aria-label', 'Due key');
+                t.inputEl.setAttribute('title', 'Due key');
+                t.setValue(this.plugin.settings.dueDateKey).onChange(v => {
+                    this.plugin.settings.dueDateKey = v;
+                    void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                });
+            });
 
         new Setting(parserDetails)
             .setName('Course detection')
             .setDesc('How to determine a task\'s course or topic name.')
-            .addDropdown(d => d
-                .addOption('per-file', 'File name')
+            .addDropdown(d => {
+                d.selectEl.setAttribute('aria-label', 'Course detection mode');
+                d.selectEl.setAttribute('title', 'Course detection mode');
+                d.addOption('per-file', 'File name')
                 .addOption('per-folder', 'Folder name')
                 .addOption('frontmatter', 'Frontmatter field')
                 .setValue(this.plugin.settings.courseDetection)
@@ -120,7 +132,8 @@ export class SettingsTab extends PluginSettingTab {
                     this.plugin.settings.courseDetection = v as 'per-file' | 'per-folder' | 'frontmatter';
                     void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
                     this.renderFrontmatterKeyField(frontmatterKeyContainer);
-                }));
+                });
+            });
 
         const frontmatterKeyContainer = parserDetails.createDiv();
         this.renderFrontmatterKeyField(frontmatterKeyContainer);
@@ -135,8 +148,10 @@ export class SettingsTab extends PluginSettingTab {
 
         new Setting(uiDetails)
             .setName('Color mode')
-            .addDropdown(d => d
-                .addOption('status', 'By urgency (overdue, active)')
+            .addDropdown(d => {
+                d.selectEl.setAttribute('aria-label', 'Color mode');
+                d.selectEl.setAttribute('title', 'Color mode');
+                d.addOption('status', 'By urgency (overdue, active)')
                 .addOption('course', 'By topic (file palette)')
                 .setValue(this.plugin.settings.colorMode)
                 .onChange((v) => {
@@ -145,7 +160,8 @@ export class SettingsTab extends PluginSettingTab {
                         this.plugin.refreshViews();
                         this.renderColorPickers(colorPickersContainer);
                     });
-                }));
+                });
+            });
 
         new Setting(uiDetails)
             .setName('Show task action buttons')
@@ -196,13 +212,16 @@ export class SettingsTab extends PluginSettingTab {
             new Setting(container)
                 .setName('Frontmatter key')
                 .setDesc('Frontmatter field name to read the course name from.')
-                .addText(t => t
-                    .setPlaceholder('Course')
+                .addText(t => {
+                    t.inputEl.setAttribute('aria-label', 'Frontmatter key');
+                    t.inputEl.setAttribute('title', 'Frontmatter key');
+                    t.setPlaceholder('Course')
                     .setValue(this.plugin.settings.courseFrontmatterKey)
                     .onChange(v => {
                         this.plugin.settings.courseFrontmatterKey = v;
                         void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
-                    }));
+                    });
+                });
         }
     }
 
