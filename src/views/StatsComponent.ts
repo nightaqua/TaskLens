@@ -21,6 +21,7 @@ export class StatsComponent {
             const card = containerDiv.createDiv({ cls: ['stat-card', stat.cls] });
             card.setAttribute('role', 'status');
             card.setAttribute('aria-label', `${stat.label} tasks: ${String(stat.value)}`);
+            card.setAttribute('title', `${stat.label} tasks: ${String(stat.value)}`);
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
@@ -43,6 +44,10 @@ export class StatsComponent {
 
         velocity.forEach((val, i) => {
             const barWrapper = histogramContainer.createDiv('histogram-bar-wrapper');
+            barWrapper.setAttribute('role', 'group');
+            const labelStr = `${days[i]}: ${String(val)} tasks completed`;
+            barWrapper.setAttribute('aria-label', labelStr);
+            barWrapper.setAttribute('title', labelStr);
             const percent = (val / maxVal) * 100;
 
             const bar = barWrapper.createDiv('histogram-bar');
@@ -62,14 +67,19 @@ export class StatsComponent {
 
         const card = wrapper.createDiv({ cls: ['stat-card', 'stat-urgent-topic'] });
 
+        const percent = Math.round(topic.ratio * 100);
+        const detailsText = `${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`;
+
+        card.setAttribute('role', 'status');
+        const labelStr = `Most urgent topic: ${topic.name}, ${String(percent)}% urgent, ${detailsText}`;
+        card.setAttribute('aria-label', labelStr);
+        card.setAttribute('title', labelStr);
+
         const nameDiv = card.createDiv('urgent-topic-name');
         nameDiv.setText(topic.name);
 
-        const percent = Math.round(topic.ratio * 100);
         card.createDiv('urgent-topic-ratio').setText(`${String(percent)}% urgent`);
 
-        card.createDiv('urgent-topic-details').setText(
-            `${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`
-        );
+        card.createDiv('urgent-topic-details').setText(detailsText);
     }
 }
