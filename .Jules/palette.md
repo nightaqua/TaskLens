@@ -8,3 +8,6 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-05-18 - Unified labeling for stats and infographics
+**Learning:** In Obsidian dashboards, pure informational data (like histograms and stat cards) is better served by wrapping the container with `role="group"` or `role="status"` with an inclusive `aria-label` and `title`, instead of labeling individual DOM elements.
+**Action:** When adding infographics, add a unified `aria-label` and `title` to the wrapper to offer a seamless screen reader and hover experience.
