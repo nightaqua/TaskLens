@@ -134,6 +134,8 @@ export class QuickAddModal extends Modal {
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
                 text.inputEl.addEventListener('keydown', handleEnter);
+                text.inputEl.setAttribute('aria-label', 'Task');
+                text.inputEl.setAttribute('title', 'Task');
             });
 
         // --- 2. Destination dropdown (hidden in edit mode) --------
@@ -165,6 +167,8 @@ export class QuickAddModal extends Modal {
 
                     drop.setValue(this.selectedFile);
                     drop.onChange(value => { this.selectedFile = value; });
+                    drop.selectEl.setAttribute('aria-label', 'Destination');
+                    drop.selectEl.setAttribute('title', 'Destination');
                 });
         } else {
             // In edit mode, pre-set selectedFile to the task's file
@@ -180,6 +184,8 @@ export class QuickAddModal extends Modal {
                 text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
+                text.inputEl.setAttribute('aria-label', 'Due date');
+                text.inputEl.setAttribute('title', 'Due date');
             });
 
         // --- 3.5 Start date picker ---
@@ -191,6 +197,8 @@ export class QuickAddModal extends Modal {
                 text.setValue(this.startDate);
                 text.onChange(value => { this.startDate = value; });
                 text.inputEl.addEventListener('keydown', handleEnter);
+                text.inputEl.setAttribute('aria-label', 'Start date');
+                text.inputEl.setAttribute('title', 'Start date');
             });
 
         // --- 4. Recurrence input (dropdown) ---
@@ -213,6 +221,8 @@ export class QuickAddModal extends Modal {
 
                 drop.setValue(this.recurrence);
                 drop.onChange(value => { this.recurrence = value; });
+                drop.selectEl.setAttribute('aria-label', 'Repeat');
+                drop.selectEl.setAttribute('title', 'Repeat');
             });
 
         // --- 5. Submit button -----------------------------------------------
