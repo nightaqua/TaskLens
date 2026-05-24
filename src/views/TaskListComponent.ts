@@ -2,6 +2,7 @@ import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
 import { App, MarkdownView, TFile, setIcon } from 'obsidian';
 import { SemesterSettings, getTopicColor } from '../settings/Settings';
 import { TaskManager } from '../services/TaskManager';
+import { ConfirmModal } from '../modals/ConfirmModal';
 
 /**
  * Opens the source file for a task and moves the editor cursor to its exact line.
@@ -139,7 +140,12 @@ export class TaskListComponent {
             deleteBtn.setAttribute('title', 'Delete task');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.callbacks.onDelete(task);
+                new ConfirmModal(
+                    this.app,
+                    'Delete task',
+                    `Are you sure you want to delete "${task.title}"?`,
+                    () => { this.callbacks.onDelete(task); }
+                ).open();
             });
         }
 

@@ -8,3 +8,6 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-05-24 - Added Confirmation Dialog to Task Deletion
+**Learning:** Reusable `ConfirmModal` with `.setWarning()` provides an excellent native pattern for safe destructive actions in Obsidian. Integrating it ensures data loss protection when deleting tasks without straying from Obsidian UI paradigms.
+**Action:** Always wrap destructive actions (like file modifications or deletions) inside a confirmation dialog using Obsidian's native Modal API, unless the user explicitly requested a streamlined or rapid-fire workflow without prompts.
