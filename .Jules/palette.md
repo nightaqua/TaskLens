@@ -8,3 +8,7 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+
+## 2026-05-26 - Roles and Attributes for Info-graphics
+**Learning:** Non-interactive visual info-graphics (like stat cards and histograms) built with `div`s aren't automatically announced well by screen readers. A combination of `role="status"` or `role="group"` alongside a descriptive `aria-label` and matching `title` solves this efficiently.
+**Action:** When creating visual data components (charts, stat cards), always apply `role="group"` or `role="status"` to the parent wrapper along with a concise `aria-label` and matching `title` attribute to provide a unified hover target and screen reader announcement, avoiding the need for nested labels.
