@@ -43,6 +43,10 @@ export class StatsComponent {
 
         velocity.forEach((val, i) => {
             const barWrapper = histogramContainer.createDiv('histogram-bar-wrapper');
+            barWrapper.setAttribute('role', 'group');
+            barWrapper.setAttribute('aria-label', `${days[i]}: ${String(val)} tasks completed`);
+            barWrapper.setAttribute('title', `${days[i]}: ${String(val)} tasks completed`);
+
             const percent = (val / maxVal) * 100;
 
             const bar = barWrapper.createDiv('histogram-bar');
@@ -62,10 +66,15 @@ export class StatsComponent {
 
         const card = wrapper.createDiv({ cls: ['stat-card', 'stat-urgent-topic'] });
 
+        const percent = Math.round(topic.ratio * 100);
+        const label = `Most urgent topic: ${topic.name}. ${String(percent)}% urgent, ${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`;
+        card.setAttribute('role', 'status');
+        card.setAttribute('aria-label', label);
+        card.setAttribute('title', label);
+
         const nameDiv = card.createDiv('urgent-topic-name');
         nameDiv.setText(topic.name);
 
-        const percent = Math.round(topic.ratio * 100);
         card.createDiv('urgent-topic-ratio').setText(`${String(percent)}% urgent`);
 
         card.createDiv('urgent-topic-details').setText(
