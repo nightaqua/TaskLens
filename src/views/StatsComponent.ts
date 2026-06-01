@@ -20,7 +20,9 @@ export class StatsComponent {
         statCards.forEach(stat => {
             const card = containerDiv.createDiv({ cls: ['stat-card', stat.cls] });
             card.setAttribute('role', 'status');
-            card.setAttribute('aria-label', `${stat.label} tasks: ${String(stat.value)}`);
+            const label = `${stat.label} tasks: ${String(stat.value)}`;
+            card.setAttribute('aria-label', label);
+            card.setAttribute('title', label);
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
@@ -43,6 +45,10 @@ export class StatsComponent {
 
         velocity.forEach((val, i) => {
             const barWrapper = histogramContainer.createDiv('histogram-bar-wrapper');
+            barWrapper.setAttribute('role', 'group');
+            const label = `${days[i]}: ${String(val)} tasks`;
+            barWrapper.setAttribute('aria-label', label);
+            barWrapper.setAttribute('title', label);
             const percent = (val / maxVal) * 100;
 
             const bar = barWrapper.createDiv('histogram-bar');
@@ -61,11 +67,15 @@ export class StatsComponent {
         wrapper.createEl('h3', { text: 'Most urgent topic' });
 
         const card = wrapper.createDiv({ cls: ['stat-card', 'stat-urgent-topic'] });
+        const percent = Math.round(topic.ratio * 100);
+        card.setAttribute('role', 'status');
+        const label = `Most urgent topic: ${topic.name}. ${String(percent)}% urgent. ${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent`;
+        card.setAttribute('aria-label', label);
+        card.setAttribute('title', label);
 
         const nameDiv = card.createDiv('urgent-topic-name');
         nameDiv.setText(topic.name);
 
-        const percent = Math.round(topic.ratio * 100);
         card.createDiv('urgent-topic-ratio').setText(`${String(percent)}% urgent`);
 
         card.createDiv('urgent-topic-details').setText(
