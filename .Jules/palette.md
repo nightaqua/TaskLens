@@ -8,3 +8,4 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-06-06 - Consistent Empty States in Collections\n**Learning:** When building custom dashboard UI components that handle collections (e.g., boards or lists), rendering empty structural elements when there is no data creates a confusing user experience.\n**Action:** Always explicitly render a dedicated empty state container (such as `.dashboard-empty-state` with a text message) when there is no data to display, rather than rendering empty structural elements.
