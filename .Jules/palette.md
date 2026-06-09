@@ -8,3 +8,7 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+
+## 2026-04-14 - [Chart Accessibility]
+**Learning:** When building custom histograms or charts out of DOM elements, individual bars often lack context. Simply rendering elements is insufficient for screen readers and mouse users.
+**Action:** Always add `role="group"` (or `role="img"`), an `aria-label`, and a matching `title` to the bar wrappers so screen readers can announce the data points correctly and mouse users get native hover tooltips.

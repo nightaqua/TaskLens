@@ -22,6 +22,12 @@ export class BoardComponent {
     public render(groups: TaskGroup[]): void {
         this.container.empty();
 
+        if (groups.length === 0) {
+            const empty = this.container.createDiv('dashboard-empty-state');
+            empty.createEl('p', { text: 'No tasks found.' });
+            return;
+        }
+
         const boardContainer = this.container.createDiv('dashboard-board');
         boardContainer.setCssProps({
             display: 'flex',

@@ -21,6 +21,7 @@ export class StatsComponent {
             const card = containerDiv.createDiv({ cls: ['stat-card', stat.cls] });
             card.setAttribute('role', 'status');
             card.setAttribute('aria-label', `${stat.label} tasks: ${String(stat.value)}`);
+            card.setAttribute('title', `${stat.label} tasks: ${String(stat.value)}`);
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
@@ -43,6 +44,10 @@ export class StatsComponent {
 
         velocity.forEach((val, i) => {
             const barWrapper = histogramContainer.createDiv('histogram-bar-wrapper');
+            barWrapper.setAttribute('role', 'group');
+            barWrapper.setAttribute('aria-label', `${String(val)} tasks completed on ${days[i]}`);
+            barWrapper.setAttribute('title', `${String(val)} tasks completed on ${days[i]}`);
+
             const percent = (val / maxVal) * 100;
 
             const bar = barWrapper.createDiv('histogram-bar');
