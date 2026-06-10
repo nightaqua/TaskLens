@@ -8,3 +8,6 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-06-10 - [Focus Visible Styles for Custom Inputs]
+**Learning:** Adding a `focus-visible` pseudo-class in `.css` is crucial for keyboard users navigating to dynamically created custom title edit inputs (e.g. `.dashboard-title-input`).
+**Action:** When creating text input fields using `createEl` or dynamically creating inline edit fields that aren't native Obsidian `Setting` text components, ensure matching `.component-class:focus-visible` styles are declared to maintain consistent keyboard accessibility feedback.
