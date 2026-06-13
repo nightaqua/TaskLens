@@ -133,6 +133,8 @@ export class QuickAddModal extends Modal {
 
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
+                text.inputEl.setAttribute('aria-label', 'Task title');
+                text.inputEl.setAttribute('title', 'Task title');
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -165,6 +167,8 @@ export class QuickAddModal extends Modal {
 
                     drop.setValue(this.selectedFile);
                     drop.onChange(value => { this.selectedFile = value; });
+                    drop.selectEl.setAttribute('aria-label', 'Destination file');
+                    drop.selectEl.setAttribute('title', 'Destination file');
                 });
         } else {
             // In edit mode, pre-set selectedFile to the task's file
@@ -179,6 +183,8 @@ export class QuickAddModal extends Modal {
                 text.inputEl.type = 'date';
                 text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
+                text.inputEl.setAttribute('aria-label', 'Due date');
+                text.inputEl.setAttribute('title', 'Due date');
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -190,6 +196,8 @@ export class QuickAddModal extends Modal {
                 text.inputEl.type = 'date';
                 text.setValue(this.startDate);
                 text.onChange(value => { this.startDate = value; });
+                text.inputEl.setAttribute('aria-label', 'Start date');
+                text.inputEl.setAttribute('title', 'Start date');
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -213,6 +221,8 @@ export class QuickAddModal extends Modal {
 
                 drop.setValue(this.recurrence);
                 drop.onChange(value => { this.recurrence = value; });
+                drop.selectEl.setAttribute('aria-label', 'Recurrence pattern');
+                drop.selectEl.setAttribute('title', 'Recurrence pattern');
             });
 
         // --- 5. Submit button -----------------------------------------------
