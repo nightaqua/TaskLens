@@ -8,3 +8,6 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2026-04-12 - [Missing native tooltips for input fields and stat cards]
+**Learning:** Like icon-only buttons, input fields and non-interactive informative UI elements (like stat cards) that rely entirely on ARIA labels without visual labels or text also need a `title` attribute to provide hover context for mouse users.
+**Action:** When auditing or implementing inputs (like the dashboard title input) or stat cards that use `aria-label` for screen readers, also provide an identical `title` attribute.
