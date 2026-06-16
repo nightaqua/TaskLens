@@ -43,7 +43,8 @@ tmp/
 temp/
 
 # AI agent working files
-# .Jules/ is tracked on dev so Jules retains context between sessions
+.jules/
+.Jules/
 .iloom/
 
 # TypeScript incremental build info
