@@ -36,8 +36,8 @@ type WorkspaceWithSplits = {
 };
 
 export default class TaskLensPlugin extends Plugin {
-    settings: SemesterSettings;
-    taskManager: TaskManager;
+    settings!: SemesterSettings;
+    taskManager!: TaskManager;
     isLayoutLocked: boolean = true;
     isFocusMode: boolean = false;
 
