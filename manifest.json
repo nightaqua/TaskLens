@@ -2,7 +2,7 @@
 	"id": "tasklens",
 	"name": "TaskLens",
 	"version": "1.2.3",
-	"minAppVersion": "0.15.0",
+	"minAppVersion": "1.7.2",
 	"description": "Your personal command center. Widget-based dashboard for task and timelines visualization and goal tracking.",
 	"author": "nightaqua",
 	"authorUrl": "https://buymeacoffee.com/joblessdev",
