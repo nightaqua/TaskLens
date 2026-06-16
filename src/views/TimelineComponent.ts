@@ -144,7 +144,7 @@ export class TimelineComponent {
             navHandle.setAttribute('aria-expanded', 'true');
             // Guard: don't double-register
             if (this.ribbonOutsideHandler) {
-                document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
                 this.ribbonOutsideHandler = null;
             }
             const handler = (e: MouseEvent): void => {
@@ -154,12 +154,12 @@ export class TimelineComponent {
                     this.ribbonNavOpen = false;
                     navSection.removeClass('is-open');
                     navHandle.setAttribute('aria-expanded', 'false');
-                    document.removeEventListener('mousedown', handler);
+                    activeDocument.removeEventListener('mousedown', handler);
                     this.ribbonOutsideHandler = null;
                 }
             };
             this.ribbonOutsideHandler = handler;
-            document.addEventListener('mousedown', handler);
+            activeDocument.addEventListener('mousedown', handler);
         };
 
         const closeNav = (): void => {
@@ -167,7 +167,7 @@ export class TimelineComponent {
             navSection.removeClass('is-open');
             navHandle.setAttribute('aria-expanded', 'false');
             if (this.ribbonOutsideHandler) {
-                document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
                 this.ribbonOutsideHandler = null;
             }
         };
@@ -299,7 +299,7 @@ export class TimelineComponent {
 
     public render(): void {
         if (this.ribbonOutsideHandler) {
-            document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
             this.ribbonOutsideHandler = null;
         }
         this.container.empty();
@@ -596,7 +596,7 @@ export class TimelineComponent {
 
     private showTooltip(e: MouseEvent, task: Task, isRecurring: boolean): void {
         if (!this.tooltipEl) {
-            this.tooltipEl = document.body.createDiv('dashboard-tooltip');
+            this.tooltipEl = activeDocument.body.createDiv('dashboard-tooltip');
         }
         this.tooltipEl.empty();
         this.tooltipEl.createDiv('tooltip-title').setText(task.title);
@@ -645,7 +645,7 @@ export class TimelineComponent {
         this.tooltipEl?.remove();
         this.tooltipEl = null;
         if (this.ribbonOutsideHandler) {
-            document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
             this.ribbonOutsideHandler = null;
         }
     }
