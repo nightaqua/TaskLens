@@ -356,6 +356,8 @@ export class DashboardView extends ItemView implements RefreshableView {
                 text: label,
             });
             btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            btn.setAttribute('aria-label', `Toggle ${label} view`);
+            btn.setAttribute('title', `Toggle ${label} view`);
             btn.addEventListener('click', () => {
                 setter(!getter());
                 this.app.workspace.requestSaveLayout();
