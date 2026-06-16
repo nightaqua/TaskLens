@@ -62,7 +62,7 @@ export class WelcomeModal extends Modal {
         const textDiv = row.createDiv('step-text');
         const titleEl = textDiv.createEl('h3', { text: title });
         titleEl.setCssProps({ margin: '0 0 4px 0', 'font-size': '1.1em' });
-        const descEl = textDiv.createEl('span', { text: desc, cls: 'text-muted' });
+        const descEl = textDiv.createSpan({ text: desc, cls: 'text-muted' });
         descEl.setCssProps({ 'font-size': '0.9em', 'line-height': '1.4' });
     }
 
