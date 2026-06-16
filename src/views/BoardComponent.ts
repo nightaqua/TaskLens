@@ -67,6 +67,10 @@ export class BoardComponent {
             colEl.addEventListener('drop', this.onDrop);
         });
 
+        // Track task counts per column
+        const columnCounts: Record<string, number> = {};
+        Object.keys(this.columns).forEach(id => { columnCounts[id] = 0; });
+
         // Add tasks to columns
         groups.forEach(group => {
             let status = getTaskStatus(group.representative);
@@ -77,7 +81,16 @@ export class BoardComponent {
                 // This should not happen with current logic, but handle gracefully
                 return;
             }
+            columnCounts[status]++;
             this.renderTaskCard(col, group);
+        });
+
+        // Render empty states for empty columns
+        Object.entries(this.columns).forEach(([id, col]) => {
+            if (col && columnCounts[id] === 0) {
+                const empty = col.createDiv('dashboard-empty-state');
+                empty.createEl('p', { text: 'No tasks' });
+            }
         });
     }
 

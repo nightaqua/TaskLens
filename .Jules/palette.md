@@ -8,3 +8,7 @@
 ## 2026-04-12 - Unified ARIA labels for UI chips
 **Learning:** When grouping multiple visual elements (like an icon and text) into a single logical UI component like a chip, labeling individual child elements causes poor screen reader and tooltip experience.
 **Action:** Always apply unified `aria-label` and `title` attributes to the parent container to create a single, comprehensive hover target and screen reader announcement.
+## 2024-05-24 - Added empty states for the Board view
+
+**Learning:** Obsidian `setCssProps` only works for setting CSS variable values in custom properties rather than setting standard inline styles like padding or min-height. The codebase uses `dashboard-empty-state` class to provide an empty state layout, which can just be used.
+**Action:** When working on Obsidian styling, stick to adding classes that are already defined in css instead of trying to manipulate inline properties using `setCssProps`.
