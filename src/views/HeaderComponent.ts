@@ -144,7 +144,7 @@ export class HeaderComponent {
         refreshBtn.addEventListener('click', () => {
             refreshBtn.addClass('is-rotating');
             this.onRefresh();
-            setTimeout(() => { refreshBtn.removeClass('is-rotating'); }, 1000);
+            activeWindow.setTimeout(() => { refreshBtn.removeClass('is-rotating'); }, 1000);
         });
 
         const hideBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });

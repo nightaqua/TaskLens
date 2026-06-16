@@ -134,7 +134,7 @@ private readonly onDrop = (e: DragEvent): void => {
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', task.id);
             }
-            setTimeout(() => {
+            activeWindow.setTimeout(() => {
                 card.setCssProps({ opacity: '0.5' });
             }, 0);
         });

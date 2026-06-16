@@ -65,9 +65,9 @@ export class TimelineView extends ItemView implements RefreshableView {
         const rendered = this.timelineComponent;
         if (!rendered) return;
         if (this.hasOpenedOnce) {
-            setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+            activeWindow.setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
         } else {
-            setTimeout(() => { rendered.scrollToToday(); }, 300);
+            activeWindow.setTimeout(() => { rendered.scrollToToday(); }, 300);
         }
     }
 
@@ -97,9 +97,9 @@ export class TimelineView extends ItemView implements RefreshableView {
             if (!rendered) return;
             if (!this.hasOpenedOnce) {
                 this.hasOpenedOnce = true;
-                setTimeout(() => { rendered.scrollToToday(); }, 500);
+                activeWindow.setTimeout(() => { rendered.scrollToToday(); }, 500);
             } else {
-                setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+                activeWindow.setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
             }
         });
 
@@ -156,11 +156,11 @@ export class TimelineView extends ItemView implements RefreshableView {
         );
         this.timelineComponent.render();
 
-        // Restore pan position after DOM rebuild — setTimeout lets layout settle first.
+        // Restore pan position after DOM rebuild — activeWindow.setTimeout lets layout settle first.
         // Captured in a local const so the closure holds a guaranteed non-null reference.
         const rendered = this.timelineComponent;
         if (this.savedScrollLeft > 0) {
-            setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+            activeWindow.setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
         }
     }
 

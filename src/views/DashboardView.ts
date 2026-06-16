@@ -67,7 +67,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private statsCompletionFormat: 'all' | 'today' = 'all';
 
     private timelineDaysToShow: number = 10;
-    private renderTimer: ReturnType<typeof setTimeout> | null = null;
+    private renderTimer: ReturnType<typeof activeWindow.setTimeout> | null = null;
 
     // Tracks scroll position so re-renders don't jump the timeline,
     // unless a forced scroll-to-today is requested
@@ -76,9 +76,9 @@ export class DashboardView extends ItemView implements RefreshableView {
     private forceScrollToToday: boolean = false;
 
     private readonly onTasksUpdated = (): void => {
-        if (this.renderTimer) clearTimeout(this.renderTimer);
+        if (this.renderTimer) activeWindow.clearTimeout(this.renderTimer);
 
-        this.renderTimer = setTimeout(() => {
+        this.renderTimer = activeWindow.setTimeout(() => {
             if (this.timelineComponent && !this.forceScrollToToday) {
                 this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
                 this.lastViewportStart = this.timelineComponent.getViewportStart();
@@ -154,7 +154,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.render();
 
         // Delay scroll until the timeline DOM is ready
-        setTimeout(() => {
+        activeWindow.setTimeout(() => {
             if (this.timelineComponent) this.timelineComponent.scrollToToday();
         }, 500);
     }
@@ -190,7 +190,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         void this.taskManager.loadTasks().then(() => {
             this.render();
             this.forceScrollToToday = true;
-            setTimeout(() => {
+            activeWindow.setTimeout(() => {
                 if (this.timelineComponent) {
                     this.timelineComponent.scrollToToday();
                 }

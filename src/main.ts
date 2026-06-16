@@ -76,7 +76,7 @@ export default class TaskLensPlugin extends Plugin {
 
         // Delay welcome modal slightly so Obsidian's own UI finishes loading first
         if (!this.settings.hasSeenWelcome) {
-            setTimeout(() => { new WelcomeModal(this.app, this).open(); }, 1000);
+            activeWindow.setTimeout(() => { new WelcomeModal(this.app, this).open(); }, 1000);
         }
 
         this.addSettingTab(new SettingsTab(this.app, this));
