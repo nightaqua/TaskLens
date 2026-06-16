@@ -605,7 +605,7 @@ export class TimelineComponent {
             this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${TaskManager.formatDisplayDate(task.dueDate)}`);
         }
         if (isRecurring) {
-            this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 recurring');
+            this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 Recurring');
         }
         if (task.notes) {
             this.tooltipEl.createDiv('tooltip-notes').setText(task.notes);

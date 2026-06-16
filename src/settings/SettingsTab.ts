@@ -57,7 +57,7 @@ export class SettingsTab extends PluginSettingTab {
 
         const scanPathsSetting = new Setting(scanDetails)
             .setName('Scan paths')
-            .setDesc('Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
+            .setDesc('Folders (e.g. Uni/math)\nor specific files (e.g. Projects/todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
             .addTextArea(text => {
                 text.inputEl.setAttribute("aria-label", "Scan paths");
                 text.inputEl.setAttribute("title", "Scan paths");
