@@ -281,7 +281,6 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         // Left side: status and topic filter dropdowns
         const filtersDiv = controls.createDiv('filters-wrapper');
-        filtersDiv.setCssProps({ display: 'flex', gap: '12px', 'flex-wrap': 'wrap' });
 
         const statusGroup = filtersDiv.createDiv('control-group');
         statusGroup.createEl('label', { text: 'Show:', attr: { for: 'dashboard-status-filter' } });
@@ -340,7 +339,6 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         // Right side: section visibility toggles
         const actionsDiv = controls.createDiv('actions-wrapper');
-        actionsDiv.setCssProps({ display: 'flex', gap: '12px', 'align-items': 'center' });
 
         const toggles = [
             { label: 'Timeline', getter: () => this.showTimeline, setter: (v: boolean) => { this.showTimeline = v; } },

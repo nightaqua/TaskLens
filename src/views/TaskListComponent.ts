@@ -57,8 +57,8 @@ export class TaskListComponent {
         const taskEl = container.createDiv({ cls: ['task-item'] });
 
         if (this.settings.colorMode === 'course' && task.fileName) {
-            // --- USES SHARED HELPER ---
-            taskEl.setCssProps({ 'border-left-color': getTopicColor(task.fileName, this.settings) });
+            taskEl.setCssProps({ '--tl-task-color': getTopicColor(task.fileName, this.settings) });
+            taskEl.addClass('has-topic-color');
         } else {
             const status = getTaskStatus(task);
             if (status === TaskStatus.Overdue) taskEl.addClass('status-overdue');

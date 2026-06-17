@@ -357,18 +357,18 @@ export class TimelineComponent {
 
         // CSS grid for day columns — row 1 is the date header, rows 2+ hold task bars
         const grid = scrollContent.createDiv('timeline-grid');
-        grid.setCssProps({ 'grid-template-columns': `repeat(${String(allDays.length)}, 1fr)` });
+        grid.setCssProps({ '--tl-days': String(allDays.length) });
 
         allDays.forEach((day, idx) => {
             // Day number + weekday label in the header row
             const cell = grid.createDiv('timeline-header-cell');
             cell.setText(day.getDate().toString());
             cell.createDiv('timeline-day-name').setText(day.toLocaleString('default', { weekday: 'short' }));
-            cell.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '1' });
+            cell.setCssProps({ '--tl-col': String(idx + 1) });
 
             // Background column cell spanning all task rows
             const bgCell = grid.createDiv('timeline-bg-cell');
-            bgCell.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '2 / -1' });
+            bgCell.setCssProps({ '--tl-col': String(idx + 1) });
 
             if (day.getDate() === 1) {
                 cell.addClass('is-month-start');
@@ -381,7 +381,7 @@ export class TimelineComponent {
 
                 // Vertical line marking today across all rows
                 const marker = grid.createDiv('timeline-today-marker');
-                marker.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '1 / -1' });
+                marker.setCssProps({ '--tl-col': String(idx + 1) });
             }
         });
 
@@ -445,7 +445,7 @@ export class TimelineComponent {
                 rowEndTimes.push(taskEnd.getTime());
 
                 const rowBg = grid.createDiv('timeline-row-bg');
-                rowBg.setCssProps({ 'grid-column': '1 / -1', 'grid-row': String(rowIndex + 2) });
+                rowBg.setCssProps({ '--tl-row': String(rowIndex + 2) });
             } else {
                 rowEndTimes[rowIndex] = taskEnd.getTime();
             }
@@ -459,9 +459,9 @@ export class TimelineComponent {
             bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
             bar.setAttribute('title', `Open task in editor: ${task.title}`);
             bar.setCssProps({
-                'grid-column-start': String(startIdx + 1),
-                'grid-column-end': `span ${String((dueIdx - startIdx) + 1)}`,
-                'grid-row': String(rowIndex + 2)
+                '--tl-col-start': String(startIdx + 1),
+                '--tl-col-span': String((dueIdx - startIdx) + 1),
+                '--tl-row': String(rowIndex + 2)
             });
 
             if (taskStart < allDays[0]) bar.addClass('is-clamped-left');
@@ -469,7 +469,8 @@ export class TimelineComponent {
 
             // Colour by course/topic or by urgency status depending on settings
             if (this.settings.colorMode === 'course' && task.fileName) {
-                bar.setCssProps({ 'background-color': getTopicColor(task.fileName, this.settings) });
+                bar.setCssProps({ '--tl-task-color': getTopicColor(task.fileName, this.settings) });
+                bar.addClass('has-topic-color');
             } else {
                 const statusClass: Record<string, string> = {
                     [TaskStatus.Overdue]: 'status-overdue',

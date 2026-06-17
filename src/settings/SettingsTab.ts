@@ -180,21 +180,12 @@ export class SettingsTab extends PluginSettingTab {
         containerEl.createEl('br');
         containerEl.createEl('hr');
 
-        const supportDiv = containerEl.createDiv();
-        supportDiv.setCssProps({
-            'text-align': 'center',
-            'margin-top': '20px',
-            'margin-bottom': '20px'
-        });
+        const supportDiv = containerEl.createDiv('settings-support-section');
 
         // The weak gray, centered text
-        const supportText = supportDiv.createEl('p', {
-            text: 'If this dashboard helps you stay organized, consider supporting its development!'
-        });
-        supportText.setCssProps({
-            'color': 'var(--text-muted)',
-            'font-size': '0.9em',
-            'margin-bottom': '12px'
+        supportDiv.createEl('p', {
+            text: 'If this dashboard helps you stay organized, consider supporting its development!',
+            cls: 'settings-support-text'
         });
 
         const bmcLink = supportDiv.createEl('a', {
@@ -260,18 +251,16 @@ export class SettingsTab extends PluginSettingTab {
     }
 
     private renderTopicColors(container: HTMLElement): void {
-        const helperText = container.createEl('p', {
+        container.createEl('p', {
             text: 'Assign a custom color to each of your active topics.',
-            cls: 'text-muted'
+            cls: ['text-muted', 'color-picker-helper']
         });
-        helperText.setCssProps({ 'margin-left': '14px', 'margin-bottom': '12px', 'font-size': '0.9em' });
 
         const allTasks = this.plugin.taskManager.getAllTasks();
         const uniqueTopics = Array.from(new Set(allTasks.map(t => t.fileName).filter((t): t is string => Boolean(t))));
 
         if (uniqueTopics.length === 0) {
-            const emptyText = container.createEl('p', { text: 'No active topics found. Add some tasks first!' });
-            emptyText.setCssProps({ 'margin-left': '14px', 'font-style': 'italic' });
+            container.createEl('p', { text: 'No active topics found. Add some tasks first!', cls: 'color-picker-empty' });
             return;
         }
 

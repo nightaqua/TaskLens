@@ -29,13 +29,6 @@ export class BoardComponent {
         }
 
         const boardContainer = this.container.createDiv('dashboard-board');
-        boardContainer.setCssProps({
-            display: 'flex',
-            gap: '16px',
-            'overflow-x': 'auto',
-            'padding-bottom': '16px',
-            'min-height': '300px'
-        });
 
         const columnsData = [
             { id: TaskStatus.UpcomingWeek, title: 'Active' },
@@ -46,24 +39,9 @@ export class BoardComponent {
 
         columnsData.forEach(colData => {
             const colEl = boardContainer.createDiv('board-column');
-            colEl.setCssProps({
-                flex: '1 1 280px',
-                'min-width': '280px',
-                background: 'var(--background-secondary)',
-                'border-radius': '8px',
-                padding: '12px',
-                display: 'flex',
-                'flex-direction': 'column',
-                gap: '8px'
-            });
             colEl.dataset.status = colData.id;
 
             const header = colEl.createDiv('board-column-header');
-            header.setCssProps({
-                'font-weight': '600',
-                'margin-bottom': '8px',
-                color: 'var(--text-normal)'
-            });
             header.setText(colData.title);
 
             this.columns[colData.id] = colEl;
@@ -113,25 +91,16 @@ private readonly onDrop = (e: DragEvent): void => {
         const card = container.createDiv('board-task-card');
 
         card.setAttribute('draggable', 'true');
-        card.setCssProps({
-            background: 'var(--background-primary)',
-            border: '1px solid var(--background-modifier-border)',
-            'border-radius': '6px',
-            padding: '10px',
-            cursor: 'grab',
-            display: 'flex',
-            'flex-direction': 'column',
-            gap: '6px'
-        });
 
         if (this.settings.colorMode === 'course' && task.fileName) {
-            card.setCssProps({ 'border-left': `4px solid ${getTopicColor(task.fileName, this.settings)}` });
+            card.setCssProps({ '--tl-task-color': getTopicColor(task.fileName, this.settings) });
+            card.addClass('has-topic-color');
         } else {
             const status = getTaskStatus(task);
-            if (status === TaskStatus.Overdue) card.setCssProps({ 'border-left': '4px solid var(--color-red)' });
-            if (status === TaskStatus.Urgent) card.setCssProps({ 'border-left': '4px solid var(--color-orange)' });
-            if (status === TaskStatus.Completed) card.setCssProps({ 'border-left': '4px solid var(--color-blue)', opacity: '0.7' });
-            if (status === TaskStatus.UpcomingWeek) card.setCssProps({ 'border-left': '4px solid var(--color-green)' });
+            if (status === TaskStatus.Overdue) card.addClass('board-status-overdue');
+            if (status === TaskStatus.Urgent) card.addClass('board-status-urgent');
+            if (status === TaskStatus.Completed) card.addClass('board-status-completed');
+            if (status === TaskStatus.UpcomingWeek) card.addClass('board-status-active');
         }
 
         card.addEventListener('dragstart', (e) => {
@@ -141,51 +110,29 @@ private readonly onDrop = (e: DragEvent): void => {
                 e.dataTransfer.setData('text/plain', task.id);
             }
             window.setTimeout(() => {
-                card.setCssProps({ opacity: '0.5' });
+                card.addClass('is-dragging');
             }, 0);
         });
 
         card.addEventListener('dragend', () => {
             this.draggedTaskGroup = null;
-            card.setCssProps({ opacity: '1' });
+            card.removeClass('is-dragging');
         });
 
         // Content
         const titleRow = card.createDiv('board-task-title');
-        titleRow.setCssProps({
-            'font-size': '0.95em',
-            'font-weight': '500',
-            'line-height': '1.3'
-        });
         titleRow.setText(task.title);
 
         const meta = card.createDiv('board-task-meta');
-        meta.setCssProps({
-            display: 'flex',
-            'flex-wrap': 'wrap',
-            gap: '6px',
-            'font-size': '0.8em',
-            color: 'var(--text-muted)'
-        });
 
         if (task.fileName) {
             const courseLabel = meta.createDiv('board-task-course');
             courseLabel.setText(task.fileName);
-            courseLabel.setCssProps({
-                background: 'var(--background-secondary-alt)',
-                padding: '2px 6px',
-                'border-radius': '4px'
-            });
         }
 
         if (task.dueDate) {
             const dateLabel = meta.createDiv('board-task-date');
             dateLabel.setText(TaskManager.formatDisplayDate(task.dueDate));
-            dateLabel.setCssProps({
-                background: 'var(--background-secondary-alt)',
-                padding: '2px 6px',
-                'border-radius': '4px'
-            });
         }
 
         if (group.isRecurring) {
@@ -196,14 +143,6 @@ private readonly onDrop = (e: DragEvent): void => {
             const recurringChip = meta.createDiv('board-task-recurring-chip');
             recurringChip.setAttribute('aria-label', label);
             recurringChip.setAttribute('title', label);
-            recurringChip.setCssProps({
-                display: 'flex',
-                'align-items': 'center',
-                gap: '2px',
-                background: 'var(--background-secondary-alt)',
-                padding: '2px 6px',
-                'border-radius': '4px'
-            });
             const icon = recurringChip.createSpan();
             setIcon(icon, 'repeat');
             if (group.doneCount > 0) {
