@@ -166,7 +166,7 @@ export class HeaderComponent {
             type: 'text',
             value: this.title,
             cls: 'dashboard-title-input',
-            attr: { 'aria-label': 'Edit dashboard title' }
+            attr: { 'aria-label': 'Edit dashboard title', title: 'Edit dashboard title' }
         });
 
         input.focus();
