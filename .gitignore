@@ -37,6 +37,8 @@ docs/announcement-*.md
 
 # --- Testing ---
 coverage/
+# ESLint report written by the code-quality agent (repo-local, never commit)
+eslint-report.json
 
 # --- Temporary ---
 tmp/
@@ -46,6 +48,8 @@ temp/
 .jules/
 .Jules/
 .iloom/
+# Scheduled-agent transient run-lock (never commit)
+.agents/.lock
 
 # TypeScript incremental build info
 tsconfig.tsbuildinfo

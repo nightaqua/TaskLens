@@ -56,15 +56,15 @@ Seed list of feature ideas and research directions. The Feature Agent works thro
 
 Agents should periodically study these for patterns, UX ideas, and integration opportunities:
 
-| Plugin | Author / Repo | Focus |
-|--------|--------------|-------|
-| tasknotes | callumalpass | How it models recurring tasks and date handling |
-| taskgenius-plugin | — | Feature set comparison, UX patterns |
-| TaskForge | — | Board/kanban UX, status model |
-| obsidian-tasks | — | The incumbent; what users expect; parsing conventions |
-| obsidian-tasklens fork | suzutan | What the fork changed — potential upstream cherry-picks |
+| Plugin | Author / Repo | Focus | Last verified | Failed fetches |
+|--------|--------------|-------|---------------|----------------|
+| tasknotes | callumalpass | How it models recurring tasks and date handling | — | 0 |
+| taskgenius-plugin | — | Feature set comparison, UX patterns | — | 0 |
+| TaskForge | — | Board/kanban UX, status model | — | 0 |
+| obsidian-tasks | — | The incumbent; what users expect; parsing conventions | — | 0 |
+| obsidian-tasklens fork | suzutan | What the fork changed — potential upstream cherry-picks | — | 0 |
 
-**Research procedure:** Don't just list features. For each competitor, note: (1) what they do better than TaskLens, (2) what TaskLens does better, (3) one concrete thing we could borrow without breaking our architecture.
+**Research procedure:** Don't just list features. For each competitor, note: (1) what they do better than TaskLens, (2) what TaskLens does better, (3) one concrete thing we could borrow without breaking our architecture. Research each target **at most once per 30 days** (per `feature-agent/PROMPT.md` §6) and update its **"Last verified"** date when you do. If a fetch fails, increment **"Failed fetches"**; after **2 consecutive failures**, drop the target (strike it through and note it dead) rather than chasing a dead link every run.
 
 ---
 
