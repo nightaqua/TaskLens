@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.1]
+
+### Fixes & compliance
+
+- **Inline styles removed.** All remaining `el.style.*` mutations replaced with CSS classes and custom properties — required for Obsidian community plugin review.
+- **minAppVersion bumped to 1.13.0.** Required to use the `setDestructive()` menu API introduced in that release.
+- **License restored.** PolyForm Noncommercial 1.0.0 license file was inadvertently overwritten; restored to correct text.
+- **Duplicate CSS focus rule removed.** A stray duplicate `.tasklens-input:focus` rule in `styles.css` was eliminated.
+- **ESLint sentence-case fixes.** UI-facing strings now consistently use sentence case throughout all views and modals, satisfying the `obsidianmd/prefer-sentence-case` lint rule.
+
+### Dependencies
+
+- `@types/node` `25.0` → `25.9`
+- `esbuild` `0.28.0` → latest patch
+- `eslint` `10.2` → `10.5`
+- `@typescript-eslint` `8.58` → `8.61`
+- `vitest` `4.1.2` → `4.1.9`
+- `typescript` `5.x` → `6.0`
+
+---
+
 ## [1.3.0]
 
 ### New features
