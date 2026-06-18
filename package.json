@@ -20,7 +20,7 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.4",
-    "@eslint/json": "^1.2.0",
+    "@eslint/json": "^2.0.0",
     "@types/node": "^25.9.3",
     "@typescript-eslint/parser": "^8.61.1",
     "esbuild": "^0.28.0",
