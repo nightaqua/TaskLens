@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.2]
+
+### Fixes & compliance
+
+- **CSS `!important` cleanup.** Removed ~33 redundant `!important` declarations from `styles.css`. Selectors already win by specificity or source order; the seven remaining instances (Obsidian chrome `display: none` overrides) are intentional and unchanged.
+- **Duplicate padding rule removed.** A second `.tasklens-dashboard-content { padding: 12px }` block that conflicted with the first was eliminated; the canonical value is now `12px` in a single rule.
+- **License metadata corrected.** `package.json` now uses the proper SPDX identifier `PolyForm-Noncommercial-1.0.0`.
+- **Release notes.** The GitHub release workflow now extracts the relevant CHANGELOG section and includes it as the release body.
+- **README typo fixed.** "by each widget to your liking" → "by customizing each widget to your liking".
+
+---
+
 ## [1.3.1]
 
 ### Fixes & compliance

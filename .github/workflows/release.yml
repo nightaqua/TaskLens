@@ -46,9 +46,18 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Extract changelog entry
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          BODY=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
       - name: Release
         uses: softprops/action-gh-release@v3
         with:
+          body: ${{ steps.changelog.outputs.body }}
           files: |
             main.js
             manifest.json

@@ -36,7 +36,7 @@ TaskLens operates entirely from a single, unified Ribbon Icon (the magnifying gl
 3. **Lock/Unlock Layout:** Toggle this to drag and drop widgets around your screen. Lock it to hide the tabs for a clean look. **Customize and place the windows however you like and whatever size!**
 4. **Enter Focus Mode:** Temporarily hides all widgets so you can write
 
-Create your own version of the TaskLens dashboard by each widget to your liking.
+Create your own version of the TaskLens dashboard by customizing each widget to your liking.
 
 ## Gallery
 
