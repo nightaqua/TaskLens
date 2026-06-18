@@ -36,8 +36,8 @@ type WorkspaceWithSplits = {
 };
 
 export default class TaskLensPlugin extends Plugin {
-    settings: SemesterSettings;
-    taskManager: TaskManager;
+    settings!: SemesterSettings;
+    taskManager!: TaskManager;
     isLayoutLocked: boolean = true;
     isFocusMode: boolean = false;
 
@@ -76,7 +76,7 @@ export default class TaskLensPlugin extends Plugin {
 
         // Delay welcome modal slightly so Obsidian's own UI finishes loading first
         if (!this.settings.hasSeenWelcome) {
-            setTimeout(() => { new WelcomeModal(this.app, this).open(); }, 1000);
+            window.setTimeout(() => { new WelcomeModal(this.app, this).open(); }, 1000);
         }
 
         this.addSettingTab(new SettingsTab(this.app, this));
@@ -97,7 +97,7 @@ export default class TaskLensPlugin extends Plugin {
     }
 
     private setupRibbonIcon(): void {
-        const ribbonIconEl = this.addRibbonIcon(ICON_NAME, 'Tasklens', async (evt: MouseEvent) => {
+        const ribbonIconEl = this.addRibbonIcon(ICON_NAME, 'TaskLens', async (evt: MouseEvent) => {
             ribbonIconEl.removeClass(CLASS_FEATURE_HIGHLIGHT);
 
             if (!this.settings.hasClickedRibbonIcon) {

@@ -67,7 +67,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private statsCompletionFormat: 'all' | 'today' = 'all';
 
     private timelineDaysToShow: number = 10;
-    private renderTimer: ReturnType<typeof setTimeout> | null = null;
+    private renderTimer: number | null = null;
 
     // Tracks scroll position so re-renders don't jump the timeline,
     // unless a forced scroll-to-today is requested
@@ -76,9 +76,9 @@ export class DashboardView extends ItemView implements RefreshableView {
     private forceScrollToToday: boolean = false;
 
     private readonly onTasksUpdated = (): void => {
-        if (this.renderTimer) clearTimeout(this.renderTimer);
+        if (this.renderTimer) window.clearTimeout(this.renderTimer);
 
-        this.renderTimer = setTimeout(() => {
+        this.renderTimer = window.setTimeout(() => {
             if (this.timelineComponent && !this.forceScrollToToday) {
                 this.lastTimelineScroll = this.timelineComponent.getScrollPosition();
                 this.lastViewportStart = this.timelineComponent.getViewportStart();
@@ -120,7 +120,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     }
 
     getViewType(): string { return VIEW_TYPE_DASHBOARD; }
-    getDisplayText(): string { return 'Tasklens dashboard'; }
+    getDisplayText(): string { return 'TaskLens dashboard'; }
     getIcon(): string { return 'layout-dashboard'; }
 
     async setState(state: unknown, result: ViewStateResult): Promise<void> {
@@ -154,7 +154,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.render();
 
         // Delay scroll until the timeline DOM is ready
-        setTimeout(() => {
+        window.setTimeout(() => {
             if (this.timelineComponent) this.timelineComponent.scrollToToday();
         }, 500);
     }
@@ -190,7 +190,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         void this.taskManager.loadTasks().then(() => {
             this.render();
             this.forceScrollToToday = true;
-            setTimeout(() => {
+            window.setTimeout(() => {
                 if (this.timelineComponent) {
                     this.timelineComponent.scrollToToday();
                 }
@@ -281,7 +281,6 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         // Left side: status and topic filter dropdowns
         const filtersDiv = controls.createDiv('filters-wrapper');
-        filtersDiv.setCssProps({ display: 'flex', gap: '12px', 'flex-wrap': 'wrap' });
 
         const statusGroup = filtersDiv.createDiv('control-group');
         statusGroup.createEl('label', { text: 'Show:', attr: { for: 'dashboard-status-filter' } });
@@ -340,7 +339,6 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         // Right side: section visibility toggles
         const actionsDiv = controls.createDiv('actions-wrapper');
-        actionsDiv.setCssProps({ display: 'flex', gap: '12px', 'align-items': 'center' });
 
         const toggles = [
             { label: 'Timeline', getter: () => this.showTimeline, setter: (v: boolean) => { this.showTimeline = v; } },
@@ -356,6 +354,8 @@ export class DashboardView extends ItemView implements RefreshableView {
                 text: label,
             });
             btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            btn.setAttribute('aria-label', `Toggle ${label} view`);
+            btn.setAttribute('title', `Toggle ${label} view`);
             btn.addEventListener('click', () => {
                 setter(!getter());
                 this.app.workspace.requestSaveLayout();

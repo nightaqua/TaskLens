@@ -57,8 +57,10 @@ export class SettingsTab extends PluginSettingTab {
 
         const scanPathsSetting = new Setting(scanDetails)
             .setName('Scan paths')
-            .setDesc('Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
+            .setDesc('Folders (e.g. Uni/math)\nor specific files (e.g. Projects/todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
             .addTextArea(text => {
+                text.inputEl.setAttribute("aria-label", "Scan paths");
+                text.inputEl.setAttribute("title", "Scan paths");
                 text.setPlaceholder('Projects\nUni/History\nTo-Do.md')
                     .setValue(this.plugin.settings.scanFolders.join('\n'))
                     .onChange((value) => {
@@ -95,18 +97,47 @@ export class SettingsTab extends PluginSettingTab {
         new Setting(parserDetails)
             .setName('Start key')
             .setDesc('Inline text used to find the start date. Example: [start:: 2026-02-02]')
-            .addText(t => t.setValue(this.plugin.settings.startDateKey).onChange(v => {
+            .addText(t => {
+                t.inputEl.setAttribute("aria-label", "Start key");
+                t.inputEl.setAttribute("title", "Start key");
+                return t.setValue(this.plugin.settings.startDateKey).onChange(v => {
                 this.plugin.settings.startDateKey = v;
                 void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
-            }));
+            });
+            });
 
         new Setting(parserDetails)
             .setName('Due key')
             .setDesc('Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]')
-            .addText(t => t.setValue(this.plugin.settings.dueDateKey).onChange(v => {
+            .addText(t => {
+                t.inputEl.setAttribute("aria-label", "Due key");
+                t.inputEl.setAttribute("title", "Due key");
+                return t.setValue(this.plugin.settings.dueDateKey).onChange(v => {
                 this.plugin.settings.dueDateKey = v;
                 void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
-            }));
+            });
+            });
+
+        new Setting(parserDetails)
+            .setName('Course detection')
+            .setDesc('How to determine a task\'s course or topic name.')
+            .addDropdown(d => {
+                d.selectEl.setAttribute("aria-label", "Course detection");
+                d.selectEl.setAttribute("title", "Course detection");
+                return d
+                .addOption('per-file', 'File name')
+                .addOption('per-folder', 'Folder name')
+                .addOption('frontmatter', 'Frontmatter field')
+                .setValue(this.plugin.settings.courseDetection)
+                .onChange((v) => {
+                    this.plugin.settings.courseDetection = v as 'per-file' | 'per-folder' | 'frontmatter';
+                    void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                    this.renderFrontmatterKeyField(frontmatterKeyContainer);
+                });
+            });
+
+        const frontmatterKeyContainer = parserDetails.createDiv();
+        this.renderFrontmatterKeyField(frontmatterKeyContainer);
 
         const uiDetails = containerEl.createEl('details');
         uiDetails.open = this.plugin.settings.settingsTabState.uiOpen;
@@ -118,7 +149,10 @@ export class SettingsTab extends PluginSettingTab {
 
         new Setting(uiDetails)
             .setName('Color mode')
-            .addDropdown(d => d
+            .addDropdown(d => {
+                d.selectEl.setAttribute("aria-label", "Color mode");
+                d.selectEl.setAttribute("title", "Color mode");
+                return d
                 .addOption('status', 'By urgency (overdue, active)')
                 .addOption('course', 'By topic (file palette)')
                 .setValue(this.plugin.settings.colorMode)
@@ -128,7 +162,16 @@ export class SettingsTab extends PluginSettingTab {
                         this.plugin.refreshViews();
                         this.renderColorPickers(colorPickersContainer);
                     });
-                }));
+                });
+            });
+
+        new Setting(uiDetails)
+            .setName('Show task action buttons')
+            .setDesc('Show edit and delete buttons on task hover in the task list.')
+            .addToggle(t => t.setValue(this.plugin.settings.showTaskActions).onChange(v => {
+                this.plugin.settings.showTaskActions = v;
+                void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
+            }));
 
         new Setting(uiDetails)
             .setName('Show task action buttons')
@@ -145,21 +188,12 @@ export class SettingsTab extends PluginSettingTab {
         containerEl.createEl('br');
         containerEl.createEl('hr');
 
-        const supportDiv = containerEl.createDiv();
-        supportDiv.setCssProps({
-            'text-align': 'center',
-            'margin-top': '20px',
-            'margin-bottom': '20px'
-        });
+        const supportDiv = containerEl.createDiv('settings-support-section');
 
         // The weak gray, centered text
-        const supportText = supportDiv.createEl('p', {
-            text: 'If this dashboard helps you stay organized, consider supporting its development!'
-        });
-        supportText.setCssProps({
-            'color': 'var(--text-muted)',
-            'font-size': '0.9em',
-            'margin-bottom': '12px'
+        supportDiv.createEl('p', {
+            text: 'If this dashboard helps you stay organized, consider supporting its development!',
+            cls: 'settings-support-text'
         });
 
         const bmcLink = supportDiv.createEl('a', {
@@ -170,6 +204,27 @@ export class SettingsTab extends PluginSettingTab {
         bmcImg.setAttribute('src', 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png');
         bmcImg.setAttribute('width', '200');
         bmcImg.setAttribute('alt', 'Buy Me A Coffee');
+    }
+
+    private renderFrontmatterKeyField(container: HTMLElement): void {
+        container.empty();
+
+        if (this.plugin.settings.courseDetection === 'frontmatter') {
+            new Setting(container)
+                .setName('Frontmatter key')
+                .setDesc('Frontmatter field name to read the course name from.')
+                .addText(t => {
+                    t.inputEl.setAttribute("aria-label", "Frontmatter key");
+                    t.inputEl.setAttribute("title", "Frontmatter key");
+                    return t
+                    .setPlaceholder('Course')
+                    .setValue(this.plugin.settings.courseFrontmatterKey)
+                    .onChange(v => {
+                        this.plugin.settings.courseFrontmatterKey = v;
+                        void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                    });
+            });
+        }
     }
 
     private renderColorPickers(container: HTMLElement): void {
@@ -204,18 +259,16 @@ export class SettingsTab extends PluginSettingTab {
     }
 
     private renderTopicColors(container: HTMLElement): void {
-        const helperText = container.createEl('p', {
+        container.createEl('p', {
             text: 'Assign a custom color to each of your active topics.',
-            cls: 'text-muted'
+            cls: ['text-muted', 'color-picker-helper']
         });
-        helperText.setCssProps({ 'margin-left': '14px', 'margin-bottom': '12px', 'font-size': '0.9em' });
 
         const allTasks = this.plugin.taskManager.getAllTasks();
         const uniqueTopics = Array.from(new Set(allTasks.map(t => t.fileName).filter((t): t is string => Boolean(t))));
 
         if (uniqueTopics.length === 0) {
-            const emptyText = container.createEl('p', { text: 'No active topics found. Add some tasks first!' });
-            emptyText.setCssProps({ 'margin-left': '14px', 'font-style': 'italic' });
+            container.createEl('p', { text: 'No active topics found. Add some tasks first!', cls: 'color-picker-empty' });
             return;
         }
 

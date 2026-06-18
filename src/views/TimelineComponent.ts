@@ -144,7 +144,7 @@ export class TimelineComponent {
             navHandle.setAttribute('aria-expanded', 'true');
             // Guard: don't double-register
             if (this.ribbonOutsideHandler) {
-                document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
                 this.ribbonOutsideHandler = null;
             }
             const handler = (e: MouseEvent): void => {
@@ -154,12 +154,12 @@ export class TimelineComponent {
                     this.ribbonNavOpen = false;
                     navSection.removeClass('is-open');
                     navHandle.setAttribute('aria-expanded', 'false');
-                    document.removeEventListener('mousedown', handler);
+                    activeDocument.removeEventListener('mousedown', handler);
                     this.ribbonOutsideHandler = null;
                 }
             };
             this.ribbonOutsideHandler = handler;
-            document.addEventListener('mousedown', handler);
+            activeDocument.addEventListener('mousedown', handler);
         };
 
         const closeNav = (): void => {
@@ -167,7 +167,7 @@ export class TimelineComponent {
             navSection.removeClass('is-open');
             navHandle.setAttribute('aria-expanded', 'false');
             if (this.ribbonOutsideHandler) {
-                document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
                 this.ribbonOutsideHandler = null;
             }
         };
@@ -299,7 +299,7 @@ export class TimelineComponent {
 
     public render(): void {
         if (this.ribbonOutsideHandler) {
-            document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
             this.ribbonOutsideHandler = null;
         }
         this.container.empty();
@@ -357,18 +357,18 @@ export class TimelineComponent {
 
         // CSS grid for day columns — row 1 is the date header, rows 2+ hold task bars
         const grid = scrollContent.createDiv('timeline-grid');
-        grid.setCssProps({ 'grid-template-columns': `repeat(${String(allDays.length)}, 1fr)` });
+        grid.setCssProps({ '--tl-days': String(allDays.length) });
 
         allDays.forEach((day, idx) => {
             // Day number + weekday label in the header row
             const cell = grid.createDiv('timeline-header-cell');
             cell.setText(day.getDate().toString());
             cell.createDiv('timeline-day-name').setText(day.toLocaleString('default', { weekday: 'short' }));
-            cell.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '1' });
+            cell.setCssProps({ '--tl-col': String(idx + 1) });
 
             // Background column cell spanning all task rows
             const bgCell = grid.createDiv('timeline-bg-cell');
-            bgCell.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '2 / -1' });
+            bgCell.setCssProps({ '--tl-col': String(idx + 1) });
 
             if (day.getDate() === 1) {
                 cell.addClass('is-month-start');
@@ -381,7 +381,7 @@ export class TimelineComponent {
 
                 // Vertical line marking today across all rows
                 const marker = grid.createDiv('timeline-today-marker');
-                marker.setCssProps({ 'grid-column': String(idx + 1), 'grid-row': '1 / -1' });
+                marker.setCssProps({ '--tl-col': String(idx + 1) });
             }
         });
 
@@ -445,7 +445,7 @@ export class TimelineComponent {
                 rowEndTimes.push(taskEnd.getTime());
 
                 const rowBg = grid.createDiv('timeline-row-bg');
-                rowBg.setCssProps({ 'grid-column': '1 / -1', 'grid-row': String(rowIndex + 2) });
+                rowBg.setCssProps({ '--tl-row': String(rowIndex + 2) });
             } else {
                 rowEndTimes[rowIndex] = taskEnd.getTime();
             }
@@ -459,9 +459,9 @@ export class TimelineComponent {
             bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
             bar.setAttribute('title', `Open task in editor: ${task.title}`);
             bar.setCssProps({
-                'grid-column-start': String(startIdx + 1),
-                'grid-column-end': `span ${String((dueIdx - startIdx) + 1)}`,
-                'grid-row': String(rowIndex + 2)
+                '--tl-col-start': String(startIdx + 1),
+                '--tl-col-span': String((dueIdx - startIdx) + 1),
+                '--tl-row': String(rowIndex + 2)
             });
 
             if (taskStart < allDays[0]) bar.addClass('is-clamped-left');
@@ -469,7 +469,8 @@ export class TimelineComponent {
 
             // Colour by course/topic or by urgency status depending on settings
             if (this.settings.colorMode === 'course' && task.fileName) {
-                bar.setCssProps({ 'background-color': getTopicColor(task.fileName, this.settings) });
+                bar.setCssProps({ '--tl-task-color': getTopicColor(task.fileName, this.settings) });
+                bar.addClass('has-topic-color');
             } else {
                 const statusClass: Record<string, string> = {
                     [TaskStatus.Overdue]: 'status-overdue',
@@ -547,9 +548,11 @@ export class TimelineComponent {
 
     private createNavigationOverlay(direction: 'left' | 'right'): void {
         const overlay = this.container.createDiv(`timeline-nav-overlay nav-${direction}`);
+        const label = `Scroll ${direction}`;
         overlay.setAttribute('role', 'button');
         overlay.setAttribute('tabindex', '0');
-        overlay.setAttribute('aria-label', `Scroll ${direction}`);
+        overlay.setAttribute('aria-label', label);
+        overlay.setAttribute('title', label);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
 
         const triggerScroll = (e: Event) => {
@@ -594,7 +597,7 @@ export class TimelineComponent {
 
     private showTooltip(e: MouseEvent, task: Task, isRecurring: boolean): void {
         if (!this.tooltipEl) {
-            this.tooltipEl = document.body.createDiv('dashboard-tooltip');
+            this.tooltipEl = activeDocument.body.createDiv('dashboard-tooltip');
         }
         this.tooltipEl.empty();
         this.tooltipEl.createDiv('tooltip-title').setText(task.title);
@@ -603,7 +606,7 @@ export class TimelineComponent {
             this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${TaskManager.formatDisplayDate(task.dueDate)}`);
         }
         if (isRecurring) {
-            this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 recurring');
+            this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 Recurring');
         }
         if (task.notes) {
             this.tooltipEl.createDiv('tooltip-notes').setText(task.notes);
@@ -643,7 +646,7 @@ export class TimelineComponent {
         this.tooltipEl?.remove();
         this.tooltipEl = null;
         if (this.ribbonOutsideHandler) {
-            document.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
             this.ribbonOutsideHandler = null;
         }
     }

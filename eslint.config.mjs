@@ -5,7 +5,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
     {
-        ignores: ["main.js", "*.mjs", "node_modules/**", "**/*.json", "__mocks__/**", "vitest.config.ts"]
+        ignores: ["main.js", "*.mjs", "node_modules/**", "**/*.json", "__mocks__/**", "vitest.config.ts", ".claude/**"]
     },
 
     ...obsidianmd.configs.recommended,
@@ -21,7 +21,7 @@ export default defineConfig([
             },
         },
         rules: {
-            "obsidianmd/ui/sentence-case": "warn",
+            "obsidianmd/ui/sentence-case": ["error", { brands: ["TaskLens"], enforceCamelCaseLower: true }],
             "obsidianmd/no-static-styles-assignment": "warn",
         },
     },
@@ -33,7 +33,8 @@ export default defineConfig([
             "@typescript-eslint/no-unsafe-member-access": "off",
             "@typescript-eslint/no-unsafe-call": "off",
             "@typescript-eslint/no-explicit-any": "off",
-            "@typescript-eslint/no-extraneous-class": "off"
+            "@typescript-eslint/no-extraneous-class": "off",
+            "obsidianmd/prefer-active-doc": "off"
         }
     }
 ]);

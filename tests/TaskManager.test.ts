@@ -411,7 +411,7 @@ describe('TaskManager.getStatistics', () => {
                 fileName: 'test',
                 lineNumber: 0,
                 originalText: '- [x] Old task'
-            } as import('../src/models/Task').Task
+            }
         ];
 
         const stats = taskManager.getStatistics();

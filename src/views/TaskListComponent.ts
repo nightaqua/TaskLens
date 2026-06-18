@@ -2,6 +2,7 @@ import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
 import { App, MarkdownView, TFile, setIcon } from 'obsidian';
 import { SemesterSettings, getTopicColor } from '../settings/Settings';
 import { TaskManager } from '../services/TaskManager';
+import { ConfirmModal } from '../modals/ConfirmModal';
 
 /**
  * Opens the source file for a task and moves the editor cursor to its exact line.
@@ -56,8 +57,8 @@ export class TaskListComponent {
         const taskEl = container.createDiv({ cls: ['task-item'] });
 
         if (this.settings.colorMode === 'course' && task.fileName) {
-            // --- USES SHARED HELPER ---
-            taskEl.setCssProps({ 'border-left-color': getTopicColor(task.fileName, this.settings) });
+            taskEl.setCssProps({ '--tl-task-color': getTopicColor(task.fileName, this.settings) });
+            taskEl.addClass('has-topic-color');
         } else {
             const status = getTaskStatus(task);
             if (status === TaskStatus.Overdue) taskEl.addClass('status-overdue');
@@ -98,14 +99,20 @@ export class TaskListComponent {
         // Recurring chip: icon always shown for recurring tasks.
         // ×N badge shows completed cycle count when at least one cycle has been done.
         if (group.isRecurring) {
+            const label = group.doneCount > 0
+                ? `Recurring task, Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`
+                : 'Recurring task';
+
             const recurringChip = meta.createDiv('task-recurring-chip');
+            recurringChip.setAttribute('aria-label', label);
+            recurringChip.setAttribute('title', label);
+
             const icon = recurringChip.createSpan({ cls: 'task-recurring-icon' });
             setIcon(icon, 'repeat');
             if (group.doneCount > 0) {
                 recurringChip.createSpan({
                     text: `×${String(group.doneCount)}`,
-                    cls: 'task-recurrence-count',
-                    attr: { 'aria-label': `Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}` }
+                    cls: 'task-recurrence-count'
                 });
             }
         }
@@ -122,6 +129,7 @@ export class TaskListComponent {
             const editBtn = actionsEl.createEl('button', { cls: 'task-action-btn' });
             setIcon(editBtn, 'pencil');
             editBtn.setAttribute('aria-label', 'Edit task');
+            editBtn.setAttribute('title', 'Edit task');
             editBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.callbacks.onEdit(task);
@@ -129,9 +137,15 @@ export class TaskListComponent {
             const deleteBtn = actionsEl.createEl('button', { cls: ['task-action-btn', 'btn-danger'] });
             setIcon(deleteBtn, 'trash-2');
             deleteBtn.setAttribute('aria-label', 'Delete task');
+            deleteBtn.setAttribute('title', 'Delete task');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.callbacks.onDelete(task);
+                new ConfirmModal(
+                    this.app,
+                    'Delete task',
+                    `Are you sure you want to delete "${task.title}"?`,
+                    () => { this.callbacks.onDelete(task); }
+                ).open();
             });
         }
 

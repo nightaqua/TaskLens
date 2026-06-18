@@ -13,8 +13,6 @@ export class WelcomeModal extends Modal {
         contentEl.addClass(CLASS_WELCOME_MODAL);
 
         const header = contentEl.createDiv('welcome-header');
-        header.setCssProps({ 'text-align': 'center', 'margin-bottom': '20px' });
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- "TaskLens" is a proper noun
         header.createEl('h1', { text: 'Welcome to TaskLens 🚀' });
         header.createEl('p', { text: 'Your command center for tasks, timelines, and projects.', cls: 'text-muted' });
 
@@ -39,8 +37,7 @@ export class WelcomeModal extends Modal {
                 })
             );
 
-        const btnContainer = contentEl.createDiv();
-        btnContainer.setCssProps({ display: 'flex', 'justify-content': 'center', 'margin-top': '15px' });
+        const btnContainer = contentEl.createDiv('welcome-btn-container');
 
         new Setting(btnContainer)
             .addButton(btn => btn
@@ -54,17 +51,13 @@ export class WelcomeModal extends Modal {
 
     private createStep(container: HTMLElement, icon: string, title: string, desc: string): void {
         const row = container.createDiv('welcome-step');
-        row.setCssProps({ display: 'flex', gap: '15px', 'margin-bottom': '15px', 'align-items': 'flex-start', padding: '10px', 'background-color': 'var(--background-secondary)', 'border-radius': '8px' });
 
         const iconEl = row.createDiv('step-icon');
         iconEl.setText(icon);
-        iconEl.setCssProps({ 'font-size': '24px', 'line-height': '1.2' });
 
         const textDiv = row.createDiv('step-text');
-        const titleEl = textDiv.createEl('h3', { text: title });
-        titleEl.setCssProps({ margin: '0 0 4px 0', 'font-size': '1.1em' });
-        const descEl = textDiv.createEl('span', { text: desc, cls: 'text-muted' });
-        descEl.setCssProps({ 'font-size': '0.9em', 'line-height': '1.4' });
+        textDiv.createEl('h3', { text: title });
+        textDiv.createSpan({ text: desc, cls: 'text-muted' });
     }
 
     onClose(): void {
