@@ -18,18 +18,25 @@ You auto-commit **safe, non-behavioral fixes** to `dev`. Any change that could a
 
 ## 0. Before Anything Else
 
-**0.0 — Check for the pause file.** If `.agents/PAUSE` exists, **immediately stop**. Write nothing, commit nothing, exit.
+**0.0 — Check for the pause file.** If `.agents/PAUSE` exists, **immediately stop**: make no commits and no changes to tracked files. The **only** permitted write is a single heartbeat line `2026-06-19 | code-quality | exit: paused` appended to the local-only `.agents/run-log.md`. Then exit.
 
-**0.1 — Loop guard.** Read the last 3 entries in your `notes.md` Run History. If you are about to perform an action (same fix, same file, same flag) that appears in **2 or more** of the last 3 runs, **do not repeat it.** Instead add a `backlog.md` row flagging "repeated action not converging — needs maintainer" and skip it.
+**0.1 — Loop guard.** Read the last 3 entries in your `notes.md` Run History. If you are about to perform an action (same fix, same file, same flag) that appears in **2 or more** of the last 3 runs, **do not repeat it.** Instead add a `backlog.md` row flagging "repeated action not converging — needs maintainer", append `exit: loop-guard` to `run-log.md`, release the lock, and skip it.
 
-**0.2 — Acquire the run lock.** If `.agents/.lock` exists and its timestamp is under **2 hours** old, another agent is running — **exit immediately**. Otherwise create `.agents/.lock` with your agent name and start time; delete it only in Finishing Up. A lock older than 2 hours may be reclaimed.
+**0.2 — Acquire the run lock.** The lock file is `.agents/.lock`; its single line is `<agent-name> | <ISO-8601 timestamp with date AND time>` (e.g. `code-quality | 2026-06-19T02:00:00`).
+- If `.agents/.lock` exists, compare its timestamp to the **current wall-clock time from your run environment** — **not** the date-stamp you use for notes. If the lock is **under 2 hours** old, another agent is running: append `exit: lock-held` to `run-log.md` and **exit immediately**. If it is **2+ hours** old it is stale: record `exit: reclaimed-stale-lock` in `run-log.md`, overwrite it, and proceed.
+- **If you cannot obtain a current wall-clock time**, fall back to the date: a lock dated **today** is fresh (exit); any **earlier date** is stale (reclaim).
+- Write `.agents/.lock` with your agent name and the current ISO timestamp.
+- **Release discipline (treat as a `finally`):** you normally delete the lock in Finishing Up — but if you abort for **any** reason after acquiring it (recovery stop, flag-and-stop, suite failure, loop guard, nothing-to-do), delete `.agents/.lock` before exiting. Only an actual crash should leave it held.
+- The lock is a backstop; the **staggered schedule** (README "Execution Model"; code-quality runs Wed 02:00) is the primary concurrency guarantee.
 
-**0.3 — Clean startup state.** Run `git status`. If the tree is dirty or you're on an unfamiliar branch, follow the startup-cleanup recovery in `README.md`. Then `git checkout dev` and `git pull --rebase origin dev`.
+**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on an unfamiliar branch, follow the startup-cleanup recovery in `README.md`. Then `git checkout dev` and `git pull --rebase origin dev`.
+
+**0.4 — Heartbeat on every exit.** On **every** path out of this run, append one line to the local-only `.agents/run-log.md`: `2026-06-19 | code-quality | exit: <reason>` (`paused` · `lock-held` · `reclaimed-stale-lock` · `loop-guard` · `no-op` · `committed <Ref>` · `flagged <Ref>` · `network-skip`). Gitignored — never commit or stage it.
 
 **Then read these files — every single run:**
 
-1. `.agents/backlog.md` — Is this work already tracked? Don't duplicate.
-2. `.agents/decisions.md` — Has any quality fix been rejected? Match on the `Ref` column first, then prose. If rejected, skip it.
+1. `.agents/backlog.md` — Is this work already tracked? Don't duplicate. A row marked `pending-review` is **waiting on the maintainer** — don't act on it and don't re-propose it.
+2. `.agents/decisions.md` — Has any quality fix been rejected? Match on the `Ref` column first, then prose. If rejected, skip it. **This file is maintainer-owned and read-only to you** — you never write to it. To flag a fix for approval, add a `pending-review` row to `backlog.md` (the maintainer decides via Cowork).
 3. `.agents/code-quality/notes.md` — What did you do last time? What did you defer?
 4. `AGENTS.md` (repo root) — The full code rules. All fixes must conform.
 
@@ -181,14 +188,14 @@ Each hit is a candidate fix. Apply only if the correct alternative is unambiguou
 
 When you find something that needs approval:
 
-1. Add a row to `.agents/backlog.md` (allocate the next free `CQ-` ID per the backlog's ID-allocation rule; cite the relevant file/rule in the `Ref` column):
+1. Add a row to `.agents/backlog.md` with status **`pending-review`** (allocate the next free `CQ-` ID per the backlog's ID-allocation rule; cite the relevant file/rule in the `Ref` column). **Never write to `decisions.md`** — it is maintainer-owned; the maintainer records the verdict there via Cowork.
    ```
-   | CQ-001 | todo | code-quality | Fix control flow in TaskManager.processManualUpdate error path | TaskManager.ts | 2026-06-19 | Behavioral change — needs approval. See code-quality/notes.md |
+   | CQ-001 | pending-review | code-quality | Fix control flow in TaskManager.processManualUpdate error path | TaskManager.ts | 2026-06-19 | Behavioral change — needs approval. See code-quality/notes.md |
    ```
 
 2. In `.agents/code-quality/notes.md`, write a brief explanation of what you found and why you're not auto-committing (include the exact diff for behavioral items).
 
-3. Do NOT open a PR without maintainer signal. The maintainer will pick up the `backlog.md` item and respond.
+3. Do NOT open a PR without maintainer signal. The maintainer reviews the `pending-review` row via Cowork and either approves it (flips to `todo`/`in-progress`, adds an `approved` row to `decisions.md`) or rejects it. While it stays `pending-review`, leave it alone.
 
 ---
 
@@ -215,13 +222,15 @@ When you find something that needs approval:
    fi
    ```
 
-4. **Release the run lock:** delete `.agents/.lock` — last, after the push (or after confirming nothing to commit).
+4. **Append the run-log heartbeat:** add one line to `.agents/run-log.md` — `2026-06-19 | code-quality | exit: <reason>` (e.g. `committed CQ-004`, `flagged CQ-005`, `no-op`). Required every run; never commit or stage it.
+
+5. **Release the run lock:** delete `.agents/.lock` — last, after the push (or after confirming nothing to commit). Per §0.2, the lock must also be released on any early abort path, not just here.
 
 ---
 
 ## 6. When to Do Nothing
 
-**Always run the ESLint / compliance checks first.** *If those come back clean* **and** there are no flagged items remaining in `backlog.md`, it is correct to do nothing — write "No actionable items found" in `notes.md`, commit the notes **only if they changed**, release the lock, and stop. ("Nothing to do" never means "skip the checks" — it means the checks ran and found nothing.) A week with no quality issues is a good week.
+**Always run the ESLint / compliance checks first.** *If those come back clean* **and** there are no flagged items remaining in `backlog.md`, it is correct to do nothing — write "No actionable items found" in `notes.md`, commit the notes **only if they changed**, append `exit: no-op` to `run-log.md`, release the lock, and stop. ("Nothing to do" never means "skip the checks" — it means the checks ran and found nothing.) A week with no quality issues is a good week.
 
 ---
 
@@ -230,3 +239,4 @@ When you find something that needs approval:
 <!-- Date + one line per maintainer edit to this prompt. -->
 
 - 2026-06-19 — Added PAUSE/Loop-Guard/lock/startup-cleanup and `git pull --rebase`; corrected source paths and switched to recursive greps; fixed CSS source to `src/styles.css` (never root); moved `normalizePath()`/`registerEvent()` to flag-for-approval; replaced `/tmp` eslint output with gitignored `eslint-report.json`; literal dates; gated notes commit on real change; notes archival; `CQ-` ID prefix; clarified §6; cite AGENTS.md rules by name.
+- 2026-06-19 (review-2) — Made lock age computable (ISO timestamp + wall-clock source + date fallback); lock release on every abort path; §0.3 stop-don't-stash on foreign merge/rebase; run-log heartbeat on every exit; documented staggered schedule (Wed 02:00); flags now go to `backlog.md` as `pending-review` (Cowork approval), never `decisions.md`.

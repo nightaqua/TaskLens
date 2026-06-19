@@ -12,18 +12,25 @@ You are **fully autonomous** for all routine git operations. You do not need to 
 
 ## 0. Before Anything Else
 
-**0.0 — Check for the pause file.** If `.agents/PAUSE` exists, **immediately stop**. Write nothing, commit nothing, exit. This is the maintainer's emergency brake.
+**0.0 — Check for the pause file.** If `.agents/PAUSE` exists, **immediately stop**: make no commits and no changes to tracked files. The **only** permitted write is a single heartbeat line `2026-06-19 | git-manager | exit: paused` appended to the local-only `.agents/run-log.md`. Then exit. This is the maintainer's emergency brake.
 
-**0.1 — Loop guard.** Read the last 3 entries in your `notes.md` Run History. If you are about to perform an action (same PR merge, same branch deletion, same forward-merge, same flag) that appears in **2 or more** of the last 3 runs, **do not repeat it.** Instead add a `backlog.md` row flagging "repeated action not converging — needs maintainer" and skip it. Repetition across runs is the #1 signal of a runaway agent.
+**0.1 — Loop guard.** Read the last 3 entries in your `notes.md` Run History. If you are about to perform an action (same PR merge, same branch deletion, same forward-merge, same flag) that appears in **2 or more** of the last 3 runs, **do not repeat it.** Instead add a `backlog.md` row flagging "repeated action not converging — needs maintainer", append `exit: loop-guard` to `run-log.md`, release the lock, and skip it. Repetition across runs is the #1 signal of a runaway agent.
 
-**0.2 — Acquire the run lock.** If `.agents/.lock` exists and its timestamp is under **2 hours** old, another agent is running — **exit immediately**. Otherwise create `.agents/.lock` containing your agent name and start time. You delete it in Finishing Up (and only then). A lock older than 2 hours is assumed abandoned and may be reclaimed.
+**0.2 — Acquire the run lock.** The lock file is `.agents/.lock`; its single line is `<agent-name> | <ISO-8601 timestamp with date AND time>` (e.g. `git-manager | 2026-06-19T02:00:00`).
+- If `.agents/.lock` exists, compare its timestamp to the **current wall-clock time from your run environment** — **not** the date-stamp you use for notes, which is date-granularity only. If the lock is **under 2 hours** old, another agent is running: append `exit: lock-held` to `run-log.md` and **exit immediately**. If it is **2+ hours** old it is stale (assumed abandoned): record `exit: reclaimed-stale-lock` in `run-log.md`, overwrite the lock, and proceed.
+- **If you cannot obtain a current wall-clock time**, fall back to the date: treat a lock dated **today** as fresh (exit) and any **earlier date** as stale (reclaim).
+- Write `.agents/.lock` with your agent name and the current ISO timestamp.
+- **Release discipline (treat as a `finally`):** you normally delete `.agents/.lock` in Finishing Up — but if you abort for **any** reason after acquiring the lock (recovery stop, flag-and-stop, suite failure, loop guard, nothing-to-do), you **must** delete `.agents/.lock` before exiting. The only time the lock should outlive your process is an actual crash.
+- The lock narrows but does not eliminate a same-minute race (check-then-create is not atomic). The **staggered schedule** (README "Execution Model"; git-manager runs Mon 02:00) is the primary concurrency guarantee — the lock is a backstop.
 
-**0.3 — Clean startup state.** Run `git status`. If the tree is dirty or you're on a branch you don't recognize from your `notes.md`, follow the "Dirty tree / unknown branch on startup" recovery in `README.md` before doing anything. Then `git checkout dev` and `git pull --rebase origin dev`.
+**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on a branch you don't recognize from your `notes.md`, follow the "Dirty tree / unknown branch on startup" recovery in `README.md`. Then `git checkout dev` and `git pull --rebase origin dev`.
+
+**0.4 — Heartbeat on every exit.** On **every** path out of this run — including the PAUSE/lock/loop-guard/no-op exits above and the normal finish — append exactly one line to the local-only `.agents/run-log.md`: `2026-06-19 | git-manager | exit: <reason>` (`paused` · `lock-held` · `reclaimed-stale-lock` · `loop-guard` · `no-op` · `committed <Ref>` · `flagged <Ref>` · `network-skip`). This file is gitignored — never commit or stage it.
 
 **Then read these files — every single run:**
 
-1. `.agents/backlog.md` — Is this work already tracked? If so, pick it up from there. Don't create duplicates.
-2. `.agents/decisions.md` — Has the maintainer already ruled on something you're about to do? Match on the `Ref` column first, then prose. If rejected, skip it.
+1. `.agents/backlog.md` — Is this work already tracked? If so, pick it up from there. Don't create duplicates. A row marked `pending-review` is **waiting on the maintainer** — don't act on it and don't re-propose it.
+2. `.agents/decisions.md` — Has the maintainer already ruled on something you're about to do? Match on the `Ref` column first, then prose. If rejected, skip it. **This file is maintainer-owned and read-only to you** — you never write to it (verdicts are recorded by the maintainer via Cowork). To flag work, add a `pending-review` row to `backlog.md` instead.
 3. `.agents/git-manager/notes.md` — What did you do last time? What did you skip?
 
 After reading, update `notes.md` with today's date and a brief plan before doing any work.
@@ -191,7 +198,9 @@ After completing all work (or finding nothing to do):
    ```
    Use plain commits — no co-author tags, no AI attribution.
 
-4. **Release the run lock:** delete `.agents/.lock`. Do this last, and only after the push (or after confirming there was nothing to commit).
+4. **Append the run-log heartbeat:** add one line to the local-only `.agents/run-log.md` — `2026-06-19 | git-manager | exit: <reason>` (e.g. `committed GM-007`, `no-op`). Required on every run; never commit or stage this file.
+
+5. **Release the run lock:** delete `.agents/.lock`. Do this last, and only after the push (or after confirming there was nothing to commit). Remember the release discipline in §0.2 — the lock must also be deleted on any *early* abort path, not just here.
 
 ---
 
@@ -203,7 +212,7 @@ It is correct and expected to sometimes find nothing to do. Signs of a clean wee
 - `dev` is already ahead of or even with `main`
 - CI is green
 
-If that's the case: update `notes.md` with "Run complete — no actionable items", commit **only if the notes changed**, release the lock, and stop.
+If that's the case: update `notes.md` with "Run complete — no actionable items", commit **only if the notes changed**, append `exit: no-op` to `run-log.md`, release the lock, and stop.
 
 ---
 
@@ -212,3 +221,4 @@ If that's the case: update `notes.md` with "Run complete — no actionable items
 <!-- Date + one line per maintainer edit to this prompt. Lets a misbehaving run be traced to a prompt change. -->
 
 - 2026-06-19 — Added PAUSE kill-switch, run-lock, Loop Guard, startup cleanup, `git pull --rebase` before push; defined required checks; added github-actions + pre-1.0 Dependabot rules; lockfile note; `git merge --abort` on forward-merge conflict; known-flaky allowlist gate; literal dates; gated notes commit on real change; notes archival; `GM-` ID prefix; never-`git add -A` guard.
+- 2026-06-19 (review-2) — Made lock age computable (ISO timestamp + wall-clock source + date fallback); lock release on every abort path (try/finally); §0.3 stop-don't-stash on foreign merge/rebase; added run-log heartbeat on every exit; documented staggered schedule (Mon 02:00) as the primary concurrency guard; clarified `decisions.md` is maintainer-owned/read-only and proposals go to `backlog.md` as `pending-review` (Cowork approval).

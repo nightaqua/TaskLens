@@ -50,6 +50,10 @@ temp/
 .iloom/
 # Scheduled-agent transient run-lock (never commit)
 .agents/.lock
+# Scheduled-agent emergency kill-switch (local-only control file — never commit)
+.agents/PAUSE
+# Scheduled-agent run heartbeat log (local-only telemetry — never commit)
+.agents/run-log.md
 
 # TypeScript incremental build info
 tsconfig.tsbuildinfo

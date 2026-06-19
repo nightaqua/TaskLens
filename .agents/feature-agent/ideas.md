@@ -66,4 +66,70 @@ Seed list of feature ideas and research directions. The Feature Agent works thro
 
 ## Competitor Research Targets
 
-Agents should periodically s
+Agents should periodically study these for patterns, UX ideas, and integration opportunities:
+
+| Plugin | Author / Repo | Focus | Last verified | Failed fetches |
+|--------|--------------|-------|---------------|----------------|
+| tasknotes | callumalpass/obsidian-tasknotes | How it models recurring tasks and date handling | — | 0 |
+| obsidian-tasks | obsidian-tasks-group/obsidian-tasks | The incumbent; what users expect; parsing conventions | 2026-06-19 | 0 |
+| obsidian-tasklens fork | suzutan/obsidian-tasklens | What the fork changed — potential upstream cherry-picks | 2026-06-19 | 0 |
+
+<!-- Removed 2026-06-19: taskgenius-plugin and TaskForge had no resolvable author/repo (`—`), so every fetch would have failed and burned the drop-after-2 counter within ~2 runs, wasting research budget. Re-add them here only with a concrete `owner/repo`. -->
+
+**Research procedure:** Don't just list features. For each competitor, note: (1) what they do better than TaskLens, (2) what TaskLens does better, (3) one concrete thing we could borrow without breaking our architecture. Research each target **at most once per 30 days** (per `feature-agent/PROMPT.md` §6) and update its **"Last verified"** date when you do.
+
+**Failed-fetch counter rules:**
+- On a **successful** fetch, set the target's **"Failed fetches"** count back to **0** and update "Last verified". Only **consecutive** failures count toward the drop rule — a target that fails once, succeeds, then fails again is healthy, not dying.
+- On a **failed** fetch, increment "Failed fetches". After **2 consecutive** failures, drop the target (strike it through and note it dead) rather than chasing a dead link every run.
+- Never add a target without a concrete `owner/repo` — a row with no repo can never succeed and will be wrongly marked dead within two runs.
+
+---
+
+## Research Directions
+
+- How do large-vault users (5,000+ notes) actually use TaskLens? Are there performance bottlenecks in `getFilesToScan` at scale?
+- Obsidian's new Properties UI (frontmatter editor) — does TaskLens correctly parse tasks in files that use YAML frontmatter?
+- Calendar plugin integration — can TaskLens tasks show up on the Obsidian Calendar view?
+
+---
+
+## Competitor Research Notes
+
+### obsidian-tasks (obsidian-tasks-group) — 2026-06-19
+
+**What they do better:**
+- Full query language: `sort by due date`, `sort by priority desc`, `group by filename`, `limit N`, boolean filters with AND/OR/NOT
+- Priority system (⏫🔼🔽 emojis) baked into the task model
+- Custom status types (IN_PROGRESS, CANCELLED, NON_TASK)
+- Urgency score calculated from multiple fields, used as default sort
+- Advanced custom sorting via functions (Tasks 6.0.0+)
+
+**What TaskLens does better:**
+- Native dashboard widget with visual timeline, board, and stats cards — obsidian-tasks is query-embedded-in-notes only
+- TaskGroup abstraction for recurring tasks (obsidian-tasks shows each recurrence as a separate item)
+- More approachable for non-power users — no query syntax needed
+
+**One thing to borrow:** Urgency score as a default sort key. Currently TaskLens list order is arbitrary (file-scan order). Sorting by an urgency score (derived from overdue + due-soon status) would immediately make the list more actionable. This is the core value of the Sorting Toggles feature (FA-001).
+
+---
+
+### suzutan/obsidian-tasklens fork — 2026-06-19
+
+**What they do better (features upstream lacks):**
+- Live countdown/elapsed timers on tasks (`#countdown`, `#elapsed`, `#countdown-elapsed` labels)
+- Priority emojis from obsidian-tasks format (⏫🔼🔽)
+- Scheduled date (⏳) and start date (🛫) as first-class fields
+- Drag-and-drop task reordering within the list
+- Subtasks via indentation
+- Natural language date parsing in Quick Add
+- Tag autocomplete (`#` in Quick Add suggests existing tags)
+- Section picker in Quick Add (choose `##` heading in destination file)
+- 3-column layout (sidebar filters + main list + detail panel)
+
+**What TaskLens upstream does better:**
+- Timeline and board views (fork has neither)
+- Stats cards / dashboard overview
+- Simpler architecture (plain TS, no Preact dependency)
+- More stable / more releases
+
+**One concrete thing to borrow:** Tag autocomplete in Quick Add. The fork collects all `#tags` from scanned tasks and offers them as completions. TaskManager already indexes tasks so we have the data; adding autocomplete to the Quick Add input field is a contained UI improvement (~50 lines, existing modal) → could qualify as a small enhancement. Flag for decisions.md before implementing since it adds new UX to an existing modal.
