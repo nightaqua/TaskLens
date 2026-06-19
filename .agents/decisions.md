@@ -15,8 +15,7 @@ The `Ref` column is the stable key linking a decision to its origin — a `backl
 | Date | Verdict | Ref | Agent | Proposal | Reason |
 |------|---------|-----|-------|----------|--------|
 | 2026-06-19 | approved | (standing policy) | — | Plain commits with no AI attribution / co-author trailers | Maintainer's deliberate choice: clean solo-developer history over per-agent git auditability. `notes.md` is the audit trail instead. |
-
-<!-- FA-001 (Sorting Toggles) is currently a proposal awaiting a decision — it lives in backlog.md as `pending-review`, not here. A row is added here only once the maintainer approves or rejects it via Cowork. -->
+| 2026-06-19 | approved | FA-001 / Sorting Toggles | feature-agent | Sorting Toggles for Task List (sort by Urgency, Topic, File Name) | Approved by maintainer. |
 
 ---
 

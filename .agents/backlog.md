@@ -39,7 +39,7 @@ Shared task tracker for all scheduled agents. Every agent reads this before star
 
 | ID | Status | Agent | Task | Ref | Added | Notes |
 |----|--------|-------|------|-----|-------|-------|
-| FA-001 | pending-review | feature-agent | Sorting Toggles for Task List (sort by Urgency, Topic, File Name) | Sorting Toggles | 2026-06-19 | Proposed; awaiting maintainer decision via Cowork. Do not start while pending-review. |
+| FA-001 | approved | feature-agent | Sorting Toggles for Task List (sort by Urgency, Topic, File Name) | Sorting Toggles | 2026-06-19 | Approved by maintainer 2026-06-19. |
 | FA-002 | todo | feature-agent | Timer Display (#countdown / #elapsed chips) | Timer Display (FA-002) | 2026-06-19 | Inspired by suzutan fork; proposal not yet submitted |
 | FA-003 | todo | feature-agent | Priority Field Support (⏫🔼🔽 obsidian-tasks emojis) | Priority Field Support (FA-003) | 2026-06-19 | Pairs well with FA-001 sort; proposal not yet submitted |
 
