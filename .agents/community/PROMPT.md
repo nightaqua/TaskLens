@@ -25,7 +25,7 @@ You run **weekly (Thu 02:00)** as a check, and may also be **triggered after a r
 - **Release discipline (treat as a `finally`):** delete the lock in Finishing Up — but if you abort for **any** reason after acquiring it (recovery stop, flag-and-stop, loop guard, nothing-to-do), delete `.agents/.lock` before exiting. Only an actual crash should leave it held.
 - The lock is a backstop; the **staggered schedule** (README "Execution Model"; community runs Thu 02:00) is the primary concurrency guarantee.
 
-**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on an unfamiliar branch, follow the startup-cleanup recovery in `README.md`. Then `git checkout dev` and `git pull --rebase origin dev`.
+**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on an unfamiliar branch, follow the startup-cleanup recovery in `README.md`. Then `git checkout dev` and `git pull --rebase agents dev`.
 
 **0.4 — Heartbeat on every exit.** On **every** path out of this run, append one line to the local-only `.agents/run-log.md`: `2026-06-19 | community | exit: <reason>` (`paused` · `lock-held` · `reclaimed-stale-lock` · `loop-guard` · `no-op` · `committed <Ref>` · `draft-prepared <Ref>` · `flagged <Ref>` · `network-skip`). Gitignored — never commit or stage it.
 
@@ -118,13 +118,13 @@ If nothing qualifies: write "Nothing to communicate this run" in `notes.md`, app
 
 3. **Commit the agent / doc files only if they actually changed** (and only the allowed auto-commit set from §2 — never a draft file, which is gitignored anyway):
    ```bash
-   git pull --rebase origin dev
+   git pull --rebase agents dev
    git add .agents/community/notes.md .agents/backlog.md   # plus any §2-allowed doc fix, e.g. README.md/docs/<file>.md
    if git diff --cached --quiet; then
      echo "No changes to commit."
    else
      git commit -m "docs: fix changelog version links 2026-06-19"   # literal date; or "chore: community run 2026-06-19"
-     git push origin dev   # if rejected: pull --rebase, retry once, else flag and stop
+     git push agents dev   # if rejected: pull --rebase, retry once, else flag and stop
    fi
    ```
    Plain commits — no co-author tags, no AI attribution.

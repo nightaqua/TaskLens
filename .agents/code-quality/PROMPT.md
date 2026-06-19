@@ -29,7 +29,7 @@ You auto-commit **safe, non-behavioral fixes** to `dev`. Any change that could a
 - **Release discipline (treat as a `finally`):** you normally delete the lock in Finishing Up — but if you abort for **any** reason after acquiring it (recovery stop, flag-and-stop, suite failure, loop guard, nothing-to-do), delete `.agents/.lock` before exiting. Only an actual crash should leave it held.
 - The lock is a backstop; the **staggered schedule** (README "Execution Model"; code-quality runs Wed 02:00) is the primary concurrency guarantee.
 
-**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on an unfamiliar branch, follow the startup-cleanup recovery in `README.md`. Then `git checkout dev` and `git pull --rebase origin dev`.
+**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on an unfamiliar branch, follow the startup-cleanup recovery in `README.md`. Then `git checkout dev` and `git pull --rebase agents dev`.
 
 **0.4 — Heartbeat on every exit.** On **every** path out of this run, append one line to the local-only `.agents/run-log.md`: `2026-06-19 | code-quality | exit: <reason>` (`paused` · `lock-held` · `reclaimed-stale-lock` · `loop-guard` · `no-op` · `committed <Ref>` · `flagged <Ref>` · `network-skip`). Gitignored — never commit or stage it.
 
@@ -178,8 +178,8 @@ Each hit is a candidate fix. Apply only if the correct alternative is unambiguou
 
 4. Push (rebase first to absorb concurrent agents' commits):
    ```bash
-   git pull --rebase origin dev
-   git push origin dev   # if rejected: pull --rebase, retry once, else flag and stop
+   git pull --rebase agents dev
+   git push agents dev   # if rejected: pull --rebase, retry once, else flag and stop
    ```
 
 ---
@@ -212,13 +212,13 @@ When you find something that needs approval:
 
 3. **Commit the notes files only if they actually changed:**
    ```bash
-   git pull --rebase origin dev
+   git pull --rebase agents dev
    git add .agents/code-quality/notes.md .agents/backlog.md
    if git diff --cached --quiet; then
      echo "No changes to commit."
    else
      git commit -m "chore: code quality agent run 2026-06-19"   # literal date
-     git push origin dev
+     git push agents dev
    fi
    ```
 

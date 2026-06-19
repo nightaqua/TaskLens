@@ -23,7 +23,7 @@ You are **fully autonomous** for all routine git operations. You do not need to 
 - **Release discipline (treat as a `finally`):** you normally delete `.agents/.lock` in Finishing Up — but if you abort for **any** reason after acquiring the lock (recovery stop, flag-and-stop, suite failure, loop guard, nothing-to-do), you **must** delete `.agents/.lock` before exiting. The only time the lock should outlive your process is an actual crash.
 - The lock narrows but does not eliminate a same-minute race (check-then-create is not atomic). The **staggered schedule** (README "Execution Model"; git-manager runs Mon 02:00) is the primary concurrency guarantee — the lock is a backstop.
 
-**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on a branch you don't recognize from your `notes.md`, follow the "Dirty tree / unknown branch on startup" recovery in `README.md`. Then `git checkout dev` and `git pull --rebase origin dev`.
+**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on a branch you don't recognize from your `notes.md`, follow the "Dirty tree / unknown branch on startup" recovery in `README.md`. Then `git checkout dev` and `git pull --rebase agents dev`.
 
 **0.4 — Heartbeat on every exit.** On **every** path out of this run — including the PAUSE/lock/loop-guard/no-op exits above and the normal finish — append exactly one line to the local-only `.agents/run-log.md`: `2026-06-19 | git-manager | exit: <reason>` (`paused` · `lock-held` · `reclaimed-stale-lock` · `loop-guard` · `no-op` · `committed <Ref>` · `flagged <Ref>` · `network-skip`). This file is gitignored — never commit or stage it.
 
@@ -81,12 +81,12 @@ gh pr merge <number> --squash --delete-branch
 
 List all remote branches:
 ```
-git fetch --prune
+git fetch agents --prune
 git branch -r
 ```
 
 Identify branches that are:
-- Merged into `main` or `dev` (use `git branch -r --merged origin/main` and `git branch -r --merged origin/dev`)
+- Merged into `main` or `dev` (use `git branch -r --merged agents/main` and `git branch -r --merged agents/dev`)
 - Old automated bot branches matching known bot prefixes: `palette/*`, `ux/*`, `fix-*`, `worktree-agent-*`, `jules-*` — that are already merged
 - Dependabot branches for already-merged PRs
 
@@ -105,7 +105,7 @@ gh api -X DELETE repos/{owner}/{repo}/git/refs/heads/{branch-name}
 ```
 Or:
 ```
-git push origin --delete <branch-name>
+git push agents --delete <branch-name>
 ```
 
 Log every deleted branch in `notes.md`.
@@ -126,15 +126,15 @@ git worktree prune
 
 First confirm a clean tree and that you hold the lock (§0.2). Check if `dev` has fallen behind `main`:
 ```
-git log origin/dev..origin/main --oneline
+git log agents/dev..agents/main --oneline
 ```
 
 If `main` has commits not in `dev`, merge them forward — but **guard against being left in a half-merged state**:
 ```bash
 git status --porcelain   # must be empty before you start
 git checkout dev
-git pull --rebase origin dev
-git merge origin/main --no-edit -m "chore: merge main into dev" || {
+git pull --rebase agents dev
+git merge agents/main --no-edit -m "chore: merge main into dev" || {
   git merge --abort
   echo "Forward-merge conflict — aborted, tree restored. Flagging for maintainer."
   # add a backlog row (status todo) + a notes entry, then STOP this step
@@ -143,8 +143,8 @@ git merge origin/main --no-edit -m "chore: merge main into dev" || {
 
 Only if the merge succeeded:
 ```bash
-git pull --rebase origin dev
-git push origin dev
+git pull --rebase agents dev
+git push agents dev
 ```
 
 If conflicts occurred, you already aborted and flagged — do **not** attempt to hand-resolve non-trivial source conflicts.
@@ -187,13 +187,13 @@ After completing all work (or finding nothing to do):
 
 3. **Commit the notes files only if they actually changed.** Always rebase before pushing so concurrent agents' commits are absorbed:
    ```bash
-   git pull --rebase origin dev
+   git pull --rebase agents dev
    git add .agents/git-manager/notes.md .agents/backlog.md
    if git diff --cached --quiet; then
      echo "No changes to commit."
    else
      git commit -m "chore: git manager run 2026-06-19"   # literal date — no $(date ...)
-     git push origin dev   # if rejected: pull --rebase, retry once, else flag and stop (see README)
+     git push agents dev   # if rejected: pull --rebase, retry once, else flag and stop (see README)
    fi
    ```
    Use plain commits — no co-author tags, no AI attribution.

@@ -27,7 +27,7 @@ TaskLens is an Obsidian community plugin written in **strict TypeScript**. It pr
 - **Release discipline (treat as a `finally`):** delete the lock in Finishing Up — but if you abort for **any** reason after acquiring it (recovery stop, flag-and-stop, suite failure, loop guard, nothing-to-do), delete `.agents/.lock` before exiting. Only an actual crash should leave it held.
 - The lock is a backstop; the **staggered schedule** (README "Execution Model"; feature-agent runs Tue & Fri 02:00) is the primary concurrency guarantee.
 
-**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on a `feat/*`/`fix/*` branch you don't recognize from your `notes.md` In-Flight Work, follow the startup-cleanup recovery in `README.md` (stash/discard, return to `dev`). Then `git checkout dev` and `git pull --rebase origin dev`.
+**0.3 — Clean startup state.** Run `git status`. If a merge/rebase is in progress that you did **not** start, **STOP** and flag in `backlog.md` (another agent left the tree dirty) — do **not** stash over it; then release the lock + heartbeat and exit. If the tree is merely dirty with stray edits, or you're on a `feat/*`/`fix/*` branch you don't recognize from your `notes.md` In-Flight Work, follow the startup-cleanup recovery in `README.md` (stash/discard, return to `dev`). Then `git checkout dev` and `git pull --rebase agents dev`.
 
 **0.4 — Heartbeat on every exit.** On **every** path out of this run, append one line to the local-only `.agents/run-log.md`: `2026-06-19 | feature-agent | exit: <reason>` (`paused` · `lock-held` · `reclaimed-stale-lock` · `loop-guard` · `no-op` · `committed <Ref>` · `pr-opened <url>` · `flagged <Ref>` · `network-skip`). Gitignored — never commit or stage it.
 
@@ -94,7 +94,7 @@ When opening a PR:
 Always branch off an up-to-date `dev`:
 ```bash
 git checkout dev
-git pull --rebase origin dev
+git pull --rebase agents dev
 git checkout -b feat/sort-toggles-task-list
 ```
 
@@ -127,17 +127,17 @@ The only thing you ever commit straight to `dev` is your own bookkeeping — not
 
 ```bash
 git checkout dev
-git pull --rebase origin dev
+git pull --rebase agents dev
 # ... update notes/ideas/backlog only ...
 git add .agents/feature-agent/notes.md .agents/feature-agent/ideas.md .agents/backlog.md   # targeted — never git add -A, never src/**, main.js, styles.css, data.json
 git commit -m "chore: feature agent research run 2026-06-19"
-git push origin dev   # if rejected: pull --rebase, retry once, else flag and stop
+git push agents dev   # if rejected: pull --rebase, retry once, else flag and stop
 ```
 
 ### For feature branch PRs
 
 ```bash
-git push origin feat/sort-toggles-task-list
+git push agents feat/sort-toggles-task-list
 gh pr create --base dev --title "feat: add sort toggle to Task List header" --body "..."
 ```
 
@@ -148,9 +148,9 @@ Then stop — do not merge your own PR. Add it to `notes.md` under "In-Flight Wo
 The maintainer squash-merges with "delete branch", so the **remote branch is usually already gone** — guard the cleanup so it doesn't error:
 ```bash
 git checkout dev
-git pull --rebase origin dev
+git pull --rebase agents dev
 git branch -d feat/sort-toggles-task-list 2>/dev/null || true
-git push origin --delete feat/sort-toggles-task-list 2>/dev/null || echo "Remote branch already removed."
+git push agents --delete feat/sort-toggles-task-list 2>/dev/null || echo "Remote branch already removed."
 ```
 
 ---
@@ -234,13 +234,13 @@ Write findings in `notes.md`. If you find a clear integration path, add it to `i
 
 5. **Commit the agent files only if they actually changed:**
    ```bash
-   git pull --rebase origin dev
+   git pull --rebase agents dev
    git add .agents/feature-agent/notes.md .agents/feature-agent/ideas.md .agents/backlog.md
    if git diff --cached --quiet; then
      echo "No changes to commit."
    else
      git commit -m "chore: feature agent run 2026-06-19"   # literal date
-     git push origin dev
+     git push agents dev
    fi
    ```
 
