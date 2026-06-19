@@ -32,21 +32,5 @@ When picking up a task, change status to `in-progress` and add your agent name a
 
 | ID | Status | Agent | Task | Ref | Added | Notes |
 |----|--------|-------|------|-----|-------|-------|
-
----
-
-## Completed
-
-<!-- Move items here when done -->
-
-| ID | Status | Agent | Task | Ref | Completed | Outcome |
-|----|--------|-------|------|-----|-----------|---------|
-
----
-
-## Rejected
-
-<!-- Move items here when rejected by maintainer (also add to decisions.md) -->
-
-| ID | Status | Ref | Reason | Task |
-|----|--------|-----|--------|------|
+| FA-001 | todo | feature-agent | Sorting Toggles for Task List (sort by Urgency, Topic, File Name) | Sorting Toggles | 2026-06-19 | Awaiting maintainer approval in decisions.md before implementation |
+| FA-002 | todo | feature-agent | Timer Display (#countdown / #elapsed chips) | Timer Display (FA-002) | 2026-06-19 | Inspired by suzutan fork; prop

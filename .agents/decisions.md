@@ -13,13 +13,10 @@ The `Ref` column is the stable key linking a decision to its origin — a `backl
 | Date | Verdict | Ref | Agent | Proposal | Reason |
 |------|---------|-----|-------|----------|--------|
 | 2026-06-19 | approved | (standing policy) | — | Plain commits with no AI attribution / co-author trailers | Maintainer's deliberate choice: clean solo-developer history over per-agent git auditability. `notes.md` is the audit trail instead. |
+| 2026-06-19 | **pending** | FA-001 / Sorting Toggles | feature-agent | Add sort toggle button to Task List header. Sort by Urgency (default, overdue-first then due-soonest), Topic (fileName), or File Name. Direction toggle (↑↓). State persisted via existing `DashboardView.getState()`/`setState()`. No new files — changes to `DashboardView.ts` (sort logic + button) and `src/styles.css` only. See `ideas.md § Sorting Toggles` for spec. | Awaiting maintainer approval. New UI element + user-visible functionality. |
 
 ---
 
 ## How to Use
 
-**Maintainer:** When you approve or reject an agent's proposal (from a PR comment, a flagged item, or a conversation), add a row here. Fill in the `Ref` with the backlog ID and/or `ideas.md` heading so the agent can match it reliably. The agent will not re-propose it.
-
-**Agents:**
-- When you flag work or open a PR, **cite the originating `ideas.md` heading or `backlog.md` ID** in the row's `Ref` so a later decision can be tied back to it.
-- Before adding a task to `backlog.md` or opening a PR, scan this table. **Match on the `Ref` column first** (backlog ID / `ideas.md` heading), **then** on prose. If your proposed work matches a `rejected` row, skip it entirely — do not re-propose, do not re-open, do not mention it.
+**Maintainer:** When you approve or reject an agent's proposal (from a PR comment, a flagged item, or a conversation), add a row here. Fill in the `Ref` with the backlog ID and/or `ideas.md` heading so the 

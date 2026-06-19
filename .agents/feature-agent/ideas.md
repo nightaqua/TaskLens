@@ -50,26 +50,20 @@ Seed list of feature ideas and research directions. The Feature Agent works thro
 **Idea:** Introduce `config/`, `scripts/`, `docs/` top-level directories to organize loose root files.  
 **Complexity:** Low (file moves), but high coordination cost (all open PRs would conflict). Only pursue if no other PRs are open. **Note:** per AGENTS.md §11, cosmetic-only restructures that move files without behavior change are rejected — make sure any restructure is bundled with meaningful changes or justified by concrete developer pain.
 
+### Timer Display (FA-002)
+**Area:** Task List UX  
+**Idea:** Tasks tagged with `#countdown`, `#elapsed`, or `#countdown-elapsed` show a live timer chip in the task list. Countdown reads the due date; elapsed reads the start date. Color shifts green→blue→orange→red as deadline approaches or time accumulates. Inspired by suzutan fork (2026-06-19).  
+**Complexity:** Medium-high. Needs an interval-based updater, parser change to recognise the tags, and new CSS. No settings schema change if tags are the activation mechanism.  
+**Notes:** The suzutan fork implements this in Preact with signals; our vanilla-DOM approach would use `window.setInterval` and targeted DOM updates. Propose in decisions.md before starting — this is unambiguously a new user-visible feature.
+
+### Priority Field Support (FA-003)
+**Area:** Parsing / Compatibility  
+**Idea:** Parse obsidian-tasks priority emojis (⏫ highest, 🔼 high, 🔽 low) from task text and expose a `priority` field on the Task model. Surface in the Task List and Timeline as a sort key, and as a filter option in DashboardView. Improves interoperability with vaults that already use obsidian-tasks format.  
+**Complexity:** Low-medium. Parser change + model field + sort/filter wiring. No new UI primitives needed beyond an extra sort option (piggybacks on FA-001 Sorting Toggles if approved).  
+**Notes:** obsidian-tasks also uses `🔁` for recurrence (already supported) and `✅` for completion date, `📅` for due date (already supported). Priority is the main missing field.
+
 ---
 
 ## Competitor Research Targets
 
-Agents should periodically study these for patterns, UX ideas, and integration opportunities:
-
-| Plugin | Author / Repo | Focus | Last verified | Failed fetches |
-|--------|--------------|-------|---------------|----------------|
-| tasknotes | callumalpass | How it models recurring tasks and date handling | — | 0 |
-| taskgenius-plugin | — | Feature set comparison, UX patterns | — | 0 |
-| TaskForge | — | Board/kanban UX, status model | — | 0 |
-| obsidian-tasks | — | The incumbent; what users expect; parsing conventions | — | 0 |
-| obsidian-tasklens fork | suzutan | What the fork changed — potential upstream cherry-picks | — | 0 |
-
-**Research procedure:** Don't just list features. For each competitor, note: (1) what they do better than TaskLens, (2) what TaskLens does better, (3) one concrete thing we could borrow without breaking our architecture. Research each target **at most once per 30 days** (per `feature-agent/PROMPT.md` §6) and update its **"Last verified"** date when you do. If a fetch fails, increment **"Failed fetches"**; after **2 consecutive failures**, drop the target (strike it through and note it dead) rather than chasing a dead link every run.
-
----
-
-## Research Directions
-
-- How do large-vault users (5,000+ notes) actually use TaskLens? Are there performance bottlenecks in `getFilesToScan` at scale?
-- Obsidian's new Properties UI (frontmatter editor) — does TaskLens correctly parse tasks in files that use YAML frontmatter?
-- Calendar plugin integration — can TaskLens tasks show up on the Obsidian Calendar view?
+Agents should periodically s
