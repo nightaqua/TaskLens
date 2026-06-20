@@ -1,62 +1,128 @@
 import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
-import TaskLensPlugin from '../main';
+import TaskLensPlugin, { RefreshableView } from '../main';
 import { TimelineComponent } from './TimelineComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
+import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
+import { VIEW_TYPE_TIMELINE, CLASS_DASHBOARD_VIEW } from '../constants';
 
-export const VIEW_TYPE_TIMELINE = 'tasklens-timeline-view';
 
-export class TimelineView extends ItemView {
+function isHeaderState(v: unknown): v is HeaderState {
+    if (typeof v !== 'object' || v === null) return false;
+    const rec = v as Record<string, unknown>;
+    return (rec.title === null || typeof rec.title === 'string')
+        && typeof rec.isCollapsed === 'boolean';
+}
+
+export class TimelineView extends ItemView implements RefreshableView {
     private leafRootEl: HTMLElement | null = null;
     private tabContainer: HTMLElement | null = null;
+    private timelineComponent: TimelineComponent | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
-    constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
-        super(leaf);
-        // Subscribe to shared updates
-        this.plugin.taskManager.on('tasks-updated', () => this.render());
-    }
+    private timelineDaysToShow = 10;
+    private viewportStart: Date | null = null;
+    private savedScrollLeft = 0;
+    private hasOpenedOnce = false;
 
-    getViewType() { return VIEW_TYPE_TIMELINE; }
-    getDisplayText() { return 'Timeline'; }
-    getIcon() { return 'calendar-range'; }
-
-    async setState(state: any, result: ViewStateResult): Promise<void> {
-        if (state?.headerState) {
-            this.headerState = state.headerState;
-        }
-        await super.setState(state, result);
+    private readonly onTasksUpdated = (): void => {
         this.render();
+    };
+
+    constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
+        super(leaf);
+        this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
+                    void this.plugin.taskManager.refreshFileTask(file.path);
+                }
+            })
+        );
     }
 
-    getState(): any {
-        if (this.headerComponent) {
-            this.headerState = this.headerComponent.getState();
+    getViewType(): string { return VIEW_TYPE_TIMELINE; }
+    getDisplayText(): string { return 'Timeline view'; }
+    getIcon(): string { return 'clock'; }
+
+    async setState(state: unknown, result: ViewStateResult): Promise<void> {
+        await super.setState(state, result);
+
+        if (state && typeof state === 'object') {
+            const s = state as Record<string, unknown>;
+            if (Object.prototype.hasOwnProperty.call(s, 'headerState') && isHeaderState(s.headerState)) this.headerState = s.headerState;
+            if (Object.prototype.hasOwnProperty.call(s, 'zoomLevel') && typeof s.zoomLevel === 'number') this.timelineDaysToShow = s.zoomLevel;
+            if (Object.prototype.hasOwnProperty.call(s, 'viewportStart')) {
+                const raw = s.viewportStart;
+                if (typeof raw === 'string') {
+                    const parsed = new Date(raw);
+                    if (!isNaN(parsed.getTime())) this.viewportStart = parsed;
+                }
+            }
         }
-        return { headerState: this.headerState };
+
+        this.render();
+        // Restore persisted scroll position; only jump to today on a genuine cold open
+        const rendered = this.timelineComponent;
+        if (!rendered) return;
+        if (this.hasOpenedOnce) {
+            window.setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+        } else {
+            window.setTimeout(() => { rendered.scrollToToday(); }, 300);
+        }
     }
 
-    async onOpen() {
-        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
-        if (this.leafRootEl) this.leafRootEl.classList.add('tasklens-chromeless');
+    getState(): Record<string, unknown> {
+        // Grab the live viewport position from the component so it survives layout saves
+        const liveViewportStart = this.timelineComponent?.getViewportStart() ?? this.viewportStart;
 
-        // Find and flag the parent tab container to hide its header strip
-        this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
-        if (this.tabContainer) this.tabContainer.classList.add('tasklens-hide-tabs');
+        return Object.assign(super.getState(), {
+            headerState: this.headerComponent ? this.headerComponent.getState() : this.headerState,
+            zoomLevel: this.timelineDaysToShow,
+            viewportStart: liveViewportStart?.toISOString() ?? null,
+        });
+    }
+
+    onOpen(): Promise<void> {
+        // Use shared utility for UI consistency
+        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, this.plugin.isLayoutLocked);
+        this.leafRootEl = leafRootEl;
+        this.tabContainer = tabContainer;
 
         this.contentEl.empty();
-        this.contentEl.addClass('tasklens-dashboard-view');
-        this.contentEl.addClass('is-single-view');
+        this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
 
-        await this.plugin.taskManager.loadTasks();
-        this.render();
+        void this.plugin.taskManager.loadTasks().then(() => {
+            this.render();
+            const rendered = this.timelineComponent;
+            if (!rendered) return;
+            if (!this.hasOpenedOnce) {
+                this.hasOpenedOnce = true;
+                window.setTimeout(() => { rendered.scrollToToday(); }, 500);
+            } else {
+                window.setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+            }
+        });
+
+        return Promise.resolve();
     }
 
-    async onClose(): Promise<void> {
-        if (this.tabContainer) this.tabContainer.classList.remove('tasklens-hide-tabs');
-        if (this.leafRootEl) this.leafRootEl.classList.remove('tasklens-chromeless');
+    onClose(): Promise<void> {
+        this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
+        this.timelineComponent?.destroy();
+        this.performCleanup();
+        return Promise.resolve();
     }
 
-    render() {
+    private performCleanup(): void {
+        cleanUpViewDOM(this.leafRootEl, this.tabContainer);
+    }
+
+    public render(): void {
+        // Preserve pan position across re-renders
+        this.savedScrollLeft = this.timelineComponent?.getScrollPosition() ?? this.savedScrollLeft;
+        // Clean up out-of-container DOM nodes before wiping contentEl
+        this.timelineComponent?.destroy();
+
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -65,20 +131,40 @@ export class TimelineView extends ItemView {
             'Timeline',
             {
                 onStateChange: () => {
-                    if (this.headerComponent) {
-                        this.headerState = this.headerComponent.getState();
-                    }
+                    if (this.headerComponent) this.headerState = this.headerComponent.getState();
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
-                onRefresh: async () => {
-                    await this.plugin.taskManager.loadTasks();
-                }
+                onRefresh: () => { void this.plugin.taskManager.loadTasks(); },
             }
         );
         this.headerComponent.render();
 
-        const timeline = new TimelineComponent(this.contentEl, this.app, this.plugin.taskManager.getFilteredTasks(), 7, this.plugin.settings);
-        timeline.render();
+        const container = this.contentEl.createDiv('dashboard-timeline-view');
+        this.timelineComponent = new TimelineComponent(
+            container,
+            this.app,
+            this.plugin.taskManager.getAllGroupedTasks(),
+            this.timelineDaysToShow,
+            this.plugin.settings,
+            this.viewportStart ?? undefined,
+            // When the user jumps the viewport, persist it immediately so layout saves reflect it
+            (newStart: Date) => {
+                this.viewportStart = newStart;
+                this.app.workspace.requestSaveLayout();
+            }
+        );
+        this.timelineComponent.render();
+
+        // Restore pan position after DOM rebuild — window.setTimeout lets layout settle first.
+        // Captured in a local const so the closure holds a guaranteed non-null reference.
+        const rendered = this.timelineComponent;
+        if (this.savedScrollLeft > 0) {
+            window.setTimeout(() => { rendered.setScrollPosition(this.savedScrollLeft); }, 50);
+        }
+    }
+
+    public refreshFromSettings(): void {
+        this.render();
     }
 }

@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { CLASS_FEATURE_HIGHLIGHT } from '../constants';
 
 export interface HeaderState {
     title: string | null;
@@ -6,9 +7,9 @@ export interface HeaderState {
 }
 
 export class HeaderComponent {
-    private container: HTMLElement;
+    private readonly container: HTMLElement;
     private title: string;
-    private defaultTitle: string;
+    private readonly defaultTitle: string;
     private isCollapsed: boolean;
 
     private headerEl: HTMLElement | null = null;
@@ -16,12 +17,12 @@ export class HeaderComponent {
     private isSaving: boolean = false;
 
     // Callbacks
-    private onStateChange: () => void;
-    private onRefresh: () => void;
-    private onSettings: (() => void) | null;
-    private onAdd: (() => void) | null; // <--- 1. Property added
+    private readonly onStateChange: () => void;
+    private readonly onRefresh: () => void;
+    private readonly onSettings: (() => void) | null;
+    private readonly onAdd: (() => void) | null;
     private highlightAddButton: boolean;
-    private onHighlightDismiss: (() => void) | null;
+    private readonly onHighlightDismiss: (() => void) | null;
 
     constructor(
         container: HTMLElement,
@@ -31,7 +32,7 @@ export class HeaderComponent {
             onStateChange: () => void,
             onRefresh: () => void,
             onSettings?: () => void,
-            onAdd?: () => void // <--- 2. Interface updated (Optional)
+            onAdd?: () => void
         },
         options?: {
             highlightAddButton?: boolean,
@@ -46,7 +47,7 @@ export class HeaderComponent {
         this.onStateChange = callbacks.onStateChange;
         this.onRefresh = callbacks.onRefresh;
         this.onSettings = callbacks.onSettings || null;
-        this.onAdd = callbacks.onAdd || null; // <--- 3. Assign property
+        this.onAdd = callbacks.onAdd || null;
         this.highlightAddButton = options?.highlightAddButton ?? false;
         this.onHighlightDismiss = options?.onHighlightDismiss || null;
     }
@@ -62,12 +63,25 @@ export class HeaderComponent {
 
         this.sidebarHandleEl = this.container.createDiv('dashboard-sidebar-handle is-hidden');
         setIcon(this.sidebarHandleEl, 'panel-left-open');
-        this.sidebarHandleEl.setAttribute('aria-label', 'Show Header');
+        this.sidebarHandleEl.setAttribute('aria-label', 'Show header');
+        this.sidebarHandleEl.setAttribute('title', 'Show header');
+        this.sidebarHandleEl.setAttribute('role', 'button');
+        this.sidebarHandleEl.setAttribute('tabindex', '0');
+        this.sidebarHandleEl.setAttribute('aria-expanded', this.isCollapsed ? 'false' : 'true');
+        this.sidebarHandleEl.setAttribute('aria-controls', 'dashboard-header');
 
-        this.sidebarHandleEl.addEventListener('click', () => {
+        const triggerShowHeader = () => {
             this.isCollapsed = false;
             this.updateVisibility();
             this.onStateChange();
+        };
+
+        this.sidebarHandleEl.addEventListener('click', triggerShowHeader);
+        this.sidebarHandleEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerShowHeader();
+            }
         });
     }
 
@@ -75,59 +89,70 @@ export class HeaderComponent {
         if (this.headerEl) this.headerEl.remove();
 
         this.headerEl = this.container.createDiv('dashboard-header');
+        this.headerEl.id = 'dashboard-header';
 
-        // --- LEFT GROUP ---
         const leftGroup = this.headerEl.createDiv('header-actions-left');
         if (this.onSettings) {
             const settingsBtn = leftGroup.createEl('button', { cls: 'header-icon-btn' });
             setIcon(settingsBtn, 'settings');
-            settingsBtn.addEventListener('click', () => this.onSettings!());
+            settingsBtn.setAttribute('aria-label', 'Settings');
+            settingsBtn.setAttribute('title', 'Settings');
+            settingsBtn.addEventListener('click', () => { this.onSettings?.(); });
         }
 
-        // --- CENTER TITLE ---
         const titleWrapper = this.headerEl.createDiv('dashboard-title-wrapper');
         titleWrapper.setAttribute('aria-label', 'Click to rename');
-        const titleEl = titleWrapper.createEl('h2', { text: this.title });
+        titleWrapper.setAttribute('title', 'Click to rename');
+        titleWrapper.setAttribute('role', 'button');
+        titleWrapper.setAttribute('tabindex', '0');
+        titleWrapper.createEl('h2', { text: this.title });
         const editIcon = titleWrapper.createDiv('edit-title-icon');
         setIcon(editIcon, 'pencil');
 
         titleWrapper.addEventListener('click', () => {
             this.enterEditMode(titleWrapper);
         });
+        titleWrapper.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.enterEditMode(titleWrapper);
+            }
+        });
 
-        // --- RIGHT GROUP ---
         const rightGroup = this.headerEl.createDiv('header-actions-right');
 
-        // <--- 4. THE MISSING ADD BUTTON LOGIC ---
         if (this.onAdd) {
             const addBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
-            if (this.highlightAddButton) addBtn.addClass('feature-highlight');
+            if (this.highlightAddButton) addBtn.addClass(CLASS_FEATURE_HIGHLIGHT);
             setIcon(addBtn, 'plus');
-            addBtn.setAttribute('aria-label', 'Quick Add Task');
+            addBtn.setAttribute('aria-label', 'Quick add task');
+            addBtn.setAttribute('title', 'Quick add task');
             addBtn.addEventListener('click', () => {
                 if (this.highlightAddButton) {
                     this.highlightAddButton = false;
-                    addBtn.removeClass('feature-highlight');
+                    addBtn.removeClass(CLASS_FEATURE_HIGHLIGHT);
                     if (this.onHighlightDismiss) this.onHighlightDismiss();
                 }
-                this.onAdd!();
+                this.onAdd?.();
             });
         }
 
-        // Refresh Button
         const refreshBtn = rightGroup.createEl('button', { cls: 'dashboard-refresh-btn header-icon-btn' });
         setIcon(refreshBtn, 'refresh-cw');
-        refreshBtn.setAttribute('aria-label', 'Refresh Data');
+        refreshBtn.setAttribute('aria-label', 'Refresh data');
+        refreshBtn.setAttribute('title', 'Refresh data');
         refreshBtn.addEventListener('click', () => {
             refreshBtn.addClass('is-rotating');
             this.onRefresh();
-            setTimeout(() => refreshBtn.removeClass('is-rotating'), 1000);
+            window.setTimeout(() => { refreshBtn.removeClass('is-rotating'); }, 1000);
         });
 
-        // Hide Button
         const hideBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
         setIcon(hideBtn, 'panel-top-close');
-        hideBtn.setAttribute('aria-label', 'Hide Header');
+        hideBtn.setAttribute('aria-label', 'Hide header');
+        hideBtn.setAttribute('title', 'Hide header');
+        hideBtn.setAttribute('aria-expanded', this.isCollapsed ? 'false' : 'true');
+        hideBtn.setAttribute('aria-controls', 'dashboard-header');
         hideBtn.addEventListener('click', () => {
             this.isCollapsed = true;
             this.updateVisibility();
@@ -140,7 +165,8 @@ export class HeaderComponent {
         const input = wrapper.createEl('input', {
             type: 'text',
             value: this.title,
-            cls: 'dashboard-title-input'
+            cls: 'dashboard-title-input',
+            attr: { 'aria-label': 'Edit dashboard title' }
         });
 
         input.focus();
@@ -159,22 +185,24 @@ export class HeaderComponent {
 
         input.addEventListener('blur', save);
         input.addEventListener('keydown', (e) => {
-            e.stopPropagation(); // Stop hotkeys from firing
+            e.stopPropagation();
             if (e.key === 'Enter') {
                 e.preventDefault();
                 save();
             }
         });
-        input.addEventListener('keypress', (e) => e.stopPropagation());
+        input.addEventListener('keypress', (e) => { e.stopPropagation(); });
     }
 
     private updateVisibility(): void {
         if (this.isCollapsed) {
             this.headerEl?.addClass('is-collapsed');
             this.sidebarHandleEl?.removeClass('is-hidden');
+            this.sidebarHandleEl?.setAttribute('aria-expanded', 'false');
         } else {
             this.headerEl?.removeClass('is-collapsed');
             this.sidebarHandleEl?.addClass('is-hidden');
+            this.sidebarHandleEl?.setAttribute('aria-expanded', 'true');
         }
     }
 

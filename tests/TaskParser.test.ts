@@ -1,0 +1,299 @@
+import { App } from 'obsidian';
+import { describe, it, expect } from 'vitest';
+import { SemesterSettings } from '../src/settings/Settings';
+import { TaskParser } from '../src/services/TaskParser';
+
+describe('TaskParser.parseTaskMetadata', () => {
+    // Create a dummy instance. Since parseTaskMetadata doesn't use `this.app` or `this.settings`,
+    // we can pass null or empty objects casted to unknown.
+    const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string };
+
+    const getLocalMidnight = (dateStr: string) => new Date(`${dateStr}T00:00:00`);
+
+    it('should parse basic text without dates', () => {
+        const result = parseTaskMetadata('This is a simple task');
+        expect(result.title).toBe('This is a simple task');
+        expect(result.startDate).toBeUndefined();
+        expect(result.dueDate).toBeUndefined();
+        expect(result.completionDate).toBeUndefined();
+        expect(result.recurrence).toBeUndefined();
+        expect(result.notes).toBeUndefined();
+    });
+
+    it('should parse start date in yyyy-mm-dd format', () => {
+        const result = parseTaskMetadata('Task with start date [start:: 2024-05-10]');
+        expect(result.title).toBe('Task with start date');
+        expect(result.startDate).toEqual(getLocalMidnight('2024-05-10'));
+    });
+
+    it('should parse start date in dd-mm-yyyy format', () => {
+        const result = parseTaskMetadata('Task with start date (start:: 15-08-2023)');
+        expect(result.title).toBe('Task with start date');
+        expect(result.startDate).toEqual(getLocalMidnight('2023-08-15'));
+    });
+
+    it('should parse due date in yyyy-mm-dd format', () => {
+        const result = parseTaskMetadata('Submit assignment [due:: 2023-11-01]');
+        expect(result.title).toBe('Submit assignment');
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-11-01'));
+    });
+
+    it('should parse due date in dd-mm-yyyy format', () => {
+        const result = parseTaskMetadata('Submit assignment due:: 01-11-2023');
+        expect(result.title).toBe('Submit assignment');
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-11-01'));
+    });
+
+    it('should parse completion date without time', () => {
+        const result = parseTaskMetadata('Done task [completion:: 2024-01-02]');
+        expect(result.title).toBe('Done task');
+        expect(result.completionDate).toEqual(getLocalMidnight('2024-01-02'));
+    });
+
+    it('should parse completion date with time', () => {
+        // Completion date ignores the time part in parseDate, so it returns local midnight.
+        // Wait, parseDate appends T00:00:00 so the HH:mm is ignored in the returned Date object,
+        // but it removes it from the title. Let's verify this logic.
+        const result = parseTaskMetadata('Done task [completion:: 2024-01-02 14:30]');
+        expect(result.title).toBe('Done task');
+        expect(result.completionDate).toEqual(getLocalMidnight('2024-01-02'));
+    });
+
+    it('should parse recurrence with repeat::', () => {
+        const result = parseTaskMetadata('Water plants [repeat:: weekly]');
+        expect(result.title).toBe('Water plants');
+        expect(result.recurrence).toBe('weekly');
+    });
+
+    it('should parse recurrence with 🔁 emoji', () => {
+        const result = parseTaskMetadata('Water plants 🔁 every 2 weeks');
+        expect(result.title).toBe('Water plants');
+        expect(result.recurrence).toBe('every 2 weeks');
+    });
+
+    it('should parse recurrence with 🔄 emoji', () => {
+        const result = parseTaskMetadata('Water plants 🔄 daily');
+        expect(result.title).toBe('Water plants');
+        expect(result.recurrence).toBe('daily');
+    });
+
+    it('should stop emoji recurrence matching at 📅 or ✅', () => {
+        const result = parseTaskMetadata('Task 🔁 weekly 📅 2024-01-01');
+
+        // Wait, since parseTaskMetadata strips out the date part AFTER the recurrence part,
+        // it parses the 📅 out of the string, so it should be just "Task".
+        expect(result.title).toBe('Task');
+        expect(result.recurrence).toBe('weekly');
+        expect(result.dueDate).toEqual(getLocalMidnight('2024-01-01'));
+    });
+
+    it('should stop emoji recurrence matching at ✅', () => {
+        const result = parseTaskMetadata('Task 🔁 weekly ✅ 2024-01-01');
+
+        // The regex is /[\u{1F501}\u{1F504}]\s*([^[\u{1F4C5}\u2705]+)/u
+        expect(result.title).toBe('Task ✅ 2024-01-01');
+        expect(result.recurrence).toBe('weekly');
+    });
+
+    it('should parse due date with 📅 emoji', () => {
+        const result = parseTaskMetadata('Buy milk 📅 2023-10-15');
+        expect(result.title).toBe('Buy milk');
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
+    });
+
+    it('should not override [due::] with 📅 emoji', () => {
+        const result = parseTaskMetadata('Buy milk [due:: 2023-10-15] 📅 2023-10-20');
+        // emoji fallback is skipped if due is already set
+        expect(result.title).toBe('Buy milk 📅 2023-10-20');
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
+    });
+
+    it('should parse multiple metadata tags simultaneously', () => {
+        const result = parseTaskMetadata('Complex task [start:: 2023-10-01] [due:: 2023-10-15] [completion:: 2023-10-14] [repeat:: monthly]');
+        expect(result.title).toBe('Complex task');
+        expect(result.startDate).toEqual(getLocalMidnight('2023-10-01'));
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
+        expect(result.completionDate).toEqual(getLocalMidnight('2023-10-14'));
+        expect(result.recurrence).toBe('monthly');
+    });
+
+    it('should clean up extra spaces after removing metadata', () => {
+        const result = parseTaskMetadata('   Task   with   spaces   [due:: 2023-01-01]   ');
+        expect(result.title).toBe('Task with spaces');
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-01-01'));
+    });
+
+    it('should parse notes with notes::', () => {
+        const result = parseTaskMetadata('Task with a note [notes:: This is an important note]');
+        expect(result.title).toBe('Task with a note');
+        expect(result.notes).toBe('This is an important note');
+    });
+
+    it('should parse notes with parenthesis format', () => {
+        const result = parseTaskMetadata('Task with parens note (notes:: Another note here)');
+        expect(result.title).toBe('Task with parens note');
+        expect(result.notes).toBe('Another note here');
+    });
+
+    it('should handle notes alongside other metadata', () => {
+        const result = parseTaskMetadata('Complex task [due:: 2024-12-01] [notes:: Requires review before submission] [repeat:: weekly]');
+        expect(result.title).toBe('Complex task');
+        expect(result.dueDate).toEqual(getLocalMidnight('2024-12-01'));
+        expect(result.notes).toBe('Requires review before submission');
+        expect(result.recurrence).toBe('weekly');
+    });
+
+    it('should produce Invalid Date for an out-of-range date like month 13, day 45', () => {
+        // parseDate returns Invalid Date for out-of-range values (new Date('2024-13-45T00:00:00'))
+        const result = parseTaskMetadata('Task [due:: 2024-13-45]');
+        expect(result.dueDate).toBeDefined();
+        const dueDate = result.dueDate as Date;
+        expect(isNaN(dueDate.getTime())).toBe(true);
+    });
+
+    it('should parse bare start date (no brackets or parens)', () => {
+        const result = parseTaskMetadata('Task start:: 2024-05-10');
+        expect(result.title).toBe('Task');
+        expect(result.startDate).toEqual(getLocalMidnight('2024-05-10'));
+    });
+
+    it('should parse bare completion date (no brackets or parens)', () => {
+        const result = parseTaskMetadata('Done task completion:: 2024-01-02');
+        expect(result.title).toBe('Done task');
+        expect(result.completionDate).toEqual(getLocalMidnight('2024-01-02'));
+    });
+
+    it('should parse due date with 📅 emoji and dd-mm-yyyy format', () => {
+        const result = parseTaskMetadata('Buy milk 📅 15-10-2023');
+        expect(result.title).toBe('Buy milk');
+        expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
+    });
+});
+describe('TaskParser.getFilesToScan', () => {
+    // Helper to create mock TFile objects
+    const createMockFile = (path: string, parentPath?: string) => {
+        return {
+            path,
+            parent: parentPath !== undefined ? { path: parentPath } : null,
+        } as unknown as import('obsidian').TFile;
+    };
+
+    const mockFiles = [
+        createMockFile('Projects/Todo.md', 'Projects'),
+        createMockFile('Projects/SubProject/Tasks.md', 'Projects/SubProject'),
+        createMockFile('RootFile.md', '/'),
+        createMockFile('OtherFolder/Notes.md', 'OtherFolder'),
+        createMockFile('ProjectsTodo.md', '/'), // Edge case for startsWith
+    ];
+
+    const createAppMock = (files: import('obsidian').TFile[]) => {
+        return {
+            vault: {
+                getMarkdownFiles: () => files,
+            },
+        } as unknown as App;
+    };
+
+    it('should return all files if scanFolders is empty', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: [] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(5);
+        expect(result).toEqual(mockFiles);
+    });
+
+    it('should return matched file directly when given exact file name', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: ['Projects/Todo.md'] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should return matched file directly when given file name without .md', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = { scanFolders: ['Projects/Todo'] } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should return files recursively matching a folder', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: true
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(2);
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('Projects/Todo.md');
+        expect(paths).toContain('Projects/SubProject/Tasks.md');
+    });
+
+    it('should not match files starting with folder name but not inside it when scanRecursively is true', () => {
+        // e.g., 'ProjectsTodo.md' should not be matched by 'Projects/'
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: true
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        const paths = result.map(f => f.path);
+        expect(paths).not.toContain('ProjectsTodo.md');
+    });
+
+    it('should return files exactly matching a folder when scanRecursively is false', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        expect(result).toHaveLength(1);
+        expect(result[0].path).toBe('Projects/Todo.md');
+    });
+
+    it('should match files in the root directory', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['/'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        // RootFile.md and ProjectsTodo.md are in root
+        expect(result).toHaveLength(2);
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('RootFile.md');
+        expect(paths).toContain('ProjectsTodo.md');
+    });
+
+    it('should return files from multiple folders when scanRecursively is false', () => {
+        const mockApp = createAppMock(mockFiles);
+        const mockSettings = {
+            scanFolders: ['Projects', 'OtherFolder'],
+            scanRecursively: false
+        } as unknown as SemesterSettings;
+        const parser = new TaskParser(mockApp, mockSettings);
+
+        const result = parser.getFilesToScan();
+        const paths = result.map(f => f.path);
+        expect(paths).toContain('Projects/Todo.md');
+        expect(paths).toContain('OtherFolder/Notes.md');
+    });
+});

@@ -1,35 +1,45 @@
-import { Task, getTaskStatus, TaskStatus } from '../models/Task';
-import { App, MarkdownView, setIcon, TFile } from 'obsidian';
-import { SemesterSettings } from '../settings/Settings';
+import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
+import { App, MarkdownView, TFile, setIcon } from 'obsidian';
+import { SemesterSettings, getTopicColor } from '../settings/Settings';
+import { TaskManager } from '../services/TaskManager';
+import { ConfirmModal } from '../modals/ConfirmModal';
+
+/**
+ * Opens the source file for a task and moves the editor cursor to its exact line.
+ * Exported here so TimelineComponent can import it from one place — same pattern
+ * as setupViewDOM (DashboardView.ts) and getTopicColor (Settings.ts).
+ */
+export async function openTaskInEditor(app: App, task: Task): Promise<void> {
+    const file = app.vault.getAbstractFileByPath(task.filePath);
+    if (!(file instanceof TFile)) return;
+
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.openFile(file, { active: true });
+
+    const view = app.workspace.getActiveViewOfType(MarkdownView);
+    if (view) {
+        const pos = { line: task.lineNumber, ch: 0 };
+        view.editor.setCursor(pos);
+        view.editor.scrollIntoView({ from: pos, to: pos }, true);
+    }
+}
 
 export class TaskListComponent {
-    // We need callbacks for the new actions
     constructor(
-        private container: HTMLElement,
-        private app: App,
-        private callbacks: {
+        private readonly container: HTMLElement,
+        private readonly app: App,
+        private readonly callbacks: {
             onToggle: (t: Task) => void,
-            onEdit: (t: Task, newTitle: string, newDate: Date | null) => void,
+            onEdit: (t: Task) => void,
             onDelete: (t: Task) => void
         },
-        private settings: SemesterSettings
+        private readonly settings: SemesterSettings
     ) {}
 
-    private getCourseColor(courseName: string): string {
-        if (this.settings?.topicColors && this.settings.topicColors[courseName]) {
-            return this.settings.topicColors[courseName];
-        }
-        
-        const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
-        let hash = 0;
-        for (let i = 0; i < courseName.length; i++) hash = courseName.charCodeAt(i) + ((hash << 5) - hash);
-        return defaultPalette[Math.abs(hash) % defaultPalette.length];
-    }
-
-    render(tasks: Task[], groupBy: string = 'none') {
+    render(groups: TaskGroup[]): void {
         this.container.empty();
 
-        if (tasks.length === 0) {
+        if (groups.length === 0) {
             const empty = this.container.createDiv('dashboard-empty-state');
             empty.createEl('p', { text: 'No tasks found.' });
             return;
@@ -37,19 +47,19 @@ export class TaskListComponent {
 
         const listContainer = this.container.createDiv('dashboard-task-list');
 
-        tasks.forEach(task => {
-            this.renderTaskItem(listContainer, task);
+        groups.forEach(group => {
+            this.renderTaskItem(listContainer, group);
         });
     }
 
-    private renderTaskItem(container: HTMLElement, task: Task) {
+    private renderTaskItem(container: HTMLElement, group: TaskGroup): void {
+        const task = group.representative;
         const taskEl = container.createDiv({ cls: ['task-item'] });
 
-        if (this.settings?.colorMode === 'course' && task.fileName) {
-            // Apply dynamic course color
-            taskEl.style.borderLeftColor = this.getCourseColor(task.fileName);
+        if (this.settings.colorMode === 'course' && task.fileName) {
+            taskEl.setCssProps({ '--tl-task-color': getTopicColor(task.fileName, this.settings) });
+            taskEl.addClass('has-topic-color');
         } else {
-            // Apply standard urgency color
             const status = getTaskStatus(task);
             if (status === TaskStatus.Overdue) taskEl.addClass('status-overdue');
             if (status === TaskStatus.Urgent) taskEl.addClass('status-urgent');
@@ -57,18 +67,22 @@ export class TaskListComponent {
             if (status === TaskStatus.UpcomingWeek) taskEl.addClass('status-active');
         }
 
-        // 1. Checkbox
         const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
         checkbox.checked = task.completed;
-        checkbox.addEventListener('change', () => this.callbacks.onToggle(task));
+        checkbox.setAttribute('aria-label', `Toggle task: ${task.title}`);
+        checkbox.setAttribute('title', `Toggle task: ${task.title}`);
+        checkbox.addEventListener('change', () => { this.callbacks.onToggle(task); });
 
-        // 2. Content Container
         const content = taskEl.createDiv('task-content');
 
-        // --- VIEW MODE ---
         const viewMode = content.createDiv('task-view-mode');
-        const titleEl = viewMode.createDiv('task-title');
+        const titleRow = viewMode.createDiv('task-title-row');
+        const titleEl = titleRow.createDiv('task-title');
         titleEl.setText(task.title);
+        titleEl.setAttribute('role', 'button');
+        titleEl.setAttribute('tabindex', '0');
+        titleEl.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+        titleEl.setAttribute('title', `Open task in editor: ${task.title}`);
 
         const meta = viewMode.createDiv('task-meta');
 
@@ -79,92 +93,69 @@ export class TaskListComponent {
 
         if (task.dueDate) {
             const dateLabel = meta.createDiv('task-date');
-            dateLabel.setText(task.dueDate.toDateString());
+            dateLabel.setText(TaskManager.formatDisplayDate(task.dueDate));
         }
 
-        const actions = meta.createDiv('task-actions');
+        // Recurring chip: icon always shown for recurring tasks.
+        // ×N badge shows completed cycle count when at least one cycle has been done.
+        if (group.isRecurring) {
+            const label = group.doneCount > 0
+                ? `Recurring task, Completed ${String(group.doneCount)} time${group.doneCount === 1 ? '' : 's'}`
+                : 'Recurring task';
 
-        /* const editBtn = actions.createEl('button', { cls: 'task-action-btn' });
-        setIcon(editBtn, 'pencil');
-        editBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            viewMode.style.display = 'none';
-            
-            // Create Input Mode UI
-            const editMode = content.createDiv('task-edit-mode');
+            const recurringChip = meta.createDiv('task-recurring-chip');
+            recurringChip.setAttribute('aria-label', label);
+            recurringChip.setAttribute('title', label);
 
-            // Title Input
-            const titleInput = editMode.createEl('input', {
-                type: 'text',
-                value: task.title,
-                cls: 'task-edit-input'
-            });
-
-            // Date Input
-            const dateInput = editMode.createEl('input', {
-                type: 'date',
-                cls: 'task-edit-date'
-            });
-            if (task.dueDate) {
-                // Format YYYY-MM-DD for input
-                const y = task.dueDate.getFullYear();
-                const m = String(task.dueDate.getMonth() + 1).padStart(2, '0');
-                const d = String(task.dueDate.getDate()).padStart(2, '0');
-                dateInput.value = `${y}-${m}-${d}`;
+            const icon = recurringChip.createSpan({ cls: 'task-recurring-icon' });
+            setIcon(icon, 'repeat');
+            if (group.doneCount > 0) {
+                recurringChip.createSpan({
+                    text: `×${String(group.doneCount)}`,
+                    cls: 'task-recurrence-count'
+                });
             }
+        }
 
-            // Save Button
-            const saveBtn = editMode.createEl('button', { cls: 'task-save-btn', text: 'Save' });
+        // Notes display
+        if (task.notes) {
+            const notesEl = meta.createDiv('task-notes');
+            notesEl.setText(task.notes);
+        }
 
-            // Cancel Button
-            const cancelBtn = editMode.createEl('button', { cls: 'task-cancel-btn', text: 'Cancel' });
-
-            const save = () => {
-                const newTitle = titleInput.value.trim();
-                if (newTitle) {
-                    const newDate = dateInput.value ? new Date(dateInput.value) : null;
-                    this.callbacks.onEdit(task, newTitle, newDate);
-                }
-            };
-
-            const cancel = () => {
-                editMode.remove();
-                viewMode.style.display = 'flex';
-            };
-
-            saveBtn.addEventListener('click', save);
-            cancelBtn.addEventListener('click', cancel);
-
-            // Handle Enter key
-            titleInput.addEventListener('keydown', (evt) => {
-                if (evt.key === 'Enter') save();
-                if (evt.key === 'Escape') cancel();
+        // Task actions (gated by showTaskActions setting)
+        if (this.settings.showTaskActions) {
+            const actionsEl = meta.createDiv('task-actions');
+            const editBtn = actionsEl.createEl('button', { cls: 'task-action-btn' });
+            setIcon(editBtn, 'pencil');
+            editBtn.setAttribute('aria-label', 'Edit task');
+            editBtn.setAttribute('title', 'Edit task');
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.callbacks.onEdit(task);
             });
+            const deleteBtn = actionsEl.createEl('button', { cls: ['task-action-btn', 'btn-danger'] });
+            setIcon(deleteBtn, 'trash-2');
+            deleteBtn.setAttribute('aria-label', 'Delete task');
+            deleteBtn.setAttribute('title', 'Delete task');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                new ConfirmModal(
+                    this.app,
+                    'Delete task',
+                    `Are you sure you want to delete "${task.title}"?`,
+                    () => { this.callbacks.onDelete(task); }
+                ).open();
+            });
+        }
 
-            titleInput.focus();
+        titleEl.addEventListener('click', () => { void openTaskInEditor(this.app, task); });
+        titleEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void openTaskInEditor(this.app, task);
+            }
         });
-
-        const deleteBtn = actions.createEl('button', { cls: 'task-action-btn btn-danger' });
-        setIcon(deleteBtn, 'trash-2');
-        deleteBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await this.callbacks.onDelete(task);
-        }); */
-
-        // Click title to jump to file
-        titleEl.addEventListener('click', () => this.openTaskInEditor(task));
     }
 
-    private async openTaskInEditor(task: Task) {
-        const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file) {
-            const leaf = this.app.workspace.getLeaf(false);
-            await leaf.openFile(file as any);
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view) {
-                view.editor.setCursor({ line: task.lineNumber, ch: 0 });
-                view.editor.scrollIntoView({ from: {line: task.lineNumber, ch: 0}, to: {line: task.lineNumber, ch: 0} }, true);
-            }
-        }
-    }
 }

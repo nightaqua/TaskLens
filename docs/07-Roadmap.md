@@ -1,13 +1,21 @@
 # Roadmap & Future Plans
 
-TaskLens is actively evolving. While the current version focuses on core task management and native Obsidian integration, the architecture is designed to support significant future extensions.
+TaskLens is actively evolving. The architecture is designed to support significant future extensions.
 
-Below is a list of features, widgets, and integrations we are exploring for future releases.
+## ✅ Recently shipped (v1.3.0)
 
-## 🎨 New Widgets & Visualizations
+* **Kanban Board View** — Status columns with drag-to-reschedule behaviour.
+* **Task Action Buttons** — Inline edit and delete buttons per task row.
+* **Edit Modal** — Quick Add / Edit modal opens pre-populated for existing tasks.
+* **Task Notes** — `[notes:: ...]` metadata displays beneath the task in the list.
+* **7-day Velocity & Topic Urgency** — Statistics now include completion trends and per-topic urgency ratios.
+* **Stats respect topic filter** — Statistics cards update when a course/topic filter is active.
+* **Comprehensive accessibility pass** — Tooltips and ARIA attributes across all interactive elements.
 
-* **Advanced Calendar View:** A traditional month/week calendar layout to complement the existing Timeline view.
-* **Enhanced Statistics Tracking:** Historical completion rates and productivity metrics.
+## 🎨 Next: Widgets & Visualizations
+
+* **Advanced Calendar View:** A traditional month/week calendar layout to complement the existing Timeline and Board views.
+* **Velocity chart UI:** Rendering the 7-day velocity data as an inline sparkline inside the Stats widget.
 * **Advanced Filtering UI:** More granular controls for priority levels, tags, and custom metadata.
 
 ## 🔄 External Integrations
@@ -19,8 +27,8 @@ Below is a list of features, widgets, and integrations we are exploring for futu
 ## 📚 Course & Project Management
 
 * **Semester Switching:** Support for defining multiple semesters with specific date ranges.
-* **Per-Course Colors:** Expanding the Smart Topic Colors to allow explicit per-course color coding.
+* **Per-Course Colors:** More explicit per-course color control beyond the existing palette.
 
-> **Want to contribute?** If you are a developer interested in helping build these integrations, check out our `Contributing` documentation to get your local environment set up!
+> **Want to contribute?** If you are a developer interested in helping build these, check out the [Contributing](06-Contributing.md) guide to get your local environment set up!
 
 ---

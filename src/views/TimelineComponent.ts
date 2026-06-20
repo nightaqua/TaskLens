@@ -1,85 +1,344 @@
-import { Task, getTaskStatus, TaskStatus } from '../models/Task';
-import { App, MarkdownView, TFile } from 'obsidian';
-import { SemesterSettings } from '../settings/Settings';
+import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
+import { App, setIcon } from 'obsidian';
+import { SemesterSettings, getTopicColor } from '../settings/Settings';
+import { openTaskInEditor } from './TaskListComponent';
+import { TaskManager } from '../services/TaskManager';
 
 export class TimelineComponent {
-    private container: HTMLElement;
-    private tasks: Task[];
-    private daysToShow: number;
-    private app: App;
-    private settings: SemesterSettings;
+    private readonly container: HTMLElement;
+    private readonly groups: TaskGroup[];
+    private readonly daysToShow: number;
+    private readonly app: App;
+    private readonly settings: SemesterSettings;
+    private readonly onViewportChange: ((newStart: Date) => void) | null;
 
+    private viewportStart: Date;
     private scrollContainer: HTMLElement | null = null;
     private tooltipEl: HTMLElement | null = null;
 
-    // Drag state
+    // Persists the nav ribbon panel's open state across re-renders triggered by viewport jumps
+    private ribbonNavOpen = false;
+    // Stored so it can be removed before re-render
+    private ribbonOutsideHandler: ((e: MouseEvent) => void) | null = null;
+
+    // Drag-to-scroll state
     private isDragging = false;
     private startX = 0;
     private scrollLeftPos = 0;
 
-    constructor(container: HTMLElement, app: App, tasks: Task[], daysToShow: number = 10, settings: SemesterSettings) {
+    // The viewport always renders exactly MAX_DAYS columns — the DOM size stays constant
+    private static readonly MAX_DAYS = 365;
+
+    // Jump buttons shift the viewport by this many months
+    private static readonly JUMP_MONTHS = 6;
+
+    constructor(
+        container: HTMLElement,
+        app: App,
+        groups: TaskGroup[],
+        daysToShow: number = 10,
+        settings: SemesterSettings,
+        viewportStart?: Date,
+        onViewportChange?: (newStart: Date) => void
+    ) {
         this.container = container;
         this.app = app;
-        this.tasks = tasks;
+        this.groups = groups;
         this.daysToShow = daysToShow;
         this.settings = settings;
+        this.onViewportChange = onViewportChange ?? null;
+
+        // Default: start 3 months before today so today is always comfortably in view
+        if (viewportStart) {
+            this.viewportStart = new Date(viewportStart);
+        } else {
+            const defaultStart = new Date();
+            defaultStart.setMonth(defaultStart.getMonth() - 3);
+            defaultStart.setHours(0, 0, 0, 0);
+            this.viewportStart = defaultStart;
+        }
     }
 
-    private getCourseColor(courseName: string): string {
-        if (this.settings?.topicColors && this.settings.topicColors[courseName]) {
-            return this.settings.topicColors[courseName];
+    public getViewportStart(): Date {
+        return new Date(this.viewportStart);
+    }
+
+    // Commits a new viewport start date, fires the change callback, re-renders, and resets pan
+    private applyViewportJump(newStart: Date): void {
+        this.viewportStart = newStart;
+        if (this.onViewportChange) this.onViewportChange(new Date(newStart));
+        this.render();
+        this.scrollContainer?.scrollTo({ left: 0, behavior: 'auto' });
+    }
+
+    // Shifts the viewport by the given number of months and re-renders
+    private jumpViewport(monthDelta: number): void {
+        const next = new Date(this.viewportStart);
+        next.setMonth(next.getMonth() + monthDelta);
+        this.applyViewportJump(next);
+    }
+
+    // Jumps the viewport so the given date sits near the left edge, then re-renders
+    private jumpToDate(date: Date): void {
+        const target = new Date(date);
+        target.setDate(target.getDate() - 14); // 2-week lead-in
+        target.setHours(0, 0, 0, 0);
+        this.applyViewportJump(target);
+    }
+
+    // Renders a single month label cell in the month header row
+    private renderMonthCell(
+        headerRow: HTMLElement,
+        day: Date,
+        span: number,
+        colWidth: number,
+        startIdx: number
+    ): void {
+        const monthName = day.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const cell = headerRow.createDiv('timeline-month-cell');
+        cell.setText(monthName);
+        cell.setCssProps({
+            width: `${String(span * colWidth)}%`,
+            left: `${String(startIdx * colWidth)}%`
+        });
+    }
+
+    // Builds the fixed-width day array for the current viewport
+    private buildViewportDays(): Date[] {
+        const days: Date[] = [];
+        const curr = new Date(this.viewportStart);
+        curr.setHours(0, 0, 0, 0);
+        for (let i = 0; i < TimelineComponent.MAX_DAYS; i++) {
+            days.push(new Date(curr));
+            curr.setDate(curr.getDate() + 1);
         }
-        
-        const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
-        let hash = 0;
-        for (let i = 0; i < courseName.length; i++) hash = courseName.charCodeAt(i) + ((hash << 5) - hash);
-        return defaultPalette[Math.abs(hash) % defaultPalette.length];
+        return days;
+    }
+
+    private createSideRibbon(allDays: Date[], validTasks: Task[]): void {
+        const ribbon = this.container.createDiv('timeline-ribbon');
+
+        // ── Nav section ───────────────────────────────────────────────────────────
+        const navSection = ribbon.createDiv('ribbon-section ribbon-section--nav');
+
+        const navHandle = navSection.createDiv('ribbon-handle ribbon-handle--nav');
+        navHandle.setAttribute('aria-label', 'Navigate timeline');
+        navHandle.setAttribute('title', 'Navigate timeline');
+        navHandle.setAttribute('role', 'button');
+        navHandle.setAttribute('tabindex', '0');
+        navHandle.setAttribute('aria-expanded', this.ribbonNavOpen ? 'true' : 'false');
+        navHandle.setAttribute('aria-controls', 'timeline-nav-panel');
+        const navIconWrap = navHandle.createDiv('ribbon-handle-icon');
+        setIcon(navIconWrap, 'calendar-range');
+
+        const navHoverLabel = navSection.createDiv('ribbon-hover-label');
+        navHoverLabel.setText('Navigate');
+
+        const navPanel = navSection.createDiv('ribbon-panel');
+        navPanel.id = 'timeline-nav-panel';
+
+        // Define open/close before anything that might call them ──────────────────
+        const openNav = (): void => {
+            this.ribbonNavOpen = true;
+            navSection.addClass('is-open');
+            navHandle.setAttribute('aria-expanded', 'true');
+            // Guard: don't double-register
+            if (this.ribbonOutsideHandler) {
+                activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                this.ribbonOutsideHandler = null;
+            }
+            const handler = (e: MouseEvent): void => {
+                const target = e.target;
+                if (!(target instanceof Node)) return;
+                if (!navSection.contains(target)) {
+                    this.ribbonNavOpen = false;
+                    navSection.removeClass('is-open');
+                    navHandle.setAttribute('aria-expanded', 'false');
+                    activeDocument.removeEventListener('mousedown', handler);
+                    this.ribbonOutsideHandler = null;
+                }
+            };
+            this.ribbonOutsideHandler = handler;
+            activeDocument.addEventListener('mousedown', handler);
+        };
+
+        const closeNav = (): void => {
+            this.ribbonNavOpen = false;
+            navSection.removeClass('is-open');
+            navHandle.setAttribute('aria-expanded', 'false');
+            if (this.ribbonOutsideHandler) {
+                activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
+                this.ribbonOutsideHandler = null;
+            }
+        };
+
+        // Restore open state after a viewport-jump re-render — also re-attaches handler
+        if (this.ribbonNavOpen) openNav();
+
+        const viewportEnd = new Date(this.viewportStart);
+        viewportEnd.setDate(viewportEnd.getDate() + TimelineComponent.MAX_DAYS - 1);
+        const startLabel = this.viewportStart.toLocaleString('default', { month: 'short', year: '2-digit' });
+        const endLabel = viewportEnd.toLocaleString('default', { month: 'short', year: '2-digit' });
+
+        const navControls = navPanel.createDiv('ribbon-nav-controls');
+
+        const prevBtn = navControls.createEl('button', { cls: 'vp-jump' });
+        prevBtn.setText('‹‹');
+        prevBtn.setAttribute('aria-label', 'Jump back 6 months');
+        prevBtn.setAttribute('title', 'Jump back 6 months');
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.ribbonNavOpen = true;
+            this.jumpViewport(-TimelineComponent.JUMP_MONTHS);
+        });
+
+        const rangeEl = navControls.createDiv('vp-range');
+        rangeEl.createSpan().setText(startLabel);
+        rangeEl.createEl('em').setText('/');
+        rangeEl.createSpan().setText(endLabel);
+
+        const nextBtn = navControls.createEl('button', { cls: 'vp-jump' });
+        nextBtn.setText('››');
+        nextBtn.setAttribute('aria-label', 'Jump forward 6 months');
+        nextBtn.setAttribute('title', 'Jump forward 6 months');
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.ribbonNavOpen = true;
+            this.jumpViewport(TimelineComponent.JUMP_MONTHS);
+        });
+
+        const windowStart = allDays[0];
+        const windowEnd = allDays[allDays.length - 1];
+        const outOfRange = validTasks.filter(t => {
+            if (!t.dueDate) return false;
+            return t.dueDate < windowStart || t.dueDate > windowEnd;
+        });
+
+        if (outOfRange.length > 0) {
+            const byMonth = new Map<string, { label: string; date: Date; count: number }>();
+            outOfRange.forEach(t => {
+                if (!t.dueDate) return;
+                const key = t.dueDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+                const existing = byMonth.get(key);
+                if (existing) {
+                    existing.count += 1;
+                } else {
+                    byMonth.set(key, { label: key, date: new Date(t.dueDate), count: 1 });
+                }
+            });
+
+            const chipsEl = navPanel.createDiv('ribbon-chips');
+            byMonth.forEach(({ label, date, count }) => {
+                const isPast = date < windowStart;
+                const chip = chipsEl.createEl('button', { cls: `chip ${isPast ? 'chip--past' : 'chip--future'}` });
+                const countSuffix = count > 1 ? ` \xd7${String(count)}` : '';
+                chip.setText(isPast ? `\u2190 ${label}${countSuffix}` : `${label}${countSuffix} \u2192`);
+                chip.setAttribute('aria-label', `Jump to ${label}`);
+                chip.setAttribute('title', `Jump to ${label}`);
+                chip.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.ribbonNavOpen = true;
+                    this.jumpToDate(date);
+                });
+            });
+        }
+
+        const toggleNav = () => {
+            if (navSection.hasClass('is-open')) {
+                closeNav();
+            } else {
+                openNav();
+            }
+        };
+        navHandle.addEventListener('click', toggleNav);
+        navHandle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleNav();
+            }
+        });
+
+        // ── Sync section ──────────────────────────────────────────────────────────
+        // No panel, no toggle. Hover reveals a floating expand (rightward absolute overlay).
+        // Clicking either the handle or the expand fires scrollToToday.
+        const syncSection = ribbon.createDiv('ribbon-section ribbon-section--sync');
+
+        const syncHandle = syncSection.createDiv('ribbon-handle ribbon-handle--sync');
+        syncHandle.setAttribute('aria-label', 'Scroll to today');
+        syncHandle.setAttribute('title', 'Scroll to today');
+        syncHandle.setAttribute('role', 'button');
+        syncHandle.setAttribute('tabindex', '0');
+        const syncIconWrap = syncHandle.createDiv('ribbon-handle-icon');
+        setIcon(syncIconWrap, 'rotate-ccw');
+
+        // Floating expand — shown on section hover via CSS, positioned rightward
+        const syncExpand = syncSection.createDiv('ribbon-sync-expand');
+        syncExpand.setAttribute('role', 'button');
+        syncExpand.setAttribute('tabindex', '0');
+        syncExpand.setAttribute('aria-label', 'Scroll to today');
+        syncExpand.setAttribute('title', 'Scroll to today');
+        const syncExpandIcon = syncExpand.createDiv('ribbon-sync-expand-icon');
+        setIcon(syncExpandIcon, 'rotate-ccw');
+        syncExpand.createSpan({ cls: 'ribbon-sync-expand-label' }).setText('Today');
+
+        syncHandle.addEventListener('click', () => { this.scrollToToday(); });
+        syncHandle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.scrollToToday();
+            }
+        });
+        syncExpand.addEventListener('click', () => { this.scrollToToday(); });
+        syncExpand.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.scrollToToday();
+            }
+        });
     }
 
     public render(): void {
+        if (this.ribbonOutsideHandler) {
+            activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            this.ribbonOutsideHandler = null;
+        }
         this.container.empty();
         this.container.addClass('timeline-wrapper');
 
-        const validTasks = this.tasks.filter(t => t.dueDate && !isNaN(t.dueDate.getTime()));
-        if (validTasks.length === 0) {
+        // Extract representative tasks from groups. Each group renders as one bar.
+        // Completed-only groups (openCount === 0) are included so completed recurring
+        // tasks still appear on the timeline.
+        const validGroups = this.groups.filter(g => {
+            const t = g.representative;
+            return t.dueDate && !isNaN(t.dueDate.getTime());
+        });
+
+        if (validGroups.length === 0) {
             const empty = this.container.createDiv('dashboard-empty-state');
             empty.createEl('p', { text: 'No dated tasks to display.' });
             return;
         }
 
-        const dates = validTasks.map(t => t.dueDate!);
-        dates.push(new Date());
+        // Build the fixed-width viewport — always MAX_DAYS columns, no matter what dates exist
+        const allDays = this.buildViewportDays();
 
-        const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        // Ribbon is appended to the outer container so it anchors to the pane's left wall,
+        // outside the chart entirely. The chart wrapper gets a left margin to match.
+        this.createSideRibbon(allDays, validGroups.map(g => g.representative));
 
-        minDate.setDate(minDate.getDate() - 2);
-        maxDate.setDate(maxDate.getDate() + this.daysToShow + 2);
-
-        const allDays: Date[] = [];
-        const curr = new Date(minDate);
-        while (curr <= maxDate) {
-            allDays.push(new Date(curr));
-            curr.setDate(curr.getDate() + 1);
-        }
-
-        // 1. ADD NAVIGATION ARROWS (Hover Overlays)
+        // Left/right hover-overlay arrows for panning within the window — untouched
         this.createNavigationOverlay('left');
         this.createNavigationOverlay('right');
 
-        // 2. SETUP CONTAINERS
+        // Outer scroll container
         this.scrollContainer = this.container.createDiv('timeline-container');
         const scrollContent = this.scrollContainer.createDiv('timeline-scroll-content');
-
-        // Ensure width scales perfectly to fit all days
-        const totalWidthPercent = (allDays.length / this.daysToShow) * 100;
-        scrollContent.style.width = `${totalWidthPercent}%`;
+        scrollContent.setCssProps({ width: `${String((allDays.length / this.daysToShow) * 100)}%` });
 
         const colWidthPercent = 100 / allDays.length;
 
-        // 3. MONTH HEADER ROW
+        // Month header: groups day columns under their respective month labels
         const monthHeader = scrollContent.createDiv('timeline-month-row');
-
         let currentMonth = -1;
         let monthStartIdx = 0;
 
@@ -87,40 +346,29 @@ export class TimelineComponent {
             const m = day.getMonth();
             if (m !== currentMonth) {
                 if (currentMonth !== -1) {
-                    const span = idx - monthStartIdx;
-                    const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
-                    const mDiv = monthHeader.createDiv('timeline-month-cell');
-                    mDiv.setText(monthName);
-                    mDiv.style.width = `${span * colWidthPercent}%`;
-                    mDiv.style.left = `${monthStartIdx * colWidthPercent}%`;
+                    this.renderMonthCell(monthHeader, allDays[monthStartIdx], idx - monthStartIdx, colWidthPercent, monthStartIdx);
                 }
                 currentMonth = m;
                 monthStartIdx = idx;
             }
         });
+        // Flush the final month segment
+        this.renderMonthCell(monthHeader, allDays[monthStartIdx], allDays.length - monthStartIdx, colWidthPercent, monthStartIdx);
 
-        const span = allDays.length - monthStartIdx;
-        const monthName = allDays[monthStartIdx].toLocaleString('default', { month: 'long', year: 'numeric' });
-        const mDiv = monthHeader.createDiv('timeline-month-cell');
-        mDiv.setText(monthName);
-        mDiv.style.width = `${span * colWidthPercent}%`;
-        mDiv.style.left = `${monthStartIdx * colWidthPercent}%`;
-
-        // 4. GRID & DAYS (Solid grid lines)
+        // CSS grid for day columns — row 1 is the date header, rows 2+ hold task bars
         const grid = scrollContent.createDiv('timeline-grid');
-        grid.style.gridTemplateColumns = `repeat(${allDays.length}, 1fr)`;
+        grid.setCssProps({ '--tl-days': String(allDays.length) });
 
         allDays.forEach((day, idx) => {
+            // Day number + weekday label in the header row
             const cell = grid.createDiv('timeline-header-cell');
             cell.setText(day.getDate().toString());
-            const dayName = day.toLocaleString('default', { weekday: 'short' });
-            cell.createDiv('timeline-day-name').setText(dayName);
-            cell.style.gridColumn = `${idx + 1}`;
-            cell.style.gridRow = `1`;
+            cell.createDiv('timeline-day-name').setText(day.toLocaleString('default', { weekday: 'short' }));
+            cell.setCssProps({ '--tl-col': String(idx + 1) });
 
+            // Background column cell spanning all task rows
             const bgCell = grid.createDiv('timeline-bg-cell');
-            bgCell.style.gridColumn = `${idx + 1}`;
-            bgCell.style.gridRow = `2 / -1`;
+            bgCell.setCssProps({ '--tl-col': String(idx + 1) });
 
             if (day.getDate() === 1) {
                 cell.addClass('is-month-start');
@@ -131,108 +379,193 @@ export class TimelineComponent {
                 cell.addClass('is-today');
                 bgCell.addClass('is-today-bg');
 
+                // Vertical line marking today across all rows
                 const marker = grid.createDiv('timeline-today-marker');
-                marker.style.gridColumn = `${idx + 1}`;
-                marker.style.gridRow = `1 / -1`;
+                marker.setCssProps({ '--tl-col': String(idx + 1) });
             }
         });
 
-        // 5. TASKS
-        validTasks.forEach((task, rowIndex) => {
-            const rowBg = grid.createDiv('timeline-row-bg');
-            rowBg.style.gridColumn = `1 / -1`;
-            rowBg.style.gridRow = `${rowIndex + 2}`;
+        // Task bar layout: compact row-packing sorted by topic then start date.
+        // Tracks the latest end time per row to find the first available slot for each task.
+        const rowEndTimes: number[] = [];
 
-            // Treat start date as due date if no start date exists
-            const taskStart = task.startDate ? new Date(task.startDate) : new Date(task.dueDate!);
-            const taskEnd = new Date(task.dueDate!);
+        const windowStart = allDays[0];
+        const windowEnd = allDays[allDays.length - 1];
 
-            // Normalize times to midnight to avoid timezone shifting bugs
-            taskStart.setHours(0,0,0,0);
-            taskEnd.setHours(0,0,0,0);
+        const sortedGroups = [...validGroups].sort((a, b) => {
+            const ta = a.representative;
+            const tb = b.representative;
+            if (ta.fileName !== tb.fileName) {
+                return (ta.fileName || '').localeCompare(tb.fileName || '');
+            }
+            const aStart = ta.startDate?.getTime() ?? ta.dueDate?.getTime() ?? 0;
+            const bStart = tb.startDate?.getTime() ?? tb.dueDate?.getTime() ?? 0;
+            return aStart - bStart;
+        });
 
-            // Find columns
-            let startIdx = allDays.findIndex(d => d.toDateString() === taskStart.toDateString());
-            let dueIdx = allDays.findIndex(d => d.toDateString() === taskEnd.toDateString());
+        const windowStartMs = windowStart.getTime();
+        const windowEndMs = windowEnd.getTime() + 86399999;
+        const visibleGroups = sortedGroups.filter(group => {
+            const task = group.representative;
+            if (!task.dueDate) return false;
+            const dueMs = new Date(task.dueDate).setHours(23, 59, 59, 999);
+            const startDate = task.startDate ?? task.dueDate;
+            const startMs = new Date(startDate).setHours(0, 0, 0, 0);
+            return dueMs >= windowStartMs && startMs <= windowEndMs;
+        });
 
-            // If task starts before our rendered timeline, snap it to the left edge
+        // Precompute date string → column index for O(1) lookups instead of O(N) array scans
+        const dayIndexMap = new Map<string, number>();
+        for (let i = 0; i < allDays.length; i++) {
+            dayIndexMap.set(allDays[i].toDateString(), i);
+        }
+
+        visibleGroups.forEach((group) => {
+            const task = group.representative;
+            if (!task.dueDate) return;
+
+            const taskStart = new Date(task.startDate ?? task.dueDate);
+            const taskEnd = new Date(task.dueDate);
+            taskStart.setHours(0, 0, 0, 0);
+            taskEnd.setHours(0, 0, 0, 0);
+
+            let startIdx = dayIndexMap.get(taskStart.toDateString()) ?? -1;
+            let dueIdx = dayIndexMap.get(taskEnd.toDateString()) ?? -1;
+
+            // Clamp tasks that extend beyond the visible range
             if (startIdx === -1 && taskStart < allDays[0]) startIdx = 0;
-            // If task ends after our rendered timeline, snap it to the right edge
             if (dueIdx === -1 && taskEnd > allDays[allDays.length - 1]) dueIdx = allDays.length - 1;
 
-            if (dueIdx >= 0 && startIdx >= 0) {
-                const bar = grid.createDiv('timeline-task-bar');
-                bar.setText(task.title);
+            if (startIdx === -1 || dueIdx === -1 || (startIdx === 0 && dueIdx === 0 && taskEnd < allDays[0])) return;
 
-                if (this.settings?.colorMode === 'course' && task.fileName) {
-                    bar.style.backgroundColor = this.getCourseColor(task.fileName);
-                } else {
-                    const status = getTaskStatus(task);
-                    if (status === TaskStatus.Overdue) bar.addClass('status-overdue');
-                    if (status === TaskStatus.Urgent) bar.addClass('status-urgent');
-                    if (status === TaskStatus.Completed) bar.addClass('status-completed');
-                    if (status === TaskStatus.UpcomingWeek) bar.addClass('status-active');
-                }
+            // Find the first row whose last task has already ended before this one starts
+            let rowIndex = rowEndTimes.findIndex(endTime => endTime < taskStart.getTime());
+            if (rowIndex === -1) {
+                rowIndex = rowEndTimes.length;
+                rowEndTimes.push(taskEnd.getTime());
 
-                // Calculate how many days the task spans (minimum 1 day)
-                const span = (dueIdx - startIdx) + 1;
-
-                bar.style.gridColumnStart = `${startIdx + 1}`;
-                bar.style.gridColumnEnd = `span ${span}`;
-                bar.style.gridRow = `${rowIndex + 2}`;
-
-                bar.addEventListener('mouseenter', (e) => this.showTooltip(e, task));
-                bar.addEventListener('mouseleave', () => this.hideTooltip());
-                bar.addEventListener('mousemove', (e) => this.moveTooltip(e));
-
-                bar.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.openTaskFile(task);
-                });
+                const rowBg = grid.createDiv('timeline-row-bg');
+                rowBg.setCssProps({ '--tl-row': String(rowIndex + 2) });
+            } else {
+                rowEndTimes[rowIndex] = taskEnd.getTime();
             }
+
+            const barLabel = task.title;
+
+            const bar = grid.createDiv('timeline-task-bar');
+            bar.setText(barLabel);
+            bar.setAttribute('role', 'button');
+            bar.setAttribute('tabindex', '0');
+            bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
+            bar.setAttribute('title', `Open task in editor: ${task.title}`);
+            bar.setCssProps({
+                '--tl-col-start': String(startIdx + 1),
+                '--tl-col-span': String((dueIdx - startIdx) + 1),
+                '--tl-row': String(rowIndex + 2)
+            });
+
+            if (taskStart < allDays[0]) bar.addClass('is-clamped-left');
+            if (taskEnd > allDays[allDays.length - 1]) bar.addClass('is-clamped-right');
+
+            // Colour by course/topic or by urgency status depending on settings
+            if (this.settings.colorMode === 'course' && task.fileName) {
+                bar.setCssProps({ '--tl-task-color': getTopicColor(task.fileName, this.settings) });
+                bar.addClass('has-topic-color');
+            } else {
+                const statusClass: Record<string, string> = {
+                    [TaskStatus.Overdue]: 'status-overdue',
+                    [TaskStatus.Urgent]: 'status-urgent',
+                    [TaskStatus.Completed]: 'status-completed',
+                    [TaskStatus.UpcomingWeek]: 'status-active',
+                };
+                const cls = statusClass[getTaskStatus(task)];
+                if (cls) bar.addClass(cls);
+            }
+
+            bar.addEventListener('mouseenter', (e) => { this.showTooltip(e, task, group.isRecurring); });
+            bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
+            bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
+            bar.addEventListener('click', (e) => {
+                e.stopPropagation();
+                void openTaskInEditor(this.app, task);
+            });
+            bar.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void openTaskInEditor(this.app, task);
+                }
+            });
         });
 
-        // 6. INITIALIZE DRAGGING & SCROLL
         this.setupEventListeners(this.scrollContainer);
     }
 
     public getScrollPosition(): number {
-        return this.scrollContainer ? this.scrollContainer.scrollLeft : 0;
+        return this.scrollContainer?.scrollLeft ?? 0;
     }
 
     public setScrollPosition(pos: number): void {
-        if (this.scrollContainer) {
-            this.scrollContainer.scrollTo({ left: pos, behavior: 'auto' });
-        }
-    }
-    public scrollToToday(): void {
-        setTimeout(() => {
-            if (!this.scrollContainer) return;
-            const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today') as HTMLElement;
-            if (todayCell) {
-                const scrollPos = todayCell.offsetLeft - (this.scrollContainer.clientWidth / 2) + (todayCell.clientWidth / 2);
-                this.scrollContainer.scrollTo({ left: scrollPos, behavior: 'smooth' });
-            }
-        }, 100);
+        this.scrollContainer?.scrollTo({ left: pos, behavior: 'auto' });
     }
 
-    // --- PUBLIC SCROLL METHOD ---
+    // Smoothly centres the viewport on today's column.
+    // If today is outside the current window, jumps the viewport to bring it in first.
+    public scrollToToday(): void {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const windowEnd = new Date(this.viewportStart);
+        windowEnd.setDate(windowEnd.getDate() + TimelineComponent.MAX_DAYS - 1);
+
+        if (today < this.viewportStart || today > windowEnd) {
+            const newStart = new Date(today);
+            newStart.setMonth(newStart.getMonth() - 3);
+            newStart.setHours(0, 0, 0, 0);
+            // applyViewportJump re-renders, so we return — the new render will have today in range
+            this.applyViewportJump(newStart);
+            return;
+        }
+
+        if (!this.scrollContainer) return;
+        const todayCell = this.scrollContainer.querySelector('.timeline-header-cell.is-today');
+        if (todayCell instanceof HTMLElement) {
+            const scrollPos = todayCell.offsetLeft
+                - (this.scrollContainer.clientWidth / 2)
+                + (todayCell.clientWidth / 2);
+            this.scrollContainer.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
+        }
+    }
+
     public scroll(direction: 'left' | 'right'): void {
         if (!this.scrollContainer) return;
-        const scrollAmount = this.scrollContainer.clientWidth * 0.8;
+        const amount = this.scrollContainer.clientWidth * 0.8;
         this.scrollContainer.scrollBy({
-            left: direction === 'left' ? -scrollAmount : scrollAmount,
-            behavior: 'smooth'
+            left: direction === 'left' ? -amount : amount,
+            behavior: 'smooth',
         });
     }
 
     private createNavigationOverlay(direction: 'left' | 'right'): void {
         const overlay = this.container.createDiv(`timeline-nav-overlay nav-${direction}`);
+        const label = `Scroll ${direction}`;
+        overlay.setAttribute('role', 'button');
+        overlay.setAttribute('tabindex', '0');
+        overlay.setAttribute('aria-label', label);
+        overlay.setAttribute('title', label);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
 
-        overlay.addEventListener('click', (e) => {
+        const triggerScroll = (e: Event) => {
             e.stopPropagation();
-            this.scroll(direction); // Reuse the release method
+            this.scroll(direction);
+        };
+
+        overlay.addEventListener('click', triggerScroll);
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerScroll(e);
+            }
         });
     }
 
@@ -258,50 +591,64 @@ export class TimelineComponent {
             if (!this.isDragging) return;
             e.preventDefault();
             const x = e.pageX - container.offsetLeft;
-            const walk = (x - this.startX) * 1.5;
-            container.scrollLeft = this.scrollLeftPos - walk;
+            container.scrollLeft = this.scrollLeftPos - (x - this.startX) * 1.5;
         });
     }
 
-    private showTooltip(e: MouseEvent, task: Task): void {
+    private showTooltip(e: MouseEvent, task: Task, isRecurring: boolean): void {
         if (!this.tooltipEl) {
-            this.tooltipEl = document.body.createDiv('dashboard-tooltip');
+            this.tooltipEl = activeDocument.body.createDiv('dashboard-tooltip');
         }
         this.tooltipEl.empty();
         this.tooltipEl.createDiv('tooltip-title').setText(task.title);
         this.tooltipEl.createDiv('tooltip-meta').setText(`📂 ${task.fileName}`);
         if (task.dueDate) {
-            this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${task.dueDate.toDateString()}`);
+            this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${TaskManager.formatDisplayDate(task.dueDate)}`);
         }
-
-        this.tooltipEl.style.display = 'block';
+        if (isRecurring) {
+            this.tooltipEl.createDiv('tooltip-recurrence').setText('🔁 Recurring');
+        }
+        if (task.notes) {
+            this.tooltipEl.createDiv('tooltip-notes').setText(task.notes);
+        }
+        this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
     }
 
     private moveTooltip(e: MouseEvent): void {
         if (this.tooltipEl) {
-            this.tooltipEl.style.top = `${e.clientY + 15}px`;
-            this.tooltipEl.style.left = `${e.clientX + 15}px`;
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+
+            // Bounds checking against viewport
+            const width = this.tooltipEl.offsetWidth || 0;
+            const height = this.tooltipEl.offsetHeight || 0;
+            const maxLeft = window.innerWidth - width - 15;
+            const maxTop = window.innerHeight - height - 15;
+
+            if (left > maxLeft) left = Math.max(0, e.clientX - width - 15);
+            if (top > maxTop) top = Math.max(0, e.clientY - height - 15);
+
+            this.tooltipEl.setCssProps({
+                top: `${String(top)}px`,
+                left: `${String(left)}px`
+            });
         }
     }
 
     private hideTooltip(): void {
-        if (this.tooltipEl) {
-            this.tooltipEl.style.display = 'none';
+        this.tooltipEl?.setCssProps({ display: 'none' });
+    }
+
+    /** Removes DOM nodes owned by this component that live outside its container. */
+    public destroy(): void {
+        this.hideTooltip();
+        this.tooltipEl?.remove();
+        this.tooltipEl = null;
+        if (this.ribbonOutsideHandler) {
+            activeDocument.removeEventListener('mousedown', this.ribbonOutsideHandler);
+            this.ribbonOutsideHandler = null;
         }
     }
 
-    private async openTaskFile(task: Task): Promise<void> {
-        const file = this.app.vault.getAbstractFileByPath(task.filePath);
-        if (file instanceof TFile) {
-            const leaf = this.app.workspace.getLeaf(false);
-            await leaf.openFile(file);
-
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view) {
-                view.editor.setCursor({ line: task.lineNumber, ch: 0 });
-                view.editor.scrollIntoView({ from: {line: task.lineNumber, ch: 0}, to: {line: task.lineNumber, ch: 0} }, true);
-            }
-        }
-    }
 }

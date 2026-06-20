@@ -1,182 +1,291 @@
-import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
+import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { WelcomeModal } from '../modals/WelcomeModal';
+import { getTopicColor } from './Settings';
+import { CLASS_SETTINGS } from '../constants';
+
+const validSortModes = ['status', 'course'] as const;
+type SortMode = typeof validSortModes[number];
+function isSortMode(v: unknown): v is SortMode {
+    return validSortModes.includes(v as SortMode);
+}
 
 export class SettingsTab extends PluginSettingTab {
-    plugin: TaskLensPlugin;
+    private readonly plugin: TaskLensPlugin;
 
     constructor(app: App, plugin: TaskLensPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
 
+    private async updateScanPaths(value: string): Promise<void> {
+        this.plugin.settings.scanFolders = value
+            .split('\n')
+            .map(s => s.trim())
+            .filter(s => s.length > 0)
+            // Normalise slashes and whitespace for cross-platform compatibility
+            .map(s => normalizePath(s));
+
+        await this.plugin.saveSettings();
+        await this.plugin.taskManager.loadTasks();
+    }
+
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.addClass('tasklens-settings');
+        containerEl.addClass(CLASS_SETTINGS);
 
-        // Header with Help Icon
-        const headerDiv = containerEl.createDiv();
-        headerDiv.style.display = 'flex';
-        headerDiv.style.justifyContent = 'space-between';
-        headerDiv.style.alignItems = 'center';
-        headerDiv.style.marginBottom = '20px';
+        // --- NATIVE HEADER WITH HELP BUTTON ---
+        new Setting(containerEl)
+            .setName('Configuration')
+            .setHeading()
+            .addExtraButton(btn => btn
+                .setIcon('help-circle')
+                .setTooltip('Show tutorial')
+                .onClick(() => {
+                    new WelcomeModal(this.app, this.plugin).open();
+                })
+            );
 
-        const headerTitle = headerDiv.createEl('h2', { text: 'TaskLens Settings' });
-        headerTitle.style.margin = '0';
-
-        const helpBtn = headerDiv.createEl('button', {
-            cls: 'clickable-icon',
-            attr: { 'aria-label': 'Show Tutorial' }
-        });
-        helpBtn.style.background = 'transparent';
-        helpBtn.style.border = 'none';
-        helpBtn.style.cursor = 'pointer';
-        helpBtn.style.color = 'var(--text-muted)';
-        helpBtn.style.padding = '4px';
-        setIcon(helpBtn, 'help-circle');
-
-        helpBtn.addEventListener('click', () => {
-            new WelcomeModal(this.app, this.plugin).open();
-        });
-        // 1. Scanning
         const scanDetails = containerEl.createEl('details');
-        scanDetails.open = true;
-        scanDetails.createEl('summary', { text: 'Vault Scanning' });
+        scanDetails.open = this.plugin.settings.settingsTabState.scanOpen;
+        scanDetails.createEl('summary', { text: 'Vault scanning' });
+        scanDetails.addEventListener('toggle', () => {
+            this.plugin.settings.settingsTabState.scanOpen = scanDetails.open;
+            void this.plugin.saveSettings();
+        });
 
         const scanPathsSetting = new Setting(scanDetails)
             .setName('Scan paths')
-            // Using \n to force line breaks visually
-            .setDesc('Folders (e.g. Uni/Math)\nor specific files (e.g. Projects/Todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
+            .setDesc('Folders (e.g. Uni/math)\nor specific files (e.g. Projects/todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
             .addTextArea(text => {
+                text.inputEl.setAttribute("aria-label", "Scan paths");
+                text.inputEl.setAttribute("title", "Scan paths");
                 text.setPlaceholder('Projects\nUni/History\nTo-Do.md')
                     .setValue(this.plugin.settings.scanFolders.join('\n'))
-                    .onChange(async (value) => {
-                        this.plugin.settings.scanFolders = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-                        await this.plugin.saveSettings();
+                    .onChange((value) => {
+                        void this.updateScanPaths(value);
                     });
             });
 
-        // Add a custom class so we can target this specific layout in CSS
         scanPathsSetting.settingEl.addClass('scan-paths-setting');
 
         new Setting(scanDetails)
-            .setName('Recursive Scan')
+            .setName('Recursive scan')
             .setDesc('Scan all subfolders inside the folders specified above?')
-            .addToggle(t => t.setValue(this.plugin.settings.scanRecursively).onChange(async v => {
+            .addToggle(t => t.setValue(this.plugin.settings.scanRecursively).onChange(v => {
                 this.plugin.settings.scanRecursively = v;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
             }));
 
-        /// 2. Task Parsing
         const parserDetails = containerEl.createEl('details');
-        parserDetails.createEl('summary', { text: 'Task Parsing' });
+        parserDetails.open = this.plugin.settings.settingsTabState.parserOpen;
+        parserDetails.createEl('summary', { text: 'Task parsing & automation' });
+        parserDetails.addEventListener('toggle', () => {
+            this.plugin.settings.settingsTabState.parserOpen = parserDetails.open;
+            void this.plugin.saveSettings();
+        });
 
         new Setting(parserDetails)
-            .setName('Start Key')
+            .setName('App-wide automation')
+            .setDesc('Apply date stamping and recurrence even when editing notes directly.')
+            .addToggle(t => t.setValue(this.plugin.settings.appWideAutomation).onChange(v => {
+                this.plugin.settings.appWideAutomation = v;
+                void this.plugin.saveSettings();
+            }));
+
+        new Setting(parserDetails)
+            .setName('Start key')
             .setDesc('Inline text used to find the start date. Example: [start:: 2026-02-02]')
-            .addText(t => t.setValue(this.plugin.settings.startDateKey).onChange(async v => { this.plugin.settings.startDateKey = v; await this.plugin.saveSettings(); }));
+            .addText(t => {
+                t.inputEl.setAttribute("aria-label", "Start key");
+                t.inputEl.setAttribute("title", "Start key");
+                return t.setValue(this.plugin.settings.startDateKey).onChange(v => {
+                this.plugin.settings.startDateKey = v;
+                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+            });
+            });
 
         new Setting(parserDetails)
-            .setName('Due Key')
+            .setName('Due key')
             .setDesc('Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]')
-            .addText(t => t.setValue(this.plugin.settings.dueDateKey).onChange(async v => { this.plugin.settings.dueDateKey = v; await this.plugin.saveSettings(); }));
+            .addText(t => {
+                t.inputEl.setAttribute("aria-label", "Due key");
+                t.inputEl.setAttribute("title", "Due key");
+                return t.setValue(this.plugin.settings.dueDateKey).onChange(v => {
+                this.plugin.settings.dueDateKey = v;
+                void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+            });
+            });
 
-        // 3. Visuals & Colors
+        new Setting(parserDetails)
+            .setName('Course detection')
+            .setDesc('How to determine a task\'s course or topic name.')
+            .addDropdown(d => {
+                d.selectEl.setAttribute("aria-label", "Course detection");
+                d.selectEl.setAttribute("title", "Course detection");
+                return d
+                .addOption('per-file', 'File name')
+                .addOption('per-folder', 'Folder name')
+                .addOption('frontmatter', 'Frontmatter field')
+                .setValue(this.plugin.settings.courseDetection)
+                .onChange((v) => {
+                    this.plugin.settings.courseDetection = v as 'per-file' | 'per-folder' | 'frontmatter';
+                    void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                    this.renderFrontmatterKeyField(frontmatterKeyContainer);
+                });
+            });
+
+        const frontmatterKeyContainer = parserDetails.createDiv();
+        this.renderFrontmatterKeyField(frontmatterKeyContainer);
+
         const uiDetails = containerEl.createEl('details');
-        uiDetails.open = true;
-        uiDetails.createEl('summary', { text: 'Appearance & Colors' });
+        uiDetails.open = this.plugin.settings.settingsTabState.uiOpen;
+        uiDetails.createEl('summary', { text: 'Appearance & colors' });
+        uiDetails.addEventListener('toggle', () => {
+            this.plugin.settings.settingsTabState.uiOpen = uiDetails.open;
+            void this.plugin.saveSettings();
+        });
 
         new Setting(uiDetails)
-            .setName('Color Mode')
-            .addDropdown(d => d
-                .addOption('status', 'By Urgency (Overdue, Active)')
-                .addOption('course', 'By Topic (File Palette)')
+            .setName('Color mode')
+            .addDropdown(d => {
+                d.selectEl.setAttribute("aria-label", "Color mode");
+                d.selectEl.setAttribute("title", "Color mode");
+                return d
+                .addOption('status', 'By urgency (overdue, active)')
+                .addOption('course', 'By topic (file palette)')
                 .setValue(this.plugin.settings.colorMode)
-                .onChange(async (v) => {
-                    this.plugin.settings.colorMode = v as any;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshViews();
-                    renderColorPickers();
-                }));
+                .onChange((v) => {
+                    if (isSortMode(v)) this.plugin.settings.colorMode = v;
+                    void this.plugin.saveSettings().then(() => {
+                        this.plugin.refreshViews();
+                        this.renderColorPickers(colorPickersContainer);
+                    });
+                });
+            });
+
+        new Setting(uiDetails)
+            .setName('Show task action buttons')
+            .setDesc('Show edit and delete buttons on task hover in the task list.')
+            .addToggle(t => t.setValue(this.plugin.settings.showTaskActions).onChange(v => {
+                this.plugin.settings.showTaskActions = v;
+                void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
+            }));
+
+        new Setting(uiDetails)
+            .setName('Show task action buttons')
+            .setDesc('Show edit and delete buttons on task hover in the task list.')
+            .addToggle(t => t.setValue(this.plugin.settings.showTaskActions).onChange(v => {
+                this.plugin.settings.showTaskActions = v;
+                void this.plugin.saveSettings().then(() => { this.plugin.refreshViews(); });
+            }));
 
         const colorPickersContainer = uiDetails.createDiv();
+        this.renderColorPickers(colorPickersContainer);
 
-        const renderColorPickers = () => {
-            colorPickersContainer.empty();
+// --- CLEAN DONATION BUTTON ---
+        containerEl.createEl('br');
+        containerEl.createEl('hr');
 
-            if (this.plugin.settings.colorMode === 'status') {
-                new Setting(colorPickersContainer).setName('Overdue Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.overdue).onChange(async v => { this.plugin.settings.colors.overdue = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
-                new Setting(colorPickersContainer).setName('Urgent Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.urgent).onChange(async v => { this.plugin.settings.colors.urgent = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
-                new Setting(colorPickersContainer).setName('Active Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.active).onChange(async v => { this.plugin.settings.colors.active = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
-                new Setting(colorPickersContainer).setName('Completed Color').addColorPicker(c => c.setValue(this.plugin.settings.colors.completed).onChange(async v => { this.plugin.settings.colors.completed = v; await this.plugin.saveSettings(); this.plugin.refreshViews(); }));
-            } else {
-                const helperText = colorPickersContainer.createEl('p', {
-                    text: 'Assign a custom color to each of your active topics.',
-                    cls: 'text-muted'
-                });
-                helperText.style.marginLeft = '14px';
-                helperText.style.marginBottom = '12px';
-                helperText.style.fontSize = '0.9em';
+        const supportDiv = containerEl.createDiv('settings-support-section');
 
-                const allTasks = this.plugin.taskManager.getAllTasks();
-                const uniqueTopics = Array.from(new Set(allTasks.map(t => t.fileName).filter((t): t is string => Boolean(t))));
+        // The weak gray, centered text
+        supportDiv.createEl('p', {
+            text: 'If this dashboard helps you stay organized, consider supporting its development!',
+            cls: 'settings-support-text'
+        });
 
-                if (uniqueTopics.length === 0) {
-                    const emptyText = colorPickersContainer.createEl('p', { text: 'No active topics found. Add some tasks first!' });
-                    emptyText.style.marginLeft = '14px';
-                    emptyText.style.fontStyle = 'italic';
-                    return;
-                }
+        const bmcLink = supportDiv.createEl('a', {
+            href: 'https://buymeacoffee.com/JoblessDev'
+        });
 
-                const defaultPalette = ['#4cc9f0', '#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4caf50'];
+        const bmcImg = bmcLink.createEl('img');
+        bmcImg.setAttribute('src', 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png');
+        bmcImg.setAttribute('width', '200');
+        bmcImg.setAttribute('alt', 'Buy Me A Coffee');
+    }
 
-                uniqueTopics.forEach(topic => {
-                    let hash = 0;
-                    for (let i = 0; i < topic.length; i++) hash = topic.charCodeAt(i) + ((hash << 5) - hash);
-                    const defaultColor = defaultPalette[Math.abs(hash) % defaultPalette.length];
+    private renderFrontmatterKeyField(container: HTMLElement): void {
+        container.empty();
 
-                    const savedColor = this.plugin.settings.topicColors[topic] || defaultColor;
+        if (this.plugin.settings.courseDetection === 'frontmatter') {
+            new Setting(container)
+                .setName('Frontmatter key')
+                .setDesc('Frontmatter field name to read the course name from.')
+                .addText(t => {
+                    t.inputEl.setAttribute("aria-label", "Frontmatter key");
+                    t.inputEl.setAttribute("title", "Frontmatter key");
+                    return t
+                    .setPlaceholder('Course')
+                    .setValue(this.plugin.settings.courseFrontmatterKey)
+                    .onChange(v => {
+                        this.plugin.settings.courseFrontmatterKey = v;
+                        void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
+                    });
+            });
+        }
+    }
 
-                    new Setting(colorPickersContainer)
-                        .setName(`${topic} Color`)
-                        .addColorPicker(c => c.setValue(savedColor).onChange(async v => {
-                            this.plugin.settings.topicColors[topic] = v;
-                            await this.plugin.saveSettings();
+    private renderColorPickers(container: HTMLElement): void {
+        container.empty();
+
+        if (this.plugin.settings.colorMode === 'status') {
+            this.renderStatusColors(container);
+        } else {
+            this.renderTopicColors(container);
+        }
+    }
+
+    private renderStatusColors(container: HTMLElement): void {
+        const createColorSetting = (name: string, settingKey: keyof typeof this.plugin.settings.colors) => {
+            new Setting(container)
+                .setName(name)
+                .addColorPicker(c => c
+                    .setValue(this.plugin.settings.colors[settingKey])
+                    .onChange(v => {
+                        this.plugin.settings.colors[settingKey] = v;
+                        void this.plugin.saveSettings().then(() => {
                             this.plugin.refreshViews();
-                        }));
-                });
-            }
+                        });
+                    })
+                );
         };
 
-        renderColorPickers();
+        createColorSetting('Overdue color', 'overdue');
+        createColorSetting('Urgent color', 'urgent');
+        createColorSetting('Active color', 'active');
+        createColorSetting('Completed color', 'completed');
+    }
 
-        // 4. Support (Keep existing)
-        containerEl.createEl('hr');
-        const supportDiv = containerEl.createDiv('support-section');
-        supportDiv.style.textAlign = 'center';
-        supportDiv.style.padding = '20px 0';
-        supportDiv.style.backgroundColor = 'var(--background-secondary)';
-        supportDiv.style.borderRadius = '8px';
-        supportDiv.createEl('h3', { text: 'Enjoying TaskLens?' });
-        supportDiv.createEl('p', { text: 'If this dashboard helps you stay organized, consider supporting its development!', cls: 'text-muted' });
-        const btn = supportDiv.createEl('a', { href: 'https://buymeacoffee.com/joblessdev', text: '☕ Buy Me a Coffee', cls: 'mod-cta' });
-        btn.style.textDecoration = 'none';
-        btn.style.display = 'inline-block';
-        btn.style.marginTop = '10px';
+    private renderTopicColors(container: HTMLElement): void {
+        container.createEl('p', {
+            text: 'Assign a custom color to each of your active topics.',
+            cls: ['text-muted', 'color-picker-helper']
+        });
 
-        // Buy Me a Coffee button script embed
-        const bmcScript = supportDiv.createEl('script');
-        bmcScript.setAttribute('type', 'text/javascript');
-        bmcScript.setAttribute('src', 'https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js');
-        bmcScript.setAttribute('data-name', 'bmc-button');
-        bmcScript.setAttribute('data-slug', 'JoblessDev');
-        bmcScript.setAttribute('data-color', '#40DCA5');
-        bmcScript.setAttribute('data-emoji', '☕');
-        bmcScript.setAttribute('data-font', 'Poppins');
-        bmcScript.setAttribute('data-text', 'Buy me a coffee');
-        bmcScript.setAttribute('data-outline-color', '#000000');
-        bmcScript.setAttribute('data-font-color', '#ffffff');
-        bmcScript.setAttribute('data-coffee-color', '#FFDD00');
+        const allTasks = this.plugin.taskManager.getAllTasks();
+        const uniqueTopics = Array.from(new Set(allTasks.map(t => t.fileName).filter((t): t is string => Boolean(t))));
+
+        if (uniqueTopics.length === 0) {
+            container.createEl('p', { text: 'No active topics found. Add some tasks first!', cls: 'color-picker-empty' });
+            return;
+        }
+
+        uniqueTopics.forEach(topic => {
+            const savedColor = getTopicColor(topic, this.plugin.settings);
+
+            new Setting(container)
+                .setName(`${topic} color`)
+                .addColorPicker(c => c
+                    .setValue(savedColor)
+                    .onChange(v => {
+                        this.plugin.settings.topicColors[topic] = v;
+                        void this.plugin.saveSettings().then(() => {
+                            this.plugin.refreshViews();
+                        });
+                    })
+                );
+        });
     }
 }

@@ -2,57 +2,89 @@ import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { StatsComponent } from './StatsComponent';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
+import { setupViewDOM, cleanUpViewDOM } from './DashboardView';
+import { VIEW_TYPE_STATS, CLASS_DASHBOARD_VIEW } from '../constants';
 
-export const VIEW_TYPE_STATS = 'tasklens-stats-view';
+
+function isHeaderState(v: unknown): v is HeaderState {
+    if (typeof v !== 'object' || v === null) return false;
+    const rec = v as Record<string, unknown>;
+    return (rec.title === null || typeof rec.title === 'string')
+        && typeof rec.isCollapsed === 'boolean';
+}
 
 export class StatsView extends ItemView {
     private leafRootEl: HTMLElement | null = null;
     private tabContainer: HTMLElement | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
-    constructor(leaf: WorkspaceLeaf, private plugin: TaskLensPlugin) {
+    private readonly onTasksUpdated = (): void => { this.render(); };
+
+    constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
-        this.plugin.taskManager.on('tasks-updated', () => this.render());
+        this.plugin.taskManager.on('tasks-updated', this.onTasksUpdated);
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file.path.endsWith('.md') && !this.plugin.taskManager.getIsInternalChange()) {
+                    void this.plugin.taskManager.refreshFileTask(file.path);
+                }
+            })
+        );
     }
 
-    getViewType() { return VIEW_TYPE_STATS; }
-    getDisplayText() { return 'Dashboard Stats'; }
-    getIcon() { return 'bar-chart-3'; }
+    getViewType(): string { return VIEW_TYPE_STATS; }
+    getDisplayText(): string { return 'Dashboard stats'; }
+    getIcon(): string { return 'bar-chart-3'; }
 
-    async setState(state: any, result: ViewStateResult): Promise<void> {
-        if (state?.headerState) {
-            this.headerState = state.headerState;
+    async setState(state: unknown, result: ViewStateResult): Promise<void> {
+        if (state && typeof state === 'object') {
+            const s = state as Record<string, unknown>;
+            if (Object.prototype.hasOwnProperty.call(s, 'headerState') && isHeaderState(s.headerState)) {
+                this.headerState = s.headerState;
+            }
         }
         await super.setState(state, result);
         this.render();
     }
 
-    getState(): any {
+    getState(): Record<string, unknown> {
         if (this.headerComponent) {
             this.headerState = this.headerComponent.getState();
         }
-        return { headerState: this.headerState };
+        return Object.assign(super.getState(), { headerState: this.headerState });
     }
 
-    async onOpen() {
-        this.leafRootEl = this.containerEl.closest('.workspace-leaf-content') as HTMLElement | null;
-        if (this.leafRootEl) this.leafRootEl.classList.add('tasklens-chromeless');
-
-        // Hide the tab header for this container
-        this.tabContainer = this.containerEl.closest('.workspace-tabs') as HTMLElement | null;
-        if (this.tabContainer) this.tabContainer.classList.add('tasklens-hide-tabs');
+    onOpen(): Promise<void> {
+        const { leafRootEl, tabContainer } = setupViewDOM(this.containerEl, true);
+        this.leafRootEl = leafRootEl;
+        this.tabContainer = tabContainer;
 
         this.contentEl.empty();
-        this.contentEl.addClass('tasklens-dashboard-view');
+        this.contentEl.addClass(CLASS_DASHBOARD_VIEW);
+        this.applyColorTheme();
         this.render();
+
+        return Promise.resolve();
     }
 
-    async onClose(): Promise<void> {
-        if (this.tabContainer) this.tabContainer.classList.remove('tasklens-hide-tabs');
-        if (this.leafRootEl) this.leafRootEl.classList.remove('tasklens-chromeless');
+    private applyColorTheme(): void {
+        const cols = this.plugin.settings.colors;
+        this.contentEl.setCssProps({
+            '--color-red': cols.overdue,
+            '--color-orange': cols.urgent,
+            '--color-green': cols.active,
+            '--color-blue': cols.completed,
+            '--color-purple': 'var(--interactive-accent)',
+        });
     }
 
-    render() {
+    onClose(): Promise<void> {
+        this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
+        cleanUpViewDOM(this.leafRootEl, this.tabContainer);
+        return Promise.resolve();
+    }
+
+    render(): void {
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -67,9 +99,7 @@ export class StatsView extends ItemView {
                     this.app.workspace.requestSaveLayout();
                     this.render();
                 },
-                onRefresh: async () => {
-                    await this.plugin.taskManager.loadTasks();
-                }
+                onRefresh: () => { void this.plugin.taskManager.loadTasks(); },
             }
         );
         this.headerComponent.render();

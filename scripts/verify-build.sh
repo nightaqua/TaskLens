@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Change to project root (parent of the tests directory)
+cd "$(dirname "$0")/.."
+
 # Build Verification Script for TaskLens Plugin (PATH + off-PATH support)
 
 echo "🔍 TaskLens - Build Verification"
