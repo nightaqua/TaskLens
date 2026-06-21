@@ -1633,3 +1633,42 @@
    ========================================= */
 
 .tasklens-dashboard-content .task-item.has-topic-color { border-left-color: var(--tl-task-color); }
+/* =========================================
+   12. SORT BAR — TASK LIST (FA-001)
+   ========================================= */
+
+.tasklens-dashboard-content .tasklist-sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px 6px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.tasklens-dashboard-content .tasklist-sort-label {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+
+.tasklens-dashboard-content .tasklist-sort-btn {
+    font-size: 0.78em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--background-modifier-border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tasklens-dashboard-content .tasklist-sort-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.tasklens-dashboard-content .tasklist-sort-btn.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}

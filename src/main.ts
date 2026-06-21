@@ -51,6 +51,7 @@ export default class TaskLensPlugin extends Plugin {
 
         const parser = new TaskParser(this.app, this.settings);
         this.taskManager = new TaskManager(parser, this.app, this.settings);
+        this.taskManager.setTaskListSort(this.settings.taskListSort);
 
         this.registerEvent(
             this.app.vault.on('modify', async (file) => {

@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import TaskLensPlugin from '../main';
+import { TaskListSort } from '../settings/Settings';
 import { TaskListComponent } from './TaskListComponent';
 import { Task } from '../models/Task';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
@@ -118,6 +119,8 @@ export class TaskListView extends ItemView {
         );
         this.headerComponent.render();
 
+        this.renderSortBar(this.contentEl);
+
         const list = new TaskListComponent(this.contentEl, this.app, {
             onToggle: (t: Task) => { void this.plugin.taskManager.toggleTaskCompletion(t); },
             onEdit: (t: Task) => {
@@ -128,5 +131,35 @@ export class TaskListView extends ItemView {
             }
         }, this.plugin.settings);
         list.render(this.plugin.taskManager.getGroupedFilteredTasks());
+    }
+
+    private renderSortBar(container: HTMLElement): void {
+        const SORT_LABELS: Record<TaskListSort, string> = {
+            'urgency': 'Urgency',
+            'topic': 'Topic',
+            'file-name': 'File Name',
+        };
+        const SORT_ORDER: TaskListSort[] = ['urgency', 'topic', 'file-name'];
+
+        const bar = container.createDiv('tasklist-sort-bar');
+        const label = bar.createSpan({ cls: 'tasklist-sort-label', text: 'Sort:' });
+        label.setAttribute('aria-hidden', 'true');
+
+        const currentSort = this.plugin.taskManager.getTaskListSort();
+
+        SORT_ORDER.forEach(mode => {
+            const btn = bar.createEl('button', {
+                cls: 'tasklist-sort-btn',
+                text: SORT_LABELS[mode],
+            });
+            btn.setAttribute('aria-pressed', String(mode === currentSort));
+            if (mode === currentSort) btn.addClass('is-active');
+
+            btn.addEventListener('click', () => {
+                this.plugin.settings.taskListSort = mode;
+                void this.plugin.saveSettings();
+                this.plugin.taskManager.setTaskListSort(mode);
+            });
+        });
     }
 }
