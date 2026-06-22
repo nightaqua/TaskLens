@@ -2,7 +2,7 @@ import { TFile, Events, App, normalizePath } from 'obsidian';
 import { Task, TaskGroup, TaskStatus, getTaskStatus } from '../models/Task';
 import { TaskParser } from './TaskParser';
 import { SemesterSettings, DEFAULT_SETTINGS, TaskListSort } from '../settings/Settings';
-import { hasCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
+import { hasCompletionMetadata, hasExternalCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
 
 export class TaskManager extends Events {
     private tasks: Task[] = [];
@@ -170,10 +170,20 @@ export class TaskManager extends Events {
         // Guard: if the line isn't actually checked, do nothing to avoid data loss.
         if (!/\[[xX]]/.test(originalLine)) return;
 
-        // Strip any stale completion stamp first (e.g. yyyy-mm-dd from before the
-        // format change, or a stamp left by another plugin). This ensures we always
-        // write a fresh, correctly-formatted stamp rather than silently bailing out.
-        const stripped = hasCompletionMetadata(originalLine)
+        // If another plugin (e.g. obsidian-tasks) already wrote its own completion
+        // marker (✅ YYYY-MM-DD), preserve it — do not strip and replace with our format.
+        if (hasExternalCompletionMetadata(originalLine)) {
+            if (task.recurrence) {
+                const completionDate = new Date();
+                this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
+                await this.app.vault.modify(file, lines.join('\n'));
+            }
+            await this.refreshFileTask(task.filePath);
+            return;
+        }
+
+        // Strip any stale TaskLens/Dataview completion stamp before writing a fresh one.
+        const stripped = /completion::/i.test(originalLine)
             ? stripCompletionMetadata(originalLine)
             : originalLine;
 

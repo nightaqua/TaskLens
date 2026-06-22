@@ -16,6 +16,14 @@
  *   [\])]   — literal ] or )
  */
 
+/**
+ * True if the line carries a Tasks-plugin emoji completion marker (✅ YYYY-MM-DD).
+ * This is an EXTERNAL format that TaskLens must preserve, not overwrite.
+ */
+export function hasExternalCompletionMetadata(line: string): boolean {
+    return /✅\s*\d{4}-\d{2}-\d{2}/.test(line);
+}
+
 /** True if the line already carries ANY completion marker (ours or external). */
 export function hasCompletionMetadata(line: string): boolean {
     return /\u2705\s*\d{4}-\d{2}-\d{2}/.test(line) || /completion::/i.test(line);

@@ -146,3 +146,27 @@ describe('TaskSanitizer', () => {
         });
     });
 });
+
+import { hasExternalCompletionMetadata } from '../src/services/TaskSanitizer';
+
+describe('hasExternalCompletionMetadata', () => {
+    it('returns true for Tasks-plugin ✅ YYYY-MM-DD format', () => {
+        expect(hasExternalCompletionMetadata('- [x] Task ✅ 2026-06-22')).toBe(true);
+        expect(hasExternalCompletionMetadata('- [x] Task ✅2026-06-22')).toBe(true);
+    });
+
+    it('returns false for TaskLens/Dataview completion:: format', () => {
+        expect(hasExternalCompletionMetadata('- [x] Task [completion:: 2026-06-22]')).toBe(false);
+        expect(hasExternalCompletionMetadata('- [x] Task (completion:: 2026-06-22)')).toBe(false);
+    });
+
+    it('returns false when no completion metadata present', () => {
+        expect(hasExternalCompletionMetadata('- [ ] Normal task')).toBe(false);
+        expect(hasExternalCompletionMetadata('- [x] Task without date')).toBe(false);
+    });
+
+    it('returns false for ✅ emoji without a valid YYYY-MM-DD date', () => {
+        expect(hasExternalCompletionMetadata('- [x] Task ✅')).toBe(false);
+        expect(hasExternalCompletionMetadata('- [x] Task ✅ 26-06-22')).toBe(false);
+    });
+});
