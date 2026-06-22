@@ -468,5 +468,109 @@ describe('TaskManager.getStatistics', () => {
         // diffDays === 7 does NOT satisfy diffDays < 7, so the task is excluded
         expect(totalVelocity).toBe(0);
     });
+
+    describe('buildClonedLine (via toggleTaskCompletion) — dd-mm-yyyy date format (RV-004)', () => {
+        function makeApp(fileContent: string) {
+            return {
+                vault: {
+                    getAbstractFileByPath: vi.fn().mockImplementation((path: string) => createMockFile(path)),
+                    read: vi.fn().mockResolvedValue(fileContent),
+                    modify: vi.fn().mockResolvedValue(undefined),
+                }
+            } as unknown as App;
+        }
+
+        it('advances due:: date in dd-mm-yyyy format when task is completed (weekly recurrence)', async () => {
+            // Before fix: regex only matched yyyy-mm-dd, so the clone kept the original date.
+            const originalContent = '- [ ] Write report [due:: 22-06-2026] [repeat:: weekly]';
+            const mockApp = makeApp(originalContent);
+            const tm = new TaskManager({} as TaskParser, mockApp);
+            vi.spyOn(tm, 'refreshFileTask').mockResolvedValue(undefined);
+
+            const task = {
+                id: 'test.md:0',
+                title: 'Write report',
+                completed: false,
+                filePath: 'test.md',
+                lineNumber: 0,
+                dueDate: new Date('2026-06-22T00:00:00'),
+                startDate: undefined,
+                recurrence: 'weekly',
+                originalText: originalContent,
+            } as unknown as import('../src/models/Task').Task;
+
+            await tm.toggleTaskCompletion(task);
+
+            const calls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+            expect(calls.length).toBe(1);
+            const writtenContent: string = calls[0][1];
+            const lines = writtenContent.split('\n');
+            // line 0 is the completed original; line 1 is the cloned next occurrence
+            expect(lines.length).toBeGreaterThanOrEqual(2);
+            const clonedLine = lines[1];
+            // Clone must be open and have the NEXT week's date (2026-06-29 in yyyy-mm-dd)
+            expect(clonedLine).toContain('[ ]');
+            expect(clonedLine).toContain('due:: 2026-06-29');
+        });
+
+        it('advances start:: date in dd-mm-yyyy format when start is the only anchor (daily recurrence)', async () => {
+            const originalContent = '- [ ] Morning run [start:: 22-06-2026] [repeat:: daily]';
+            const mockApp = makeApp(originalContent);
+            const tm = new TaskManager({} as TaskParser, mockApp);
+            vi.spyOn(tm, 'refreshFileTask').mockResolvedValue(undefined);
+
+            const task = {
+                id: 'test.md:0',
+                title: 'Morning run',
+                completed: false,
+                filePath: 'test.md',
+                lineNumber: 0,
+                dueDate: undefined,
+                startDate: new Date('2026-06-22T00:00:00'),
+                recurrence: 'daily',
+                originalText: originalContent,
+            } as unknown as import('../src/models/Task').Task;
+
+            await tm.toggleTaskCompletion(task);
+
+            const calls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+            expect(calls.length).toBe(1);
+            const clonedLine: string = calls[0][1].split('\n')[1];
+            expect(clonedLine).toContain('[ ]');
+            expect(clonedLine).toContain('start:: 2026-06-23');
+        });
+
+        it('advances both due:: and start:: when both are in dd-mm-yyyy format (weekly recurrence)', async () => {
+            // due = 22-06-2026, start = 15-06-2026 (7 days before due, window = 7 days)
+            const originalContent = '- [ ] Team sync [start:: 15-06-2026] [due:: 22-06-2026] [repeat:: weekly]';
+            const mockApp = makeApp(originalContent);
+            const tm = new TaskManager({} as TaskParser, mockApp);
+            vi.spyOn(tm, 'refreshFileTask').mockResolvedValue(undefined);
+
+            const task = {
+                id: 'test.md:0',
+                title: 'Team sync',
+                completed: false,
+                filePath: 'test.md',
+                lineNumber: 0,
+                dueDate: new Date('2026-06-22T00:00:00'),
+                startDate: new Date('2026-06-15T00:00:00'),
+                recurrence: 'weekly',
+                originalText: originalContent,
+            } as unknown as import('../src/models/Task').Task;
+
+            await tm.toggleTaskCompletion(task);
+
+            const calls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+            expect(calls.length).toBe(1);
+            const clonedLine: string = calls[0][1].split('\n')[1];
+            expect(clonedLine).toContain('[ ]');
+            // due advances by 1 week: 2026-06-29
+            expect(clonedLine).toContain('due:: 2026-06-29');
+            // start advances by same window (7 days before new due): 2026-06-22
+            expect(clonedLine).toContain('start:: 2026-06-22');
+        });
+    });
+
 });
 });
