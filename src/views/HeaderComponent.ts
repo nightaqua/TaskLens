@@ -21,6 +21,7 @@ export class HeaderComponent {
     private readonly onRefresh: () => void;
     private readonly onSettings: (() => void) | null;
     private readonly onAdd: (() => void) | null;
+    private readonly onScrollToToday: (() => void) | null;
     private highlightAddButton: boolean;
     private readonly onHighlightDismiss: (() => void) | null;
 
@@ -32,7 +33,8 @@ export class HeaderComponent {
             onStateChange: () => void,
             onRefresh: () => void,
             onSettings?: () => void,
-            onAdd?: () => void
+            onAdd?: () => void,
+            onScrollToToday?: () => void
         },
         options?: {
             highlightAddButton?: boolean,
@@ -48,6 +50,7 @@ export class HeaderComponent {
         this.onRefresh = callbacks.onRefresh;
         this.onSettings = callbacks.onSettings || null;
         this.onAdd = callbacks.onAdd || null;
+        this.onScrollToToday = callbacks.onScrollToToday || null;
         this.highlightAddButton = options?.highlightAddButton ?? false;
         this.onHighlightDismiss = options?.onHighlightDismiss || null;
     }
@@ -135,6 +138,13 @@ export class HeaderComponent {
                 }
                 this.onAdd?.();
             });
+        }
+
+        if (this.onScrollToToday) {
+            const todayBtn = rightGroup.createEl('button', { cls: 'header-icon-btn' });
+            setIcon(todayBtn, 'calendar');
+            todayBtn.setAttribute('aria-label', 'Scroll to today');
+            todayBtn.addEventListener('click', () => { this.onScrollToToday?.(); });
         }
 
         const refreshBtn = rightGroup.createEl('button', { cls: 'dashboard-refresh-btn header-icon-btn' });
