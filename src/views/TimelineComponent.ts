@@ -457,11 +457,12 @@ export class TimelineComponent {
             bar.setAttribute('role', 'button');
             bar.setAttribute('tabindex', '0');
             bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
-            bar.setAttribute('title', `Open task in editor: ${task.title}`);
             bar.setCssProps({
                 '--tl-col-start': String(startIdx + 1),
                 '--tl-col-span': String((dueIdx - startIdx) + 1),
-                '--tl-row': String(rowIndex + 2)
+                '--tl-row': String(rowIndex + 2),
+                // Suppress Obsidian's built-in aria-label tooltip; we show our own richer tooltip via mouseenter.
+                '--no-tooltip': 'true'
             });
 
             if (taskStart < allDays[0]) bar.addClass('is-clamped-left');
