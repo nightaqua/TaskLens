@@ -46,6 +46,129 @@ export function resolveActiveMarkdownView(app: App): MarkdownView | null {
     return view;
 }
 
+// ---------------------------------------------------------------------------
+// Natural Language Date Parsing
+// ---------------------------------------------------------------------------
+
+/** Minimal interface for the nldates-obsidian plugin's public API. */
+interface NLDatesPlugin {
+    parseDate(text: string): { moment: { isValid(): boolean; format(fmt: string): string } } | null;
+}
+
+/**
+ * Shape of the undocumented Obsidian runtime plugin registry.
+ * Cast via `unknown` to avoid conflicting with the public App type.
+ */
+interface ObsidianAppWithPlugins {
+    plugins?: {
+        plugins?: Record<string, unknown>;
+    };
+}
+
+/** Formats a Date to yyyy-mm-dd in local time. */
+function nlFormatDate(d: Date): string {
+    const y = String(d.getFullYear());
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+const NL_WEEKDAYS = [
+    'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+] as const;
+type NLWeekday = typeof NL_WEEKDAYS[number];
+
+/** Built-in NL parser covering the most common relative-date phrases. */
+function parseNLDateInline(s: string): string | null {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const MS = 86_400_000; // ms per day
+
+    if (s === 'today')     return nlFormatDate(today);
+    if (s === 'tomorrow')  return nlFormatDate(new Date(today.getTime() + MS));
+    if (s === 'yesterday') return nlFormatDate(new Date(today.getTime() - MS));
+
+    // "+N days" / "in N days" / "N days"
+    let m = s.match(/^(?:in\s+|[+])?(\d+)\s*d(?:ays?)?$/);
+    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1]) * MS));
+
+    // "+N weeks" / "in N weeks" / "N weeks"
+    m = s.match(/^(?:in\s+|[+])?(\d+)\s*w(?:eeks?)?$/);
+    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1]) * 7 * MS));
+
+    // "next <weekday>"
+    m = s.match(/^next\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)$/);
+    if (m) {
+        const target = NL_WEEKDAYS.indexOf(m[1] as NLWeekday);
+        const diff = ((target - today.getDay() + 7) % 7) || 7;
+        return nlFormatDate(new Date(today.getTime() + diff * MS));
+    }
+
+    // "next week" → next Monday
+    if (s === 'next week') {
+        const todayDay = today.getDay();
+        const diff = todayDay === 1 ? 7 : ((8 - todayDay) % 7) || 7;
+        return nlFormatDate(new Date(today.getTime() + diff * MS));
+    }
+
+    // "end of week" / "eow" → coming Sunday
+    if (s === 'end of week' || s === 'eow') {
+        const diff = today.getDay() === 0 ? 7 : 7 - today.getDay();
+        return nlFormatDate(new Date(today.getTime() + diff * MS));
+    }
+
+    // "end of month" / "eom" → last day of current month
+    if (s === 'end of month' || s === 'eom') {
+        const eom = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        return nlFormatDate(eom);
+    }
+
+    return null;
+}
+
+/**
+ * Parses a natural-language date string into a yyyy-mm-dd string.
+ *
+ * Resolves in order:
+ *   1. Already a valid yyyy-mm-dd — returned as-is.
+ *   2. nldates-obsidian plugin (if installed) — delegates to its `parseDate()` API.
+ *   3. Built-in inline parser — covers the most common relative-date patterns:
+ *      today, tomorrow, yesterday, +N days, +N weeks, next <weekday>,
+ *      next week, end of week (eow), end of month (eom).
+ *
+ * Returns `null` if the input cannot be resolved to a concrete date.
+ */
+export function parseNLDate(input: string, app: App): string | null {
+    const s = input.trim();
+    if (!s) return null;
+
+    // 1. Already formatted as yyyy-mm-dd — pass through.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // 2. Delegate to nldates-obsidian plugin if installed.
+    // Cast via `unknown` then to a typed shim — `plugins.plugins` is an undocumented runtime
+    // registry absent from the public Obsidian type definitions.
+    const appShim = app as unknown as ObsidianAppWithPlugins;
+    const pluginRegistry = appShim.plugins?.plugins;
+    // Record<string, unknown> is non-nullable — use an explicit guard, not optional-chain, for the key lookup.
+    const nlDates = pluginRegistry !== undefined
+        ? pluginRegistry['nldates-obsidian'] as NLDatesPlugin | undefined
+        : undefined;
+    if (nlDates) {
+        try {
+            const parsed = nlDates.parseDate(s);
+            if (parsed !== null && parsed.moment.isValid()) {
+                return parsed.moment.format('YYYY-MM-DD');
+            }
+        } catch {
+            // Fall through to inline parser.
+        }
+    }
+
+    // 3. Inline fallback parser.
+    return parseNLDateInline(s.toLowerCase());
+}
+
 export class QuickAddModal extends Modal {
     /** Raw text entered by the user for the task title. */
     private title: string = '';
@@ -175,29 +298,42 @@ export class QuickAddModal extends Modal {
             this.selectedFile = this.editTask.filePath;
         }
 
-        // --- 3. Due date picker ---------------------------------------------
+        // --- 3. Due date input (NL-aware) -----------------------------------
         new Setting(contentEl)
             .setName('Due date')
             .addText(text => {
                 text.inputEl.setAttribute("aria-label", "Due date");
                 text.inputEl.setAttribute("title", "Due date");
-                // Render as a native HTML date input for a built-in calendar picker.
-                text.inputEl.type = 'date';
+                // Accept free text: yyyy-mm-dd or natural language ("tomorrow",
+                // "next friday", "in 3 days", "eom", …). The value is resolved
+                // to yyyy-mm-dd on blur and on submit.
+                text.inputEl.type = 'text';
+                text.setPlaceholder('2026-12-31, "tomorrow", "next friday"');
                 text.setValue(this.date);
                 text.onChange(value => { this.date = value; });
+                text.inputEl.addEventListener('blur', () => {
+                    const resolved = parseNLDate(this.date, this.app);
+                    this.date = resolved ?? '';
+                    text.setValue(this.date);
+                });
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
-        // --- 3.5 Start date picker ---
+        // --- 3.5 Start date input (NL-aware) --------------------------------
         new Setting(contentEl)
             .setName('Start date')
             .addText(text => {
                 text.inputEl.setAttribute("aria-label", "Start date");
                 text.inputEl.setAttribute("title", "Start date");
-                // Render as a native HTML date input for a built-in calendar picker.
-                text.inputEl.type = 'date';
+                text.inputEl.type = 'text';
+                text.setPlaceholder('2026-12-31, "next monday", "in 3 days"');
                 text.setValue(this.startDate);
                 text.onChange(value => { this.startDate = value; });
+                text.inputEl.addEventListener('blur', () => {
+                    const resolved = parseNLDate(this.startDate, this.app);
+                    this.startDate = resolved ?? '';
+                    text.setValue(this.startDate);
+                });
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -255,6 +391,15 @@ export class QuickAddModal extends Modal {
 
     private async handleSubmit(): Promise<void> {
         if (this.isSubmitting) return;
+
+        // Resolve any NL date input that hasn't been normalised by a blur event
+        // (e.g. when the user presses Enter without leaving the date field first).
+        if (this.date) {
+            this.date = parseNLDate(this.date, this.app) ?? '';
+        }
+        if (this.startDate) {
+            this.startDate = parseNLDate(this.startDate, this.app) ?? '';
+        }
 
         // Guard: both a title and a destination are required.
         if (!this.title || !this.selectedFile) return;

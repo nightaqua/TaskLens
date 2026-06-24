@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { resolveActiveMarkdownView } from '../src/modals/QuickAddModal';
+import { resolveActiveMarkdownView, parseNLDate } from '../src/modals/QuickAddModal';
 import { MarkdownView } from 'obsidian';
 
 describe('resolveActiveMarkdownView', () => {
@@ -63,5 +63,222 @@ describe('resolveActiveMarkdownView', () => {
 
         const result = resolveActiveMarkdownView(mockApp as any);
         expect(result).toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// parseNLDate tests
+// ---------------------------------------------------------------------------
+
+/** Build a minimal App mock (no nldates plugin installed by default). */
+function makeApp(nlDatesPlugin?: Record<string, unknown>): any {
+    return {
+        plugins: {
+            plugins: nlDatesPlugin ? { 'nldates-obsidian': nlDatesPlugin } : {}
+        }
+    };
+}
+
+/** Returns a yyyy-mm-dd string for `today + offsetDays` in local time. */
+function localDateOffset(offsetDays: number): string {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + offsetDays);
+    const y = String(d.getFullYear());
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+describe('parseNLDate — passthrough and empty input', () => {
+    const app = makeApp();
+
+    it('returns null for empty string', () => {
+        expect(parseNLDate('', app)).toBeNull();
+    });
+
+    it('returns null for whitespace-only string', () => {
+        expect(parseNLDate('   ', app)).toBeNull();
+    });
+
+    it('passes through a valid yyyy-mm-dd without touching it', () => {
+        expect(parseNLDate('2026-12-31', app)).toBe('2026-12-31');
+    });
+
+    it('trims surrounding whitespace before matching', () => {
+        expect(parseNLDate('  2026-01-15  ', app)).toBe('2026-01-15');
+    });
+});
+
+describe('parseNLDate — inline parser keywords', () => {
+    const app = makeApp();
+
+    it('resolves "today"', () => {
+        expect(parseNLDate('today', app)).toBe(localDateOffset(0));
+    });
+
+    it('resolves "Today" (case-insensitive)', () => {
+        expect(parseNLDate('Today', app)).toBe(localDateOffset(0));
+    });
+
+    it('resolves "tomorrow"', () => {
+        expect(parseNLDate('tomorrow', app)).toBe(localDateOffset(1));
+    });
+
+    it('resolves "yesterday"', () => {
+        expect(parseNLDate('yesterday', app)).toBe(localDateOffset(-1));
+    });
+});
+
+describe('parseNLDate — relative days/weeks', () => {
+    const app = makeApp();
+
+    it('resolves "+3 days"', () => {
+        expect(parseNLDate('+3 days', app)).toBe(localDateOffset(3));
+    });
+
+    it('resolves "in 7 days"', () => {
+        expect(parseNLDate('in 7 days', app)).toBe(localDateOffset(7));
+    });
+
+    it('resolves "1 day"', () => {
+        expect(parseNLDate('1 day', app)).toBe(localDateOffset(1));
+    });
+
+    it('resolves "2w" (shorthand weeks)', () => {
+        expect(parseNLDate('2w', app)).toBe(localDateOffset(14));
+    });
+
+    it('resolves "in 2 weeks"', () => {
+        expect(parseNLDate('in 2 weeks', app)).toBe(localDateOffset(14));
+    });
+
+    it('resolves "+1 week"', () => {
+        expect(parseNLDate('+1 week', app)).toBe(localDateOffset(7));
+    });
+});
+
+describe('parseNLDate — next <weekday>', () => {
+    const app = makeApp();
+
+    it('resolves "next monday" to a future Monday', () => {
+        const result = parseNLDate('next monday', app);
+        expect(result).toBeTruthy();
+        const parsed = new Date((result as string) + 'T00:00:00');
+        expect(parsed.getDay()).toBe(1); // Monday
+        // Must be strictly in the future (at least 1 day away)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        expect(parsed.getTime()).toBeGreaterThan(today.getTime());
+    });
+
+    it('resolves "next friday" to a future Friday', () => {
+        const result = parseNLDate('next friday', app);
+        const parsed = new Date((result as string) + 'T00:00:00');
+        expect(parsed.getDay()).toBe(5); // Friday
+    });
+
+    it('resolves "next sunday" to a future Sunday', () => {
+        const result = parseNLDate('next sunday', app);
+        const parsed = new Date((result as string) + 'T00:00:00');
+        expect(parsed.getDay()).toBe(0); // Sunday
+    });
+
+    it('resolves "Next Monday" (case-insensitive)', () => {
+        const result = parseNLDate('Next Monday', app);
+        const parsed = new Date((result as string) + 'T00:00:00');
+        expect(parsed.getDay()).toBe(1);
+    });
+});
+
+describe('parseNLDate — next week / end of week / end of month', () => {
+    const app = makeApp();
+
+    it('resolves "next week" to a Monday', () => {
+        const result = parseNLDate('next week', app);
+        const parsed = new Date((result as string) + 'T00:00:00');
+        expect(parsed.getDay()).toBe(1); // Monday
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        expect(parsed.getTime()).toBeGreaterThan(today.getTime());
+    });
+
+    it('resolves "end of week" to a Sunday', () => {
+        const result = parseNLDate('end of week', app);
+        const parsed = new Date((result as string) + 'T00:00:00');
+        expect(parsed.getDay()).toBe(0); // Sunday
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        expect(parsed.getTime()).toBeGreaterThan(today.getTime());
+    });
+
+    it('resolves "eow" to a Sunday', () => {
+        const result = parseNLDate('eow', app);
+        const parsed = new Date((result as string) + 'T00:00:00');
+        expect(parsed.getDay()).toBe(0);
+    });
+
+    it('resolves "end of month" to the last day of the current month', () => {
+        const result = parseNLDate('end of month', app);
+        const parsed = new Date((result as string) + 'T00:00:00');
+        // The next day should be the 1st of the following month
+        const next = new Date(parsed.getTime() + 86_400_000);
+        expect(next.getDate()).toBe(1);
+    });
+
+    it('resolves "eom" like "end of month"', () => {
+        expect(parseNLDate('eom', app)).toBe(parseNLDate('end of month', app));
+    });
+});
+
+describe('parseNLDate — unrecognised input', () => {
+    const app = makeApp();
+
+    it('returns null for gibberish', () => {
+        expect(parseNLDate('banana', app)).toBeNull();
+    });
+
+    it('returns null for a partial date string', () => {
+        expect(parseNLDate('2026-07', app)).toBeNull();
+    });
+});
+
+describe('parseNLDate — nldates-obsidian plugin bridge', () => {
+    it('delegates to the plugin when available and valid', () => {
+        const mockPlugin = {
+            parseDate: vi.fn().mockReturnValue({
+                moment: { isValid: () => true, format: () => '2026-08-15' }
+            })
+        };
+        const app = makeApp(mockPlugin);
+        expect(parseNLDate('next month', app)).toBe('2026-08-15');
+        expect(mockPlugin.parseDate).toHaveBeenCalledWith('next month');
+    });
+
+    it('falls back to inline parser when plugin returns invalid moment', () => {
+        const mockPlugin = {
+            parseDate: vi.fn().mockReturnValue({
+                moment: { isValid: () => false, format: () => 'Invalid date' }
+            })
+        };
+        const app = makeApp(mockPlugin);
+        // "today" will be handled by the inline parser
+        expect(parseNLDate('today', app)).toBe(localDateOffset(0));
+    });
+
+    it('falls back to inline parser when plugin throws', () => {
+        const mockPlugin = {
+            parseDate: vi.fn().mockImplementation(() => { throw new Error('plugin error'); })
+        };
+        const app = makeApp(mockPlugin);
+        expect(parseNLDate('tomorrow', app)).toBe(localDateOffset(1));
+    });
+
+    it('falls back to inline parser when plugin returns null', () => {
+        const mockPlugin = {
+            parseDate: vi.fn().mockReturnValue(null)
+        };
+        const app = makeApp(mockPlugin);
+        expect(parseNLDate('yesterday', app)).toBe(localDateOffset(-1));
     });
 });
