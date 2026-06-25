@@ -100,4 +100,31 @@ The parser handles various combinations in a single file:
 > [!tip] Undated tasks
 > Dates are optional but improve visualization in the timeline widget. TaskLens is perfectly usable for general to-do items, ongoing tasks, or tasks you have not scheduled yet.
 
+## Priority markers
+
+TaskLens reads the obsidian-tasks priority emojis and surfaces them in the sort order. No special configuration is required — just include the emoji anywhere in your task title (the standard obsidian-tasks position is at the end, after the due date):
+
+```markdown
+- [ ] Critical report ⏫ [due:: 2024-06-01]
+- [ ] Team sync 🔼 [due:: 2024-06-02]
+- [ ] Nice-to-have 🔽
+- [ ] Someday ⏬
+```
+
+| Emoji | Priority level |
+|-------|---------------|
+| ⏫ | Highest |
+| 🔼 | High |
+| 🔽 | Low |
+| ⏬ | Lowest |
+| _(none)_ | Normal (default) |
+
+> [!note] Priority is read-only
+> TaskLens reads priority emojis written by other plugins (obsidian-tasks, etc.) but never writes or modifies them. To change a task's priority, edit the source Markdown directly or use the plugin that created it.
+
+When you sort the Task List by **Priority**, tasks are ordered from Highest → High → Normal → Low → Lowest. Within each priority bucket, urgency is used as the secondary sort key.
+
+Priority is independent of urgency. A Highest-priority task with a far-future due date will appear above a Normal task that is overdue — use the urgency sort if you want date-proximity to dominate.
+
+
 ---
