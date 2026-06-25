@@ -1702,4 +1702,35 @@
 .tl-input-error {
     border-color: var(--color-red) !important;
     box-shadow: 0 0 0 1px var(--color-red);
+
+   13. TAG AUTOCOMPLETE DROPDOWN (FA-007)
+   ========================================= */
+
+.tl-tag-dropdown {
+    position: fixed;
+    left: var(--tl-dd-left);
+    top: var(--tl-dd-top);
+    min-width: var(--tl-dd-min-width);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10000;
+    padding: 4px 0;
+}
+
+.tl-tag-dropdown-item {
+    padding: 5px 12px;
+    font-size: 0.9em;
+    color: var(--text-normal);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tl-tag-dropdown-item:hover,
+.tl-tag-dropdown-item.is-selected {
+    background: var(--background-modifier-hover);
+    color: var(--text-accent);
 }

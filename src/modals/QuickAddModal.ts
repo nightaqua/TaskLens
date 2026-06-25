@@ -207,6 +207,22 @@ export class QuickAddModal extends Modal {
      */
     private readonly activeViewAtOpen: MarkdownView | null;
 
+    // -------------------------------------------------------------------------
+    // Tag autocomplete state
+    // -------------------------------------------------------------------------
+
+    /** Floating suggestion list element, or null when hidden. */
+    private tagDropdownEl: HTMLDivElement | null = null;
+
+    /** Filtered tag suggestions currently shown in the dropdown. */
+    private tagSuggestions: string[] = [];
+
+    /** Index of the highlighted suggestion, or -1 for none. */
+    private tagSuggestionIndex: number = -1;
+
+    /** Cursor position in the input where the `#` that opened the dropdown sits. */
+    private tagTriggerPos: number = -1;
+
     constructor(app: App, private readonly taskManager: TaskManager, private readonly editTask?: Task, private readonly settings?: SemesterSettings) {
         super(app);
 
@@ -268,7 +284,7 @@ export class QuickAddModal extends Modal {
 
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
-                text.inputEl.addEventListener('keydown', handleEnter);
+                this.attachTagAutocomplete(text.inputEl, handleEnter);
             });
 
         // --- 2. Destination dropdown (hidden in edit mode) --------
@@ -550,6 +566,187 @@ export class QuickAddModal extends Modal {
 
     /** Cleans up the modal's DOM when it is closed. */
     onClose() {
+        this.hideTagDropdown();
         this.contentEl.empty();
+    }
+
+    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Tag autocomplete
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns all unique tag names (without leading `#`) found in the vault,
+     * sorted alphabetically. Uses the documented MetadataCache API.
+     */
+    private getVaultTags(): string[] {
+        const tagSet = new Set<string>();
+        for (const file of this.app.vault.getMarkdownFiles()) {
+            const cache = this.app.metadataCache.getFileCache(file);
+            if (cache?.tags) {
+                for (const tagRef of cache.tags) {
+                    const name = tagRef.tag.startsWith('#') ? tagRef.tag.slice(1) : tagRef.tag;
+                    tagSet.add(name.toLowerCase());
+                }
+            }
+        }
+        return Array.from(tagSet).sort();
+    }
+
+    /**
+     * Wires up `input` and `keydown` listeners on the title field to drive
+     * the tag autocomplete dropdown.
+     *
+     * The handleEnter callback is passed in so we can suppress it while the
+     * dropdown is open (Enter should select a suggestion, not submit the form).
+     */
+    private attachTagAutocomplete(
+        input: HTMLInputElement,
+        handleEnter: (e: KeyboardEvent) => void
+    ): void {
+        input.addEventListener('input', () => {
+            const pos = input.selectionStart ?? input.value.length;
+            const textBefore = input.value.slice(0, pos);
+
+            // Match a `#` preceded by start-of-string or whitespace, followed
+            // by zero or more word characters up to the cursor.
+            const match = textBefore.match(/(^|[\s])#(\w*)$/);
+            if (match) {
+                const prefix = match[2];
+                const triggerPos = textBefore.lastIndexOf('#');
+                this.showTagDropdown(input, prefix, triggerPos);
+            } else {
+                this.hideTagDropdown();
+            }
+        });
+
+        input.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (!this.tagDropdownEl || this.tagSuggestions.length === 0) {
+                // Dropdown not open — fall through to normal Enter handling
+                if (e.key === 'Enter') handleEnter(e);
+                return;
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.tagSuggestionIndex = Math.min(
+                    this.tagSuggestionIndex + 1,
+                    this.tagSuggestions.length - 1
+                );
+                this.highlightDropdownItem(this.tagSuggestionIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.tagSuggestionIndex = Math.max(this.tagSuggestionIndex - 1, -1);
+                this.highlightDropdownItem(this.tagSuggestionIndex);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (this.tagSuggestionIndex >= 0) {
+                    e.preventDefault();
+                    this.selectTag(input, this.tagSuggestionIndex);
+                } else if (e.key === 'Enter') {
+                    // Nothing highlighted — close dropdown and let Enter submit
+                    this.hideTagDropdown();
+                    handleEnter(e);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.hideTagDropdown();
+            }
+        });
+
+        // Close the dropdown when focus leaves the input. A short delay is
+        // needed so that a mousedown on an item fires before blur hides the list.
+        input.addEventListener('blur', () => {
+            window.setTimeout(() => { this.hideTagDropdown(); }, 150);
+        });
+    }
+
+    /** Renders the floating suggestion list below the input. */
+    private showTagDropdown(
+        input: HTMLInputElement,
+        prefix: string,
+        triggerPos: number
+    ): void {
+        this.hideTagDropdown();
+        this.tagTriggerPos = triggerPos;
+
+        const all = this.getVaultTags();
+        const lc = prefix.toLowerCase();
+        this.tagSuggestions = all.filter(t => t.startsWith(lc));
+        if (this.tagSuggestions.length === 0) return;
+        this.tagSuggestionIndex = -1;
+
+        const dropdown = activeDocument.createElement('div');
+        dropdown.classList.add('tl-tag-dropdown');
+
+        // Set dynamic position via CSS variables so we stay within the
+        // obsidianmd/no-static-styles-assignment rule.
+        const rect = input.getBoundingClientRect();
+        dropdown.setCssProps({
+            '--tl-dd-left':      `${String(Math.round(rect.left))}px`,
+            '--tl-dd-top':       `${String(Math.round(rect.bottom + 2))}px`,
+            '--tl-dd-min-width': `${String(Math.round(rect.width))}px`,
+        });
+
+        for (let i = 0; i < this.tagSuggestions.length; i++) {
+            const item = dropdown.createEl('div', {
+                cls: 'tl-tag-dropdown-item',
+                text: '#' + this.tagSuggestions[i],
+            });
+            // mousedown fires before blur, so we can safely select the tag
+            // without the dropdown disappearing first.
+            item.addEventListener('mousedown', (e: MouseEvent) => {
+                e.preventDefault();
+                this.selectTag(input, i);
+            });
+        }
+
+        activeDocument.body.appendChild(dropdown);
+        this.tagDropdownEl = dropdown;
+    }
+
+    /** Removes the suggestion list from the DOM and resets all autocomplete state. */
+    private hideTagDropdown(): void {
+        if (this.tagDropdownEl) {
+            this.tagDropdownEl.remove();
+            this.tagDropdownEl = null;
+        }
+        this.tagSuggestions       = [];
+        this.tagSuggestionIndex   = -1;
+        this.tagTriggerPos        = -1;
+    }
+
+    /**
+     * Inserts the selected tag into the input, replacing the partial `#…` token
+     * that opened the dropdown, and moves the cursor to after the inserted text.
+     */
+    private selectTag(input: HTMLInputElement, index: number): void {
+        const tag = this.tagSuggestions[index];
+        if (!tag || this.tagTriggerPos < 0) return;
+
+        const cursorEnd = input.selectionStart ?? input.value.length;
+        const before    = input.value.slice(0, this.tagTriggerPos);
+        const after     = input.value.slice(cursorEnd);
+        const insertion = `#${tag} `;
+
+        input.value = before + insertion + after;
+
+        const newCursor = before.length + insertion.length;
+        input.setSelectionRange(newCursor, newCursor);
+
+        // Keep this.title in sync — onChange won't fire for programmatic
+        // assignments to input.value.
+        this.title = input.value;
+        this.updateSubmitButtonState();
+        this.hideTagDropdown();
+        input.focus();
+    }
+
+    /** Adds or removes the `is-selected` highlight class on the given item index. */
+    private highlightDropdownItem(index: number): void {
+        if (!this.tagDropdownEl) return;
+        const items = this.tagDropdownEl.querySelectorAll('.tl-tag-dropdown-item');
+        items.forEach((item, i) => {
+            item.classList.toggle('is-selected', i === index);
+        });
     }
 }
