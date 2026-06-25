@@ -333,3 +333,28 @@ describe('TaskParser.getFilesToScan', () => {
         expect(paths).toContain('OtherFolder/Notes.md');
     });
 });
+
+describe('TaskParser — priority/recurrence collision', () => {
+    const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; recurrence?: string; priority?: import('../src/models/Task').TaskPriority };
+
+    it('should not absorb priority emoji into recurrence rule', () => {
+        const result = parseTaskMetadata('Stand-up 🔁 every weekday ⏫');
+        expect(result.recurrence).toBe('every weekday');
+        expect(result.priority).toBe('highest');
+        expect(result.title).toBe('Stand-up');
+    });
+
+    it('should not absorb high-priority emoji into recurrence rule', () => {
+        const result = parseTaskMetadata('Daily review 🔁 every day 🔼');
+        expect(result.recurrence).toBe('every day');
+        expect(result.priority).toBe('high');
+        expect(result.title).toBe('Daily review');
+    });
+
+    it('should strip duplicate priority emojis from title', () => {
+        const result = parseTaskMetadata('Urgent task ⏫⏫');
+        expect(result.title).toBe('Urgent task');
+        expect(result.priority).toBe('highest');
+    });
+});
