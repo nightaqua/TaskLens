@@ -70,7 +70,6 @@ export class TaskListComponent {
         const checkbox = taskEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
         checkbox.checked = task.completed;
         checkbox.setAttribute('aria-label', `Toggle task: ${task.title}`);
-        checkbox.setAttribute('title', `Toggle task: ${task.title}`);
         checkbox.addEventListener('change', () => { this.callbacks.onToggle(task); });
 
         const content = taskEl.createDiv('task-content');
@@ -82,7 +81,6 @@ export class TaskListComponent {
         titleEl.setAttribute('role', 'button');
         titleEl.setAttribute('tabindex', '0');
         titleEl.setAttribute('aria-label', `Open task in editor: ${task.title}`);
-        titleEl.setAttribute('title', `Open task in editor: ${task.title}`);
 
         const meta = viewMode.createDiv('task-meta');
 
@@ -105,7 +103,6 @@ export class TaskListComponent {
 
             const recurringChip = meta.createDiv('task-recurring-chip');
             recurringChip.setAttribute('aria-label', label);
-            recurringChip.setAttribute('title', label);
 
             const icon = recurringChip.createSpan({ cls: 'task-recurring-icon' });
             setIcon(icon, 'repeat');
@@ -129,7 +126,6 @@ export class TaskListComponent {
             const editBtn = actionsEl.createEl('button', { cls: 'task-action-btn' });
             setIcon(editBtn, 'pencil');
             editBtn.setAttribute('aria-label', 'Edit task');
-            editBtn.setAttribute('title', 'Edit task');
             editBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.callbacks.onEdit(task);
@@ -137,7 +133,6 @@ export class TaskListComponent {
             const deleteBtn = actionsEl.createEl('button', { cls: ['task-action-btn', 'btn-danger'] });
             setIcon(deleteBtn, 'trash-2');
             deleteBtn.setAttribute('aria-label', 'Delete task');
-            deleteBtn.setAttribute('title', 'Delete task');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 new ConfirmModal(

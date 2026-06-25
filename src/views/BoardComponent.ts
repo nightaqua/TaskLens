@@ -142,7 +142,6 @@ private readonly onDrop = (e: DragEvent): void => {
 
             const recurringChip = meta.createDiv('board-task-recurring-chip');
             recurringChip.setAttribute('aria-label', label);
-            recurringChip.setAttribute('title', label);
             const icon = recurringChip.createSpan();
             setIcon(icon, 'repeat');
             if (group.doneCount > 0) {
@@ -158,7 +157,6 @@ private readonly onDrop = (e: DragEvent): void => {
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-label', `Open task in editor: ${task.title}`);
-        card.setAttribute('title', `Open task in editor: ${task.title}`);
         card.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
