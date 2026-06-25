@@ -103,7 +103,7 @@ export class TaskManager extends Events {
         if (task.dueDate) {
             // Advance due:: to next occurrence
             const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
-            const dueRegex = new RegExp(`(\\[?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
+            const dueRegex = new RegExp(`(\\[?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
             clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
 
             // If start:: is also present, advance it by the same interval so the
@@ -112,13 +112,13 @@ export class TaskManager extends Events {
                 const windowMs = task.dueDate.getTime() - task.startDate.getTime();
                 const nextStart = new Date(nextDate.getTime() - windowMs);
                 const startKey = this.escapeRegex(this.settings.startDateKey || 'start');
-                const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
+                const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
                 clonedLine = clonedLine.replace(startRegex, `$1${this.formatDate(nextStart)}$3`);
             }
         } else if (task.startDate) {
             // start:: is the only anchor — advance it to the next occurrence
             const startKey = this.escapeRegex(this.settings.startDateKey || 'start');
-            const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
+            const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
             clonedLine = clonedLine.replace(startRegex, `$1${dateStr}$3`);
         }
         // Neither date: clone is created with no date, identical to original body.
