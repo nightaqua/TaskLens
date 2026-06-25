@@ -1,4 +1,4 @@
-import { App, Modal, Setting, MarkdownView, ButtonComponent, setIcon } from 'obsidian';
+import { App, Modal, Setting, MarkdownView, ButtonComponent, setIcon, getAllTags } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
 import { Task } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
@@ -577,20 +577,38 @@ export class QuickAddModal extends Modal {
 
     /**
      * Returns all unique tag names (without leading `#`) found in the vault,
-     * sorted alphabetically. Uses the documented MetadataCache API.
+     * sorted alphabetically. Uses getAllTags() from the Obsidian API which
+     * unions both inline tags (cache.tags) and frontmatter tags so that
+     * vaults organised by frontmatter get complete suggestions.
+     *
+     * Results are cached for 2 s per dropdown session to avoid a full vault
+     * scan on every keystroke.
      */
+    private tagsCachedAt = 0;
+    private cachedTagList: string[] = [];
+    private readonly TAG_CACHE_TTL_MS = 2000;
+
     private getVaultTags(): string[] {
+        const now = Date.now();
+        if (now - this.tagsCachedAt < this.TAG_CACHE_TTL_MS) {
+            return this.cachedTagList;
+        }
         const tagSet = new Set<string>();
         for (const file of this.app.vault.getMarkdownFiles()) {
             const cache = this.app.metadataCache.getFileCache(file);
-            if (cache?.tags) {
-                for (const tagRef of cache.tags) {
-                    const name = tagRef.tag.startsWith('#') ? tagRef.tag.slice(1) : tagRef.tag;
-                    tagSet.add(name.toLowerCase());
+            if (!cache) continue;
+            const tags = getAllTags(cache);
+            if (tags) {
+                for (const tag of tags) {
+                    // getAllTags returns tags with leading '#'
+                    const name = tag.startsWith('#') ? tag.slice(1) : tag;
+                    if (name) tagSet.add(name.toLowerCase());
                 }
             }
         }
-        return Array.from(tagSet).sort();
+        this.cachedTagList = Array.from(tagSet).sort();
+        this.tagsCachedAt = now;
+        return this.cachedTagList;
     }
 
     /**
@@ -610,7 +628,7 @@ export class QuickAddModal extends Modal {
 
             // Match a `#` preceded by start-of-string or whitespace, followed
             // by zero or more word characters up to the cursor.
-            const match = textBefore.match(/(^|[\s])#(\w*)$/);
+            const match = textBefore.match(/(^|[\s])#([\w/-]*)$/);
             if (match) {
                 const prefix = match[2];
                 const triggerPos = textBefore.lastIndexOf('#');

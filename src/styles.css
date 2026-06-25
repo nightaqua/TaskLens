@@ -1714,10 +1714,10 @@
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-s);
     max-height: 200px;
     overflow-y: auto;
-    z-index: 10000;
+    z-index: 10000; /* above modal content — Obsidian modal uses ~9000 */
     padding: 4px 0;
 }
 
@@ -1725,7 +1725,6 @@
     padding: 5px 12px;
     font-size: 0.9em;
     color: var(--text-normal);
-    cursor: pointer;
     white-space: nowrap;
 }
 
