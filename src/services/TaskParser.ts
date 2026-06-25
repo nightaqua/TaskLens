@@ -1,5 +1,5 @@
 import { App, TFile, CachedMetadata, normalizePath } from 'obsidian';
-import { Task } from '../models/Task';
+import { Task, TaskPriority } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
 
 export class TaskParser {
@@ -39,6 +39,10 @@ export class TaskParser {
     private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^\[\u{1F4C5}\u2705]+/u;
     private static readonly EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
     private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
+
+    // 7. PRIORITY—obsidian-tasks emoji priority markers (read-only, never written back)
+    // ⏫ = highest, 🔼 = high, 🔽 = low, ⏬ = lowest
+    private static readonly PRIORITY_REGEX = /[⏫🔼🔽⏬]/u;
 
     // NOTE: All gi-flagged static regexes above (START_REGEX, DUE_REGEX, COMP_REGEX, REPEAT_REGEX)
     // carry lastIndex state between calls because they are shared class-level objects.
@@ -137,7 +141,7 @@ export class TaskParser {
             if (taskMatch) {
                 const completed = taskMatch[2].toLowerCase() === 'x';
                 const taskText = taskMatch[3];
-                const { title, startDate, dueDate, completionDate, recurrence, notes } = this.parseTaskMetadata(taskText);
+                const { title, startDate, dueDate, completionDate, recurrence, notes, priority } = this.parseTaskMetadata(taskText);
 
                 const task: Task = {
                     id: `${file.path}:${String(i)}`,
@@ -151,6 +155,7 @@ export class TaskParser {
                     completionDate, // Added
                     recurrence,     // Added
                     notes,          // Added
+                    priority,       // FA-003
                     originalText: line
                 };
                 tasks.push(task);
@@ -177,13 +182,14 @@ export class TaskParser {
         }
     }
 
-    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string } {
+    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; priority?: TaskPriority } {
         let title = taskText;
         let startDate: Date | undefined;
         let dueDate: Date | undefined;
         let completionDate: Date | undefined;
         let recurrence: string | undefined;
         let notes: string | undefined;
+        let priority: TaskPriority | undefined;
 
         /**
          * Normalise a parsed date string to a local-midnight Date.
@@ -258,8 +264,20 @@ export class TaskParser {
             }
         }
 
+        // 7. PRIORITY emojis—obsidian-tasks format (read-only)
+        const priorityMatch = taskText.match(TaskParser.PRIORITY_REGEX);
+        if (priorityMatch) {
+            switch (priorityMatch[0]) {
+                case '⏫': priority = 'highest'; break;  // ⏫
+                case '🔼': priority = 'high'; break;  // 🔼
+                case '🔽': priority = 'low'; break;   // 🔽
+                case '⏬': priority = 'lowest'; break;   // ⏬
+            }
+            title = title.replace(TaskParser.PRIORITY_REGEX, '');
+        }
+
         title = title.replace(/\s+/g, ' ').trim();
 
-        return { title, startDate, dueDate, completionDate, recurrence, notes };
+        return { title, startDate, dueDate, completionDate, recurrence, notes, priority };
     }
 }

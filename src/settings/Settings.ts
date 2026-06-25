@@ -1,5 +1,5 @@
 export type ColorMode = 'status' | 'course';
-export type TaskListSort = 'urgency' | 'topic' | 'file-name';
+export type TaskListSort = 'urgency' | 'topic' | 'file-name' | 'priority';
 
 export interface SemesterSettings {
     scanFolders: string[];

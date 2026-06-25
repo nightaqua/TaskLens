@@ -138,8 +138,9 @@ export class TaskListView extends ItemView {
             'urgency': 'Urgency',
             'topic': 'Topic',
             'file-name': 'File Name',
+            'priority': 'Priority',
         };
-        const SORT_ORDER: TaskListSort[] = ['urgency', 'topic', 'file-name'];
+        const SORT_ORDER: TaskListSort[] = ['urgency', 'topic', 'file-name', 'priority'];
 
         const bar = container.createDiv('tasklist-sort-bar');
         const label = bar.createSpan({ cls: 'tasklist-sort-label', text: 'Sort:' });

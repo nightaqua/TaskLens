@@ -1,5 +1,5 @@
 import { TFile, Events, App, normalizePath } from 'obsidian';
-import { Task, TaskGroup, TaskStatus, getTaskStatus } from '../models/Task';
+import { Task, TaskGroup, TaskStatus, getTaskStatus, PRIORITY_WEIGHT } from '../models/Task';
 import { TaskParser } from './TaskParser';
 import { SemesterSettings, DEFAULT_SETTINGS, TaskListSort } from '../settings/Settings';
 import { hasCompletionMetadata, hasExternalCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
@@ -689,6 +689,19 @@ export class TaskManager extends Events {
                 const cmp = a.fileName.localeCompare(b.fileName);
                 if (cmp !== 0) return cmp;
                 // secondary: urgency within topic
+                const wA = this.getStatusWeight(a);
+                const wB = this.getStatusWeight(b);
+                if (wA !== wB) return wA - wB;
+                if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+                if (a.dueDate) return -1;
+                if (b.dueDate) return 1;
+                return 0;
+            }
+            if (this.currentTaskListSort === 'priority') {
+                const pA = PRIORITY_WEIGHT[a.priority ?? 'normal'];
+                const pB = PRIORITY_WEIGHT[b.priority ?? 'normal'];
+                if (pA !== pB) return pA - pB;
+                // secondary: urgency within same priority level
                 const wA = this.getStatusWeight(a);
                 const wB = this.getStatusWeight(b);
                 if (wA !== wB) return wA - wB;

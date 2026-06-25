@@ -1,4 +1,19 @@
 /**
+ * obsidian-tasks compatible priority levels.
+ * Numeric values are sort weights: lower = higher priority.
+ */
+export type TaskPriority = 'highest' | 'high' | 'normal' | 'low' | 'lowest';
+
+/** Map from TaskPriority to sort weight (lower = shown first). */
+export const PRIORITY_WEIGHT: Record<TaskPriority, number> = {
+    highest: 1,
+    high:    2,
+    normal:  3,
+    low:     4,
+    lowest:  5,
+};
+
+/**
  * Represents a task extracted from a Markdown file
  */
 export interface Task {
@@ -34,6 +49,9 @@ export interface Task {
 
     /** Extracted notes content, e.g. [notes:: ...] (optional) */
     notes?: string;
+
+    /** obsidian-tasks priority emoji (⏫🔼🔽⏬) — undefined means normal priority. */
+    priority?: TaskPriority;
 
     /** Original task text (for reference) */
     readonly originalText: string;
@@ -90,4 +108,4 @@ export function getTaskStatus(task: Task): TaskStatus {
 
     return TaskStatus.NoDate;
 }
-
+

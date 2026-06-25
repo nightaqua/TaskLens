@@ -7,7 +7,7 @@ describe('TaskParser.parseTaskMetadata', () => {
     // Create a dummy instance. Since parseTaskMetadata doesn't use `this.app` or `this.settings`,
     // we can pass null or empty objects casted to unknown.
     const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
-    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string };
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; priority?: import('../src/models/Task').TaskPriority };
 
     const getLocalMidnight = (dateStr: string) => new Date(`${dateStr}T00:00:00`);
 
@@ -168,6 +168,42 @@ describe('TaskParser.parseTaskMetadata', () => {
         const result = parseTaskMetadata('Buy milk 📅 15-10-2023');
         expect(result.title).toBe('Buy milk');
         expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
+    });
+
+    it('should parse ⏫ (highest) priority emoji', () => {
+        const result = parseTaskMetadata('Important task ⏫');
+        expect(result.title).toBe('Important task');
+        expect(result.priority).toBe('highest');
+    });
+
+    it('should parse 🔼 (high) priority emoji', () => {
+        const result = parseTaskMetadata('High priority task 🔼 [due:: 2024-06-01]');
+        expect(result.title).toBe('High priority task');
+        expect(result.priority).toBe('high');
+        expect(result.dueDate).toEqual(getLocalMidnight('2024-06-01'));
+    });
+
+    it('should parse 🔽 (low) priority emoji', () => {
+        const result = parseTaskMetadata('Low priority task 🔽');
+        expect(result.title).toBe('Low priority task');
+        expect(result.priority).toBe('low');
+    });
+
+    it('should parse ⏬ (lowest) priority emoji', () => {
+        const result = parseTaskMetadata('Lowest priority task ⏬');
+        expect(result.title).toBe('Lowest priority task');
+        expect(result.priority).toBe('lowest');
+    });
+
+    it('should leave priority undefined when no priority emoji present', () => {
+        const result = parseTaskMetadata('Normal task [due:: 2024-06-01]');
+        expect(result.priority).toBeUndefined();
+    });
+
+    it('should strip priority emoji from title', () => {
+        const result = parseTaskMetadata('Clean title ⏫ with trailing text');
+        expect(result.title).toBe('Clean title with trailing text');
+        expect(result.priority).toBe('highest');
     });
 });
 describe('TaskParser.getFilesToScan', () => {
