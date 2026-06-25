@@ -1,4 +1,4 @@
-import { App, Modal, Setting, MarkdownView, ButtonComponent } from 'obsidian';
+import { App, Modal, Setting, MarkdownView, ButtonComponent, setIcon } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
 import { Task } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
@@ -65,6 +65,16 @@ interface ObsidianAppWithPlugins {
     };
 }
 
+/**
+ * Runtime type-guard for the nldates-obsidian plugin object.
+ * Uses an `in`-narrowing check rather than a bare `as` cast (AGENTS.md §2).
+ */
+function asNLDatesPlugin(x: unknown): NLDatesPlugin | null {
+    if (typeof x !== 'object' || x === null) return null;
+    if (typeof (x as Record<string, unknown>)['parseDate'] !== 'function') return null;
+    return x as NLDatesPlugin;
+}
+
 /** Formats a Date to yyyy-mm-dd in local time. */
 function nlFormatDate(d: Date): string {
     const y = String(d.getFullYear());
@@ -90,11 +100,11 @@ function parseNLDateInline(s: string): string | null {
 
     // "+N days" / "in N days" / "N days"
     let m = s.match(/^(?:in\s+|[+])?(\d+)\s*d(?:ays?)?$/);
-    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1]) * MS));
+    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1], 10) * MS));
 
     // "+N weeks" / "in N weeks" / "N weeks"
     m = s.match(/^(?:in\s+|[+])?(\d+)\s*w(?:eeks?)?$/);
-    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1]) * 7 * MS));
+    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1], 10) * 7 * MS));
 
     // "next <weekday>"
     m = s.match(/^next\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)$/);
@@ -152,8 +162,8 @@ export function parseNLDate(input: string, app: App): string | null {
     const pluginRegistry = appShim.plugins?.plugins;
     // Record<string, unknown> is non-nullable — use an explicit guard, not optional-chain, for the key lookup.
     const nlDates = pluginRegistry !== undefined
-        ? pluginRegistry['nldates-obsidian'] as NLDatesPlugin | undefined
-        : undefined;
+        ? asNLDatesPlugin(pluginRegistry['nldates-obsidian'])
+        : null;
     if (nlDates) {
         try {
             const parsed = nlDates.parseDate(s);
@@ -310,12 +320,28 @@ export class QuickAddModal extends Modal {
                 text.inputEl.type = 'text';
                 text.setPlaceholder('2026-12-31, "tomorrow", "next friday"');
                 text.setValue(this.date);
-                text.onChange(value => { this.date = value; });
-                text.inputEl.addEventListener('blur', () => {
-                    const resolved = parseNLDate(this.date, this.app);
-                    this.date = resolved ?? '';
-                    text.setValue(this.date);
+                text.onChange(value => {
+                    this.date = value;
+                    text.inputEl.removeClass('tl-input-error');
                 });
+                text.inputEl.addEventListener('blur', () => {
+                    const raw = this.date;
+                    if (!raw) return;
+                    const resolved = parseNLDate(raw, this.app);
+                    if (resolved) {
+                        this.date = resolved;
+                        text.setValue(resolved);
+                        text.inputEl.removeClass('tl-input-error');
+                    } else {
+                        // Keep raw text visible so the user can correct it
+                        text.inputEl.addClass('tl-input-error');
+                    }
+                });
+                this.attachDatePickerButton(
+                    text.inputEl,
+                    () => this.date,
+                    v => { this.date = v; text.setValue(v); }
+                );
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -328,12 +354,27 @@ export class QuickAddModal extends Modal {
                 text.inputEl.type = 'text';
                 text.setPlaceholder('2026-12-31, "next monday", "in 3 days"');
                 text.setValue(this.startDate);
-                text.onChange(value => { this.startDate = value; });
-                text.inputEl.addEventListener('blur', () => {
-                    const resolved = parseNLDate(this.startDate, this.app);
-                    this.startDate = resolved ?? '';
-                    text.setValue(this.startDate);
+                text.onChange(value => {
+                    this.startDate = value;
+                    text.inputEl.removeClass('tl-input-error');
                 });
+                text.inputEl.addEventListener('blur', () => {
+                    const raw = this.startDate;
+                    if (!raw) return;
+                    const resolved = parseNLDate(raw, this.app);
+                    if (resolved) {
+                        this.startDate = resolved;
+                        text.setValue(resolved);
+                        text.inputEl.removeClass('tl-input-error');
+                    } else {
+                        text.inputEl.addClass('tl-input-error');
+                    }
+                });
+                this.attachDatePickerButton(
+                    text.inputEl,
+                    () => this.startDate,
+                    v => { this.startDate = v; text.setValue(v); }
+                );
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -460,6 +501,51 @@ export class QuickAddModal extends Modal {
                 this.submitBtnComp.setDisabled(false);
             }
         }
+    }
+
+    /**
+     * Appends a small calendar-icon button immediately after `inputEl` that opens
+     * a hidden native date picker. When the user picks a date the text field and
+     * state are updated, and any error styling is cleared.
+     *
+     * Preserves the native date-picker affordance alongside NL text entry.
+     */
+    private attachDatePickerButton(
+        inputEl: HTMLInputElement,
+        getState: () => string,
+        setState: (v: string) => void
+    ): void {
+        // Hidden native date input — provides the browser calendar UI
+        const picker = activeDocument.createElement('input');
+        picker.type = 'date';
+        picker.classList.add('tl-date-picker-hidden');
+        inputEl.insertAdjacentElement('afterend', picker);
+
+        // Visible calendar icon button (inserted between input and picker in DOM order)
+        const btn = activeDocument.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('aria-label', 'Open calendar');
+        btn.classList.add('tl-date-picker-btn');
+        setIcon(btn, 'calendar');
+        inputEl.insertAdjacentElement('afterend', btn);
+
+        btn.addEventListener('click', () => {
+            const cur = getState();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cur)) {
+                picker.value = cur;
+            }
+            // picker.click() opens the native calendar in Obsidian's Electron context
+            picker.click();
+        });
+
+        picker.addEventListener('change', () => {
+            if (!picker.value) return;
+            setState(picker.value);
+            inputEl.value = picker.value;
+            inputEl.removeClass('tl-input-error');
+            // Sync the Setting text component's value tracking
+            inputEl.dispatchEvent(new Event('input'));
+        });
     }
 
     /** Cleans up the modal's DOM when it is closed. */

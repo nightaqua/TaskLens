@@ -126,5 +126,32 @@ When you sort the Task List by **Priority**, tasks are ordered from Highest → 
 
 Priority is independent of urgency. A Highest-priority task with a far-future due date will appear above a Normal task that is overdue — use the urgency sort if you want date-proximity to dominate.
 
+## Natural language dates in Quick Add
+
+The Quick Add modal accepts natural language in the **Due date** and **Start date** fields — you do not have to type `YYYY-MM-DD` manually. The value is resolved to a concrete date on blur and again at submit (so pressing Enter without leaving the field still works).
+
+### Supported expressions
+
+| Input | Resolves to |
+|-------|-------------|
+| `2026-12-31` | Passed through unchanged |
+| `today` | Today |
+| `tomorrow` | Tomorrow |
+| `yesterday` | Yesterday |
+| `+3d` or `in 3 days` | 3 days from today |
+| `+2w` or `in 2 weeks` | 14 days from today |
+| `next monday` (or any weekday) | The coming occurrence of that weekday |
+| `next week` | 7 days from today |
+| `eow` or `end of week` | The coming Sunday |
+| `eom` or `end of month` | The last day of the current month |
+
+If the [Natural Language Dates](https://github.com/argenos/nldates-obsidian) plugin (`nldates-obsidian`) is installed and enabled, any expression it recognises is also accepted — giving you access to its full date vocabulary.
+
+> [!tip] Calendar picker still available
+> Each date field has a small 📅 calendar button on the right. Clicking it opens your system's native date picker — useful when you want to browse a month rather than type.
+
+> [!note] Unrecognised input
+> If Quick Add cannot parse what you typed (the field shows a red border after you leave it), the raw text is kept so you can correct it. The task will not be saved until the date resolves successfully.
+
 
 ---

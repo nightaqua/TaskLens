@@ -1671,3 +1671,35 @@
     color: var(--text-on-accent);
     border-color: var(--interactive-accent);
 }
+
+/* =========================================
+   14. NL DATE ENTRY — QUICK ADD (FA-006)
+   ========================================= */
+
+/* Hidden native date input — solely drives the browser calendar picker UI */
+.tl-date-picker-hidden {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+
+/* Calendar icon button next to date text fields */
+.tl-date-picker-btn {
+    padding: 2px 4px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    vertical-align: middle;
+}
+
+.tl-date-picker-btn:hover {
+    color: var(--text-normal);
+}
+
+/* Shown on a date field when blur resolves to an unrecognised string */
+.tl-input-error {
+    border-color: var(--color-red) !important;
+    box-shadow: 0 0 0 1px var(--color-red);
+}
