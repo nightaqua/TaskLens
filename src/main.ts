@@ -74,11 +74,6 @@ export default class TaskLensPlugin extends Plugin {
         this.setupRibbonIcon();
         this.setupCommands();
 
-        // Delay welcome modal slightly so Obsidian's own UI finishes loading first
-        if (!this.settings.hasSeenWelcome) {
-            window.setTimeout(() => { new WelcomeModal(this.app, this).open(); }, 1000);
-        }
-
         this.addSettingTab(new SettingsTab(this.app, this));
 
         // Populate this.tasks unconditionally on every startup. Without this, if no
@@ -86,6 +81,7 @@ export default class TaskLensPlugin extends Plugin {
         // this.tasks stays empty and processManualUpdate can never detect any transition.
         this.app.workspace.onLayoutReady(() => {
             void this.taskManager.loadTasks();
+            if (!this.settings.hasSeenWelcome) new WelcomeModal(this.app, this).open();
         });
     }
 
