@@ -124,7 +124,6 @@ export class QuickAddModal extends Modal {
             .setName('Task')
             .addText(text => {
                 text.inputEl.setAttribute("aria-label", "Task");
-                text.inputEl.setAttribute("title", "Task");
                 text
                     .setPlaceholder('Read chapter 4...')
                     .setValue(this.title)
@@ -144,7 +143,6 @@ export class QuickAddModal extends Modal {
                 .setName('Destination')
                 .addDropdown(drop => {
                 drop.selectEl.setAttribute("aria-label", "Destination");
-                drop.selectEl.setAttribute("title", "Destination");
                     // Always offer "insert at cursor" as the first option, so it is
                     // the most ergonomic choice when a Markdown file is already open.
                     drop.addOption('__CURSOR__', 'Insert at cursor (active file)');
@@ -180,7 +178,6 @@ export class QuickAddModal extends Modal {
             .setName('Due date')
             .addText(text => {
                 text.inputEl.setAttribute("aria-label", "Due date");
-                text.inputEl.setAttribute("title", "Due date");
                 // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
                 text.setValue(this.date);
@@ -193,7 +190,6 @@ export class QuickAddModal extends Modal {
             .setName('Start date')
             .addText(text => {
                 text.inputEl.setAttribute("aria-label", "Start date");
-                text.inputEl.setAttribute("title", "Start date");
                 // Render as a native HTML date input for a built-in calendar picker.
                 text.inputEl.type = 'date';
                 text.setValue(this.startDate);
@@ -207,7 +203,6 @@ export class QuickAddModal extends Modal {
             .setDesc('Select a recurrence pattern.')
             .addDropdown(drop => {
                 drop.selectEl.setAttribute("aria-label", "Repeat");
-                drop.selectEl.setAttribute("title", "Repeat");
                 drop.addOption('', 'None');
                 drop.addOption('daily', 'Daily');
                 drop.addOption('weekly', 'Weekly');
