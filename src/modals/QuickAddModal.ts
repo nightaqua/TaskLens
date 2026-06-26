@@ -288,7 +288,7 @@ export class QuickAddModal extends Modal {
                 const fallbackFile = this.taskManager.getScannedFiles()[0];
                 if (fallbackFile) {
                     const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-                    await this.taskManager.addTask(this.title, dateObj, fallbackFile);
+                    await this.taskManager.addTask(this.title, dateObj, fallbackFile, this.recurrence);
                 }
             }
             } else {
