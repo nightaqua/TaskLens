@@ -50,6 +50,8 @@ temp/
 .iloom/
 # Agent coordination dir — local-only operational files, never commit
 .agents/
+# Claude Code project config (contains symlink to agent definitions)
+.claude/
 
 # TypeScript incremental build info
 tsconfig.tsbuildinfo
