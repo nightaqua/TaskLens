@@ -32,7 +32,11 @@ export interface SemesterSettings {
         scanOpen: boolean;
         parserOpen: boolean;
         uiOpen: boolean;
+        icsOpen: boolean;
     };
+
+    /** ICS calendar feed URLs — one per entry. Fetched on startup and every 4 hours. */
+    icsFeedUrls: string[];
 
     savedFocusLayout?: unknown;
 }
@@ -65,7 +69,10 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
         scanOpen: true,
         parserOpen: false,
         uiOpen: true,
+        icsOpen: false,
     },
+
+    icsFeedUrls: [],
 
     savedFocusLayout: null
 };

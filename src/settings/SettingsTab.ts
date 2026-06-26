@@ -176,7 +176,50 @@ export class SettingsTab extends PluginSettingTab {
         const colorPickersContainer = uiDetails.createDiv();
         this.renderColorPickers(colorPickersContainer);
 
-// --- CLEAN DONATION BUTTON ---
+
+        // --- ICS CALENDAR FEEDS ---
+        const icsDetails = containerEl.createEl('details');
+        icsDetails.open = this.plugin.settings.settingsTabState.icsOpen;
+        icsDetails.createEl('summary', { text: 'Calendar feeds (ics)' });
+        icsDetails.addEventListener('toggle', () => {
+            this.plugin.settings.settingsTabState.icsOpen = icsDetails.open;
+            void this.plugin.saveSettings();
+        });
+
+        new Setting(icsDetails)
+            .setName('Calendar feed urls')
+            .setDesc('Subscribe to public or private .ics calendar URLs. Events appear as a read-only overlay on the Timeline. One URL per line.')
+            .addTextArea(text => {
+                text.inputEl.setAttribute('aria-label', 'Calendar feed urls');
+                text.inputEl.rows = 4;
+                return text
+                    .setPlaceholder('https://example.com/calendar.ics')
+                    .setValue(this.plugin.settings.icsFeedUrls.join('\n'))
+                    .onChange(async (value) => {
+                        this.plugin.settings.icsFeedUrls = value
+                            .split('\n')
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0);
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(icsDetails)
+            .setName('Refresh calendar feeds')
+            .setDesc('Fetch all calendar feeds now and refresh the timeline overlay.')
+            .addButton(btn => btn
+                .setButtonText('Refresh now')
+                .onClick(async () => {
+                    btn.setButtonText('Refreshing…');
+                    btn.setDisabled(true);
+                    await this.plugin.icsFeedManager.fetchAll();
+                    this.plugin.refreshViews();
+                    btn.setButtonText('Refresh now');
+                    btn.setDisabled(false);
+                })
+            );
+
+        // --- CLEAN DONATION BUTTON ---
         containerEl.createEl('br');
         containerEl.createEl('hr');
 
