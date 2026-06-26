@@ -20,6 +20,7 @@ import {
     CLASS_FEATURE_HIGHLIGHT
 } from './constants';
 import { WelcomeModal } from './modals/WelcomeModal';
+import { IcsFeedManager } from './services/IcsFeedManager';
 
 export interface RefreshableView {
     refreshFromSettings?(): void;
@@ -38,6 +39,7 @@ type WorkspaceWithSplits = {
 export default class TaskLensPlugin extends Plugin {
     settings!: SemesterSettings;
     taskManager!: TaskManager;
+    icsFeedManager!: IcsFeedManager;
     isLayoutLocked: boolean = true;
     isFocusMode: boolean = false;
 
@@ -79,13 +81,22 @@ export default class TaskLensPlugin extends Plugin {
         // Populate this.tasks unconditionally on every startup. Without this, if no
         // TaskLens view is open (e.g. focus mode was active when Obsidian was closed),
         // this.tasks stays empty and processManualUpdate can never detect any transition.
+        this.icsFeedManager = new IcsFeedManager(
+            () => this.settings.icsFeedUrls,
+            () => { this.refreshViews(); }
+        );
+
         this.app.workspace.onLayoutReady(() => {
             void this.taskManager.loadTasks();
+            void this.icsFeedManager.fetchAll().then(() => {
+                this.icsFeedManager.startAutoRefresh();
+            });
             if (!this.settings.hasSeenWelcome) new WelcomeModal(this.app, this).open();
         });
     }
 
     onunload() {
+        this.icsFeedManager.stopAutoRefresh();
         // Sentinel: Detach leaves on unload — AGENTS.md §5
         ALL_VIEW_TYPES.forEach(type => {
             this.app.workspace.detachLeavesOfType(type);

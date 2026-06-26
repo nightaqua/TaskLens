@@ -1002,6 +1002,53 @@
     margin-bottom: 16px; 
 }
 
+
+/* ── ICS Calendar Event Overlay ───────────────────────────────────────────── */
+
+/* Separator label that announces the ICS row band */
+.tasklens-dashboard-content .timeline-ics-separator {
+    grid-column-start: var(--tl-col-start);
+    grid-column-end: span var(--tl-col-span);
+    grid-row: var(--tl-row);
+    padding: 2px 8px;
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    opacity: 0.7;
+    pointer-events: none;
+    align-self: end;
+}
+
+/* ICS event bar — read-only, visually distinct from task bars */
+.tasklens-dashboard-content .timeline-ics-bar {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.80em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 2px 4px;
+    opacity: 0.82;
+    z-index: 5;
+    color: var(--text-on-accent);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    background-color: var(--color-purple, #7c3aed);
+    border-left: 3px solid rgba(255,255,255,0.3);
+    grid-column-start: var(--tl-col-start);
+    grid-column-end: span var(--tl-col-span);
+    grid-row: var(--tl-row);
+    cursor: default;
+}
+
+.tasklens-dashboard-content .timeline-ics-bar:hover {
+    opacity: 1;
+    filter: brightness(1.08);
+    z-index: 10;
+}
+
 .timeline-task-bar.is-clamped-left {
     border-left: 3px solid var(--text-accent);
     border-top-left-radius: 0;

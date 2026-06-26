@@ -152,7 +152,8 @@ export class TimelineView extends ItemView implements RefreshableView {
             (newStart: Date) => {
                 this.viewportStart = newStart;
                 this.app.workspace.requestSaveLayout();
-            }
+            },
+            this.plugin.icsFeedManager.getEvents()
         );
         this.timelineComponent.render();
 
