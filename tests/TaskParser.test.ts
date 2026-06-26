@@ -7,7 +7,7 @@ describe('TaskParser.parseTaskMetadata', () => {
     // Create a dummy instance. Since parseTaskMetadata doesn't use `this.app` or `this.settings`,
     // we can pass null or empty objects casted to unknown.
     const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
-    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string };
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; timerMode?: 'countdown' | 'elapsed' | 'both' };
 
     const getLocalMidnight = (dateStr: string) => new Date(`${dateStr}T00:00:00`);
 
@@ -168,6 +168,43 @@ describe('TaskParser.parseTaskMetadata', () => {
         const result = parseTaskMetadata('Buy milk 📅 15-10-2023');
         expect(result.title).toBe('Buy milk');
         expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
+    });
+
+    it('should parse #countdown tag and strip it from the title', () => {
+        const result = parseTaskMetadata('Submit report #countdown [due:: 2024-05-10]');
+        expect(result.title).toBe('Submit report');
+        expect(result.timerMode).toBe('countdown');
+        expect(result.dueDate).toEqual(getLocalMidnight('2024-05-10'));
+    });
+
+    it('should parse #elapsed tag and strip it from the title', () => {
+        const result = parseTaskMetadata('Track habit #elapsed [start:: 2024-05-10]');
+        expect(result.title).toBe('Track habit');
+        expect(result.timerMode).toBe('elapsed');
+        expect(result.startDate).toEqual(getLocalMidnight('2024-05-10'));
+    });
+
+    it('should parse #countdown-elapsed tag as both', () => {
+        const result = parseTaskMetadata('Exam #countdown-elapsed');
+        expect(result.title).toBe('Exam');
+        expect(result.timerMode).toBe('both');
+    });
+
+    it('should treat separate #countdown and #elapsed tags as both', () => {
+        const result = parseTaskMetadata('Sprint #countdown #elapsed');
+        expect(result.title).toBe('Sprint');
+        expect(result.timerMode).toBe('both');
+    });
+
+    it('should leave timerMode undefined when no timer tag is present', () => {
+        const result = parseTaskMetadata('Plain task');
+        expect(result.timerMode).toBeUndefined();
+    });
+
+    it('should not match timer tags embedded in longer tags', () => {
+        const result = parseTaskMetadata('Note #countdownish #elapsedaily');
+        expect(result.timerMode).toBeUndefined();
+        expect(result.title).toBe('Note #countdownish #elapsedaily');
     });
 });
 describe('TaskParser.getFilesToScan', () => {

@@ -1718,3 +1718,33 @@
     color: var(--text-on-accent);
     border-color: var(--interactive-accent);
 }
+
+/* =========================================
+   13. TIMER CHIPS — TASK LIST (FA-002)
+   ========================================= */
+
+/* Keep the title and any timer chips on one inline row. */
+.task-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tl-timer-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+    background: var(--background-secondary);
+}
+
+.tl-timer-chip.is-green { color: var(--color-green); }
+.tl-timer-chip.is-yellow { color: var(--color-yellow); }
+.tl-timer-chip.is-orange { color: var(--color-orange); }
+.tl-timer-chip.is-red { color: var(--color-red); }

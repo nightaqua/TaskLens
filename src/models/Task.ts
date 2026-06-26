@@ -53,6 +53,13 @@ export interface Task {
     /** obsidian-tasks priority emoji (⏫🔼🔽⏬) — undefined means normal priority. */
     priority?: TaskPriority;
 
+    /**
+     * Live-timer mode from #countdown / #elapsed / #countdown-elapsed tags.
+     * 'countdown' counts down to dueDate, 'elapsed' counts up from startDate,
+     * 'both' shows both chips. Undefined means no timer chip.
+     */
+    timerMode?: 'countdown' | 'elapsed' | 'both';
+
     /** Original task text (for reference) */
     readonly originalText: string;
 }

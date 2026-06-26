@@ -52,6 +52,7 @@ export class DashboardView extends ItemView implements RefreshableView {
     private taskManager: TaskManager;
     private timelineComponent: TimelineComponent | null = null;
     private boardComponent: BoardComponent | null = null;
+    private listComponent: TaskListComponent | null = null;
     private headerComponent: HeaderComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
@@ -204,6 +205,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         this.taskManager.off('tasks-updated', this.onTasksUpdated);
         this.timelineComponent?.destroy();
         this.boardComponent?.destroy();
+        this.listComponent?.destroy();
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
@@ -217,6 +219,7 @@ export class DashboardView extends ItemView implements RefreshableView {
         // Clean up out-of-container DOM nodes before wiping contentEl
         this.timelineComponent?.destroy();
         this.boardComponent?.destroy();
+        this.listComponent?.destroy();
 
         this.contentEl.empty();
 
@@ -417,13 +420,13 @@ export class DashboardView extends ItemView implements RefreshableView {
     private renderTaskList(): void {
         const container = this.contentEl.createDiv();
 
-        const list = new TaskListComponent(container, this.app, {
+        this.listComponent = new TaskListComponent(container, this.app, {
             onToggle: (t) => { void this.taskManager.toggleTaskCompletion(t); },
             onEdit: (t) => { new QuickAddModal(this.app, this.taskManager, t, this.plugin.settings).open(); },
             onDelete: (t) => { void this.taskManager.deleteTask(t); },
         }, this.plugin.settings);
 
-        list.render(this.taskManager.getGroupedFilteredTasks());
+        this.listComponent.render(this.taskManager.getGroupedFilteredTasks());
     }
 
     public applyColorTheme(): void {
