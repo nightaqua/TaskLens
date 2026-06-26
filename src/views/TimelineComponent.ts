@@ -509,7 +509,7 @@ export class TimelineComponent {
         const visibleIcsEvents = this.icsEvents.filter(ev => {
             const evEndMs = ev.end.getTime();
             const evStartMs = ev.start.getTime();
-            return evEndMs >= windowStartMs && evStartMs <= windowEndMs + 86399999;
+            return evEndMs >= windowStartMs && evStartMs <= windowEndMs;
         });
 
         if (visibleIcsEvents.length > 0) {

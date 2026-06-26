@@ -180,17 +180,17 @@ export class SettingsTab extends PluginSettingTab {
         // --- ICS CALENDAR FEEDS ---
         const icsDetails = containerEl.createEl('details');
         icsDetails.open = this.plugin.settings.settingsTabState.icsOpen;
-        icsDetails.createEl('summary', { text: 'Calendar feeds (ics)' });
+        icsDetails.createEl('summary', { text: 'Calendar feeds (.ics)' });
         icsDetails.addEventListener('toggle', () => {
             this.plugin.settings.settingsTabState.icsOpen = icsDetails.open;
             void this.plugin.saveSettings();
         });
 
         new Setting(icsDetails)
-            .setName('Calendar feed urls')
+            .setName('Calendar feed URLs')
             .setDesc('Subscribe to public or private .ics calendar URLs. Events appear as a read-only overlay on the Timeline. One URL per line.')
             .addTextArea(text => {
-                text.inputEl.setAttribute('aria-label', 'Calendar feed urls');
+                text.inputEl.setAttribute('aria-label', 'Calendar feed URLs');
                 text.inputEl.rows = 4;
                 return text
                     .setPlaceholder('https://example.com/calendar.ics')
