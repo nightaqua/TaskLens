@@ -1,6 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
-import { resolveActiveMarkdownView } from '../src/modals/QuickAddModal';
-import { MarkdownView } from 'obsidian';
+import { resolveActiveMarkdownView, QuickAddModal } from '../src/modals/QuickAddModal';
+import { MarkdownView, App } from 'obsidian';
+import { TaskManager } from '../src/services/TaskManager';
+
+interface QuickAddModalInternals {
+    title: string;
+    date: string;
+    recurrence: string;
+    selectedFile: string;
+    handleSubmit(): Promise<void>;
+}
 
 describe('resolveActiveMarkdownView', () => {
     it('returns the result of getActiveViewOfType directly when it returns a non-null value', () => {
@@ -63,5 +72,39 @@ describe('resolveActiveMarkdownView', () => {
 
         const result = resolveActiveMarkdownView(mockApp as any);
         expect(result).toBeNull();
+    });
+});
+
+describe('QuickAddModal.handleSubmit — cursor fallback', () => {
+    it('passes recurrence as the 4th argument to addTask when no active view exists', async () => {
+        // No active view and no visible markdown leaves → activeViewAtOpen is null,
+        // forcing handleSubmit() down the cursor-fallback branch.
+        const mockApp = {
+            workspace: {
+                getActiveViewOfType: vi.fn().mockReturnValue(null),
+                getLeavesOfType: vi.fn().mockReturnValue([])
+            }
+        };
+
+        const addTask = vi.fn().mockResolvedValue(undefined);
+        const taskManager = {
+            getScannedFiles: vi.fn().mockReturnValue(['Notes.md']),
+            addTask
+        };
+
+        const modal = new QuickAddModal(
+            mockApp as unknown as App,
+            taskManager as unknown as TaskManager
+        );
+
+        const internals = modal as unknown as QuickAddModalInternals;
+        internals.title = 'Buy milk';
+        internals.selectedFile = '__CURSOR__';
+        internals.recurrence = 'weekly';
+
+        await internals.handleSubmit();
+
+        expect(addTask).toHaveBeenCalledWith('Buy milk', null, 'Notes.md', 'weekly');
+        expect(addTask.mock.calls[0][3]).toBe('weekly');
     });
 });

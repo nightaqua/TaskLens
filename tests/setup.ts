@@ -11,6 +11,10 @@ vi.mock('obsidian', () => {
         },
         App: class {},
         Modal: class {
+            app: unknown;
+            constructor(app: unknown) {
+                this.app = app;
+            }
             open() {}
             close() {}
         },
