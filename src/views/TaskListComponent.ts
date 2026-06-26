@@ -158,7 +158,7 @@ export class TaskListComponent {
             if (kind === 'countdown' && !task.dueDate) continue;
             if (kind === 'elapsed' && !task.startDate) continue;
 
-            const chip = container.createSpan({ cls: ['tl-timer-chip', `tl-timer-${kind}`] });
+            const chip = container.createSpan({ cls: 'tl-timer-chip' });
             this.applyTimerChip(chip, task, kind, now);
             this.timerChips.push({ el: chip, task, kind });
         }
