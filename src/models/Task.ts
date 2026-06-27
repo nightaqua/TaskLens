@@ -13,6 +13,48 @@ export const PRIORITY_WEIGHT: Record<TaskPriority, number> = {
     lowest:  5,
 };
 
+/** Type guard for a raw string (e.g. a dropdown value) that may be a TaskPriority. */
+export function isTaskPriority(value: string): value is TaskPriority {
+    switch (value) {
+        case 'highest':
+        case 'high':
+        case 'normal':
+        case 'low':
+        case 'lowest':
+            return true;
+        default:
+            return false;
+    }
+}
+
+/**
+ * obsidian-tasks priority emoji for a given level.
+ * 'normal' (and undefined) have no emoji and return ''.
+ */
+export function priorityToEmoji(priority?: TaskPriority): string {
+    switch (priority) {
+        case 'highest': return '\u{1F53A}'; // 🔺
+        case 'high':    return '\u{23EB}';  // ⏫
+        case 'low':     return '\u{1F53D}'; // 🔽
+        case 'lowest':  return '\u{23EC}';  // ⏬
+        default:        return '';
+    }
+}
+
+/** Maps an obsidian-tasks priority emoji to its level, or undefined (normal) if unrecognised. */
+export function emojiToPriority(emoji: string): TaskPriority | undefined {
+    switch (emoji) {
+        case '\u{1F53A}': return 'highest'; // 🔺
+        case '\u{23EB}':  return 'high';    // ⏫
+        // obsidian-tasks 🔼 "medium" has no TaskLens equivalent; read it as the
+        // nearest level (high) rather than dropping it silently.
+        case '\u{1F53C}': return 'high';    // 🔼 (medium → high)
+        case '\u{1F53D}': return 'low';     // 🔽
+        case '\u{23EC}':  return 'lowest';  // ⏬
+        default:          return undefined;
+    }
+}
+
 /**
  * Represents a task extracted from a Markdown file
  */
@@ -50,7 +92,7 @@ export interface Task {
     /** Extracted notes content, e.g. [notes:: ...] (optional) */
     notes?: string;
 
-    /** obsidian-tasks priority emoji (⏫🔼🔽⏬) — undefined means normal priority. */
+    /** obsidian-tasks priority level (🔺⏫🔽⏬) — undefined means normal priority. */
     priority?: TaskPriority;
 
     /**
