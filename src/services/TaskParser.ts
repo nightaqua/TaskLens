@@ -44,8 +44,8 @@ export class TaskParser {
     private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^\[\u{1F4C5}\u2705]+/u;
     private static readonly EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
     private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
-    // obsidian-tasks priority emojis: ⏫ highest, 🔼 high, 🔽 low, ⏬ lowest.
-    private static readonly PRIORITY_REGEX = /[⏫⏬\u{1F53C}\u{1F53D}]/gu;
+    // obsidian-tasks priority emojis: 🔺 highest, ⏫ high, 🔼 medium, 🔽 low, ⏬ lowest.
+    private static readonly PRIORITY_REGEX = /[\u{1F53A}\u{23EB}\u{1F53C}\u{1F53D}\u{23EC}]/gu;
 
     // NOTE: All gi-flagged static regexes above (START_REGEX, DUE_REGEX, COMP_REGEX, REPEAT_REGEX)
     // carry lastIndex state between calls because they are shared class-level objects.

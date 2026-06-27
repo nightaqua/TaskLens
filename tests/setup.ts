@@ -30,7 +30,8 @@ vi.mock('obsidian', () => {
             editor = { replaceSelection: () => {} };
             file = { path: '' };
         },
-        setIcon: vi.fn()
+        setIcon: vi.fn(),
+        normalizePath: (p: string) => p.replace(/\\/g, '/').replace(/\/+/g, '/').trim()
     };
 });
 

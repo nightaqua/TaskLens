@@ -33,10 +33,10 @@ export function isTaskPriority(value: string): value is TaskPriority {
  */
 export function priorityToEmoji(priority?: TaskPriority): string {
     switch (priority) {
-        case 'highest': return '⏫';    // ⏫
-        case 'high':    return '\u{1F53C}'; // 🔼
+        case 'highest': return '\u{1F53A}'; // 🔺
+        case 'high':    return '\u{23EB}';  // ⏫
         case 'low':     return '\u{1F53D}'; // 🔽
-        case 'lowest':  return '⏬';    // ⏬
+        case 'lowest':  return '\u{23EC}';  // ⏬
         default:        return '';
     }
 }
@@ -44,10 +44,13 @@ export function priorityToEmoji(priority?: TaskPriority): string {
 /** Maps an obsidian-tasks priority emoji to its level, or undefined (normal) if unrecognised. */
 export function emojiToPriority(emoji: string): TaskPriority | undefined {
     switch (emoji) {
-        case '⏫':    return 'highest'; // ⏫
-        case '\u{1F53C}': return 'high';    // 🔼
+        case '\u{1F53A}': return 'highest'; // 🔺
+        case '\u{23EB}':  return 'high';    // ⏫
+        // obsidian-tasks 🔼 "medium" has no TaskLens equivalent; read it as the
+        // nearest level (high) rather than dropping it silently.
+        case '\u{1F53C}': return 'high';    // 🔼 (medium → high)
         case '\u{1F53D}': return 'low';     // 🔽
-        case '⏬':    return 'lowest';  // ⏬
+        case '\u{23EC}':  return 'lowest';  // ⏬
         default:          return undefined;
     }
 }
@@ -89,7 +92,7 @@ export interface Task {
     /** Extracted notes content, e.g. [notes:: ...] (optional) */
     notes?: string;
 
-    /** obsidian-tasks priority emoji (⏫🔼🔽⏬) — undefined means normal priority. */
+    /** obsidian-tasks priority level (🔺⏫🔽⏬) — undefined means normal priority. */
     priority?: TaskPriority;
 
     /**
