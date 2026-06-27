@@ -1,5 +1,5 @@
 import { TFile, Events, App, normalizePath } from 'obsidian';
-import { Task, TaskGroup, TaskStatus, getTaskStatus } from '../models/Task';
+import { Task, TaskGroup, TaskStatus, TaskPriority, getTaskStatus, priorityToEmoji } from '../models/Task';
 import { TaskParser } from './TaskParser';
 import { SemesterSettings, DEFAULT_SETTINGS } from '../settings/Settings';
 import { hasCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
@@ -316,7 +316,7 @@ export class TaskManager extends Events {
     /**
      * Update a task's title and/or due date
      */
-    async updateTask(task: Task, newTitle: string, newDate: Date | null | undefined): Promise<void> {
+    async updateTask(task: Task, newTitle: string, newDate: Date | null | undefined, newPriority?: TaskPriority): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
         if (!(file instanceof TFile)) return;
         this.isInternalChange = true;
@@ -330,7 +330,9 @@ export class TaskManager extends Events {
             if (!match) return;
 
             const prefix = match[1];
-            const body = match[2];
+            // Strip any existing priority emoji so it doesn't get folded into the title
+            // (the parser stores titles without the emoji). We re-insert it below.
+            const body = match[2].replace(/[⏫⏬\u{1F53C}\u{1F53D}]/gu, '').replace(/\s+/g, ' ').trim();
 
             // Isolate the bare title by stripping all known metadata tokens from a copy
             // of the body. We replace only the title portion in the original body so that
@@ -362,6 +364,21 @@ export class TaskManager extends Events {
                 const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
                 const dueRegex = new RegExp(`\\[?\\(?${dueKey}::\\s*(?:\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})[\\])]?`, 'i');
                 newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
+            }
+
+            // Re-insert the priority emoji at the end of the title, before any metadata.
+            // An explicit newPriority wins; otherwise preserve the task's existing priority.
+            const effectivePriority = newPriority !== undefined ? newPriority : task.priority;
+            const priorityEmoji = priorityToEmoji(effectivePriority);
+            if (priorityEmoji) {
+                const metaStart = newBody.indexOf('[');
+                if (metaStart === -1) {
+                    newBody = `${newBody.trimEnd()} ${priorityEmoji}`;
+                } else {
+                    const head = newBody.slice(0, metaStart).trimEnd();
+                    const tail = newBody.slice(metaStart);
+                    newBody = `${head} ${priorityEmoji} ${tail}`;
+                }
             }
 
             lines[task.lineNumber] = `${prefix}${newBody}`;
@@ -561,7 +578,7 @@ export class TaskManager extends Events {
         };
     }
 
-    async addTask(title: string, date: Date | null, filePath: string, recurrence?: string): Promise<void> {
+    async addTask(title: string, date: Date | null, filePath: string, recurrence?: string, priority?: TaskPriority): Promise<void> {
         const normalizedPath = normalizePath(filePath);
         const file = this.app.vault.getAbstractFileByPath(normalizedPath);
         if (!(file instanceof TFile)) return;
@@ -569,6 +586,9 @@ export class TaskManager extends Events {
         try {
             const content = await this.app.vault.read(file);
             let taskLine = `\n- [ ] ${title}`;
+            // Priority emoji goes at the end of the title text, before date/recurrence metadata.
+            const priorityEmoji = priorityToEmoji(priority);
+            if (priorityEmoji) taskLine += ` ${priorityEmoji}`;
             if (date) taskLine += ` [${this.settings.dueDateKey || 'due'}:: ${this.formatDate(date)}]`;
             if (recurrence) taskLine += ` [repeat:: ${recurrence}]`;
 

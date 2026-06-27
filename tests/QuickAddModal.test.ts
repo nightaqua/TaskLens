@@ -104,7 +104,7 @@ describe('QuickAddModal.handleSubmit — cursor fallback', () => {
 
         await internals.handleSubmit();
 
-        expect(addTask).toHaveBeenCalledWith('Buy milk', null, 'Notes.md', 'weekly');
+        expect(addTask).toHaveBeenCalledWith('Buy milk', null, 'Notes.md', 'weekly', undefined);
         expect(addTask.mock.calls[0][3]).toBe('weekly');
     });
 });

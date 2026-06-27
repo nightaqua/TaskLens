@@ -1,6 +1,6 @@
 import { App, Modal, Setting, MarkdownView, ButtonComponent } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
-import { Task } from '../models/Task';
+import { Task, TaskPriority, isTaskPriority, priorityToEmoji } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
 
 /**
@@ -58,6 +58,9 @@ export class QuickAddModal extends Modal {
 
     private recurrence: string = '';
 
+    /** Selected obsidian-tasks priority, or undefined for normal (no emoji). */
+    private priority: TaskPriority | undefined = undefined;
+
     /**
      * Path of the chosen destination file, or the sentinel value
      * `'__CURSOR__'` when the user wants to insert at the cursor position.
@@ -108,6 +111,9 @@ export class QuickAddModal extends Modal {
             }
             if (this.editTask.recurrence) {
                 this.recurrence = this.editTask.recurrence;
+            }
+            if (this.editTask.priority) {
+                this.priority = this.editTask.priority;
             }
         }
 
@@ -220,6 +226,23 @@ export class QuickAddModal extends Modal {
                 drop.onChange(value => { this.recurrence = value; });
             });
 
+        // --- 4.5 Priority selector ---
+        new Setting(contentEl)
+            .setName('Priority')
+            .addDropdown(drop => {
+                drop.selectEl.setAttribute('aria-label', 'Priority');
+                drop.addOption('highest', `${priorityToEmoji('highest')} Highest`);
+                drop.addOption('high', `${priorityToEmoji('high')} High`);
+                drop.addOption('', 'Normal');
+                drop.addOption('low', `${priorityToEmoji('low')} Low`);
+                drop.addOption('lowest', `${priorityToEmoji('lowest')} Lowest`);
+
+                drop.setValue(this.priority ?? '');
+                drop.onChange(value => {
+                    this.priority = isTaskPriority(value) ? value : undefined;
+                });
+            });
+
         // --- 5. Submit button -----------------------------------------------
         this.submitButton = new Setting(contentEl)
             .addButton(btn => {
@@ -272,7 +295,10 @@ export class QuickAddModal extends Modal {
                 // landing at a stale cursor position.
                 const dateStr = this.date ? ` [due:: ${this.date}]` : '';
                 const repeatStr = this.recurrence ? ` [repeat:: ${this.recurrence}]` : '';
-                const taskLine = `- [ ] ${this.title}${dateStr}${repeatStr}\n`;
+                // Priority emoji sits at the end of the title, before date/recurrence metadata.
+                const priorityEmoji = priorityToEmoji(this.priority);
+                const priorityStr = priorityEmoji ? ` ${priorityEmoji}` : '';
+                const taskLine = `- [ ] ${this.title}${priorityStr}${dateStr}${repeatStr}\n`;
 
                 this.activeViewAtOpen.editor.replaceSelection(taskLine);
 
@@ -288,7 +314,7 @@ export class QuickAddModal extends Modal {
                 const fallbackFile = this.taskManager.getScannedFiles()[0];
                 if (fallbackFile) {
                     const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-                    await this.taskManager.addTask(this.title, dateObj, fallbackFile, this.recurrence);
+                    await this.taskManager.addTask(this.title, dateObj, fallbackFile, this.recurrence, this.priority);
                 }
             }
             } else {
@@ -299,7 +325,7 @@ export class QuickAddModal extends Modal {
                 // formatting and writing to the end of the chosen file.
                 // -----------------------------------------------------------------
                 const dateObj = this.date ? new Date(`${this.date}T00:00:00`) : null;
-                await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence);
+                await this.taskManager.addTask(this.title, dateObj, this.selectedFile, this.recurrence, this.priority);
             }
 
             this.close();
