@@ -15,6 +15,11 @@ export class TaskParser {
     private static readonly REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
     // 5. NOTES — TaskLens format: [notes:: ...]
     private static readonly NOTES_REGEX = /\[?\(?notes::\s*([^\])]+)[\])]?/gi;
+    // 6. TIMER TAGS — #countdown / #elapsed / #countdown-elapsed.
+    // Group 1 is the leading boundary (start or whitespace) so it can be preserved on strip.
+    // The negative lookahead (no lookbehind — iOS Safari) prevents matching inside longer
+    // tags like #countdownfoo; #countdown-elapsed is listed first so it wins over #countdown.
+    private static readonly TIMER_TAG_REGEX = /(^|\s)#(countdown-elapsed|countdown|elapsed)(?![\w-])/gi;
 
     private escapeRegex(s: string): string {
         return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -137,7 +142,7 @@ export class TaskParser {
             if (taskMatch) {
                 const completed = taskMatch[2].toLowerCase() === 'x';
                 const taskText = taskMatch[3];
-                const { title, startDate, dueDate, completionDate, recurrence, notes } = this.parseTaskMetadata(taskText);
+                const { title, startDate, dueDate, completionDate, recurrence, notes, timerMode } = this.parseTaskMetadata(taskText);
 
                 const task: Task = {
                     id: `${file.path}:${String(i)}`,
@@ -151,6 +156,7 @@ export class TaskParser {
                     completionDate, // Added
                     recurrence,     // Added
                     notes,          // Added
+                    timerMode,      // Added
                     originalText: line
                 };
                 tasks.push(task);
@@ -177,13 +183,14 @@ export class TaskParser {
         }
     }
 
-    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string } {
+    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; timerMode?: 'countdown' | 'elapsed' | 'both' } {
         let title = taskText;
         let startDate: Date | undefined;
         let dueDate: Date | undefined;
         let completionDate: Date | undefined;
         let recurrence: string | undefined;
         let notes: string | undefined;
+        let timerMode: 'countdown' | 'elapsed' | 'both' | undefined;
 
         /**
          * Normalise a parsed date string to a local-midnight Date.
@@ -258,8 +265,36 @@ export class TaskParser {
             }
         }
 
+        // 7. TIMER TAGS — collect every #countdown / #elapsed / #countdown-elapsed
+        // occurrence, then strip them from the title (preserving the leading boundary).
+        let hasCountdown = false;
+        let hasElapsed = false;
+        TaskParser.TIMER_TAG_REGEX.lastIndex = 0;
+        let timerMatch: RegExpExecArray | null;
+        while ((timerMatch = TaskParser.TIMER_TAG_REGEX.exec(taskText)) !== null) {
+            const tag = timerMatch[2].toLowerCase();
+            if (tag === 'countdown-elapsed') {
+                hasCountdown = true;
+                hasElapsed = true;
+            } else if (tag === 'countdown') {
+                hasCountdown = true;
+            } else if (tag === 'elapsed') {
+                hasElapsed = true;
+            }
+        }
+        if (hasCountdown && hasElapsed) {
+            timerMode = 'both';
+        } else if (hasCountdown) {
+            timerMode = 'countdown';
+        } else if (hasElapsed) {
+            timerMode = 'elapsed';
+        }
+        if (timerMode) {
+            title = title.replace(TaskParser.TIMER_TAG_REGEX, '$1');
+        }
+
         title = title.replace(/\s+/g, ' ').trim();
 
-        return { title, startDate, dueDate, completionDate, recurrence, notes };
+        return { title, startDate, dueDate, completionDate, recurrence, notes, timerMode };
     }
 }

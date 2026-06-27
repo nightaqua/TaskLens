@@ -20,6 +20,7 @@ export class TaskListView extends ItemView {
     private tabContainer: HTMLElement | null = null;
     private isOpen = false;
     private headerComponent: HeaderComponent | null = null;
+    private listComponent: TaskListComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
     private readonly onTasksUpdated = (): void => {
@@ -78,6 +79,8 @@ export class TaskListView extends ItemView {
     onClose(): Promise<void> {
         this.isOpen = false;
         this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
+        this.listComponent?.destroy();
+        this.listComponent = null;
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
@@ -85,6 +88,7 @@ export class TaskListView extends ItemView {
     render(): void {
         if (!this.isOpen || !this.contentEl.isConnected) return;
 
+        this.listComponent?.destroy();
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -118,7 +122,7 @@ export class TaskListView extends ItemView {
         );
         this.headerComponent.render();
 
-        const list = new TaskListComponent(this.contentEl, this.app, {
+        this.listComponent = new TaskListComponent(this.contentEl, this.app, {
             onToggle: (t: Task) => { void this.plugin.taskManager.toggleTaskCompletion(t); },
             onEdit: (t: Task) => {
                 new QuickAddModal(this.app, this.plugin.taskManager, t, this.plugin.settings).open();
@@ -127,6 +131,6 @@ export class TaskListView extends ItemView {
                 void this.plugin.taskManager.deleteTask(t);
             }
         }, this.plugin.settings);
-        list.render(this.plugin.taskManager.getGroupedFilteredTasks());
+        this.listComponent.render(this.plugin.taskManager.getGroupedFilteredTasks());
     }
 }
