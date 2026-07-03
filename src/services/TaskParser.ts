@@ -297,7 +297,7 @@ export class TaskParser {
             title = title.replace(TaskParser.TIMER_TAG_REGEX, '$1');
         }
 
-        // 8. PRIORITY — obsidian-tasks emoji (⏫🔼🔽⏬). No emoji → undefined (normal).
+        // 8. PRIORITY — obsidian-tasks emoji (🔺⏫🔼🔽⏬). No emoji → undefined (normal).
         // Read the first priority emoji, then strip all of them from the visible title.
         TaskParser.PRIORITY_REGEX.lastIndex = 0;
         const priorityMatch = TaskParser.PRIORITY_REGEX.exec(taskText);

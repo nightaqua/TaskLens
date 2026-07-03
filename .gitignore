@@ -52,6 +52,8 @@ temp/
 .agents/
 # Claude Code project config (contains symlink to agent definitions)
 .claude/
+# Git worktrees for isolated agent workspaces (GM-005)
+.worktrees/
 
 # TypeScript incremental build info
 tsconfig.tsbuildinfo

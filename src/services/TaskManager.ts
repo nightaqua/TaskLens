@@ -360,7 +360,7 @@ export class TaskManager extends Events {
                 const prefix = match[1];
                 // Strip any existing priority emoji so it doesn't get folded into the title
                 // (the parser stores titles without the emoji). We re-insert it below.
-                const body = match[2].replace(/[⏫⏬\u{1F53C}\u{1F53D}]/gu, '').replace(/\s+/g, ' ').trim();
+                const body = match[2].replace(/[\u{1F53A}\u{23EB}\u{1F53C}\u{1F53D}\u{23EC}]/gu, '').replace(/\s+/g, ' ').trim();
 
                 // Isolate the bare title by stripping all known metadata tokens from a copy
                 // of the body. We replace only the title portion in the original body so that
