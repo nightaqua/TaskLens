@@ -187,10 +187,10 @@ export class SettingsTab extends PluginSettingTab {
         });
 
         new Setting(icsDetails)
-            .setName('Calendar feed URLs')
+            .setName('Calendar feed urls')
             .setDesc('Subscribe to public or private .ics calendar URLs. Events appear as a read-only overlay on the Timeline. One URL per line.')
             .addTextArea(text => {
-                text.inputEl.setAttribute('aria-label', 'Calendar feed URLs');
+                text.inputEl.setAttribute('aria-label', 'Calendar feed urls');
                 text.inputEl.rows = 4;
                 return text
                     .setPlaceholder('https://example.com/calendar.ics')
