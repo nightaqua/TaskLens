@@ -1,8 +1,8 @@
 import { TFile, Events, App, normalizePath } from 'obsidian';
-import { Task, TaskGroup, TaskStatus, TaskPriority, getTaskStatus, priorityToEmoji } from '../models/Task';
+import { Task, TaskGroup, TaskStatus, TaskPriority, getTaskStatus, priorityToEmoji, PRIORITY_WEIGHT } from '../models/Task';
 import { TaskParser } from './TaskParser';
-import { SemesterSettings, DEFAULT_SETTINGS } from '../settings/Settings';
-import { hasCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
+import { SemesterSettings, DEFAULT_SETTINGS, TaskListSort } from '../settings/Settings';
+import { hasCompletionMetadata, hasExternalCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
 
 export class TaskManager extends Events {
     private tasks: Task[] = [];
@@ -12,6 +12,7 @@ export class TaskManager extends Events {
 
     private currentStatusFilter: TaskStatus = TaskStatus.Open;
     private currentCourseFilter: string | null = null;
+    private currentTaskListSort: TaskListSort = 'urgency';
 
     private cachedStats: ReturnType<typeof this.calculateStatistics> | null = null;
     private lastTasksRef: Task[] | null = null;
@@ -188,6 +189,18 @@ export class TaskManager extends Events {
 
             // Guard: if the line isn't actually checked, do nothing to avoid data loss.
             if (!/\[[xX]]/.test(originalLine)) return;
+
+            // If another plugin (e.g. obsidian-tasks) already wrote its own completion
+            // marker (✅ YYYY-MM-DD), preserve it — do not strip and replace with our format.
+            if (hasExternalCompletionMetadata(originalLine)) {
+                if (task.recurrence) {
+                    const completionDate = new Date();
+                    this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
+                    await this.app.vault.modify(file, lines.join('\n'));
+                }
+                await this.refreshFileTask(task.filePath);
+                return;
+            }
 
             // Strip any stale completion stamp first (e.g. yyyy-mm-dd from before the
             // format change, or a stamp left by another plugin). This ensures we always
@@ -600,6 +613,16 @@ export class TaskManager extends Events {
     }
 
 
+    setTaskListSort(sort: TaskListSort): void {
+        this.currentTaskListSort = sort;
+        this.applyFiltersAndSort();
+        this.trigger('tasks-updated');
+    }
+
+    getTaskListSort(): TaskListSort {
+        return this.currentTaskListSort;
+    }
+
     getCurrentFilters() {
         return {
             status: this.currentStatusFilter,
@@ -715,6 +738,40 @@ export class TaskManager extends Events {
         });
 
         this.filteredTasks.sort((a, b) => {
+            if (this.currentTaskListSort === 'topic') {
+                const cmp = a.fileName.localeCompare(b.fileName);
+                if (cmp !== 0) return cmp;
+                // secondary: urgency within topic
+                const wA = this.getStatusWeight(a);
+                const wB = this.getStatusWeight(b);
+                if (wA !== wB) return wA - wB;
+                if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+                if (a.dueDate) return -1;
+                if (b.dueDate) return 1;
+                return 0;
+            }
+            if (this.currentTaskListSort === 'priority') {
+                const pA = PRIORITY_WEIGHT[a.priority ?? 'normal'];
+                const pB = PRIORITY_WEIGHT[b.priority ?? 'normal'];
+                if (pA !== pB) return pA - pB;
+                // secondary: urgency within same priority level
+                const wA = this.getStatusWeight(a);
+                const wB = this.getStatusWeight(b);
+                if (wA !== wB) return wA - wB;
+                if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+                if (a.dueDate) return -1;
+                if (b.dueDate) return 1;
+                return 0;
+            }
+            if (this.currentTaskListSort === 'file-name') {
+                const cmp = a.filePath.localeCompare(b.filePath);
+                if (cmp !== 0) return cmp;
+                if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+                if (a.dueDate) return -1;
+                if (b.dueDate) return 1;
+                return 0;
+            }
+            // default: urgency
             const weightA = this.getStatusWeight(a);
             const weightB = this.getStatusWeight(b);
             if (weightA !== weightB) return weightA - weightB;

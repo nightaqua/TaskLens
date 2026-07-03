@@ -22,7 +22,6 @@ export class StatsComponent {
             card.setAttribute('role', 'status');
             const label = `${stat.label} tasks: ${String(stat.value)}`;
             card.setAttribute('aria-label', label);
-            card.setAttribute('title', label);
             card.createDiv('stat-value').setText(String(stat.value));
             card.createDiv('stat-label').setText(stat.label);
         });
@@ -48,7 +47,6 @@ export class StatsComponent {
             barWrapper.setAttribute('role', 'group');
             const label = `${days[i]}: ${String(val)} tasks completed`;
             barWrapper.setAttribute('aria-label', label);
-            barWrapper.setAttribute('title', label);
 
             const percent = (val / maxVal) * 100;
 
@@ -73,7 +71,6 @@ export class StatsComponent {
         const percent = Math.round(topic.ratio * 100);
         const label = `Most urgent topic: ${topic.name}. ${String(percent)}% urgent. ${String(topic.urgent)} of ${String(topic.total)} open tasks are urgent.`;
         card.setAttribute('aria-label', label);
-        card.setAttribute('title', label);
 
         const nameDiv = card.createDiv('urgent-topic-name');
         nameDiv.setText(topic.name);

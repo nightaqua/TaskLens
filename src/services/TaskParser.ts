@@ -39,9 +39,9 @@ export class TaskParser {
 
     // Fallback emoji regexes
     // eslint-disable-next-line no-useless-escape -- \[ kept intentionally inside the character class for readability; removing it would make [^[ visually ambiguous
-    private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^\[\u{1F4C5}\u2705]+)/u;
+    private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^\[\u{1F4C5}\u2705\u23EB\u{1F53C}\u{1F53D}\u23EC]+)/u;
     // eslint-disable-next-line no-useless-escape -- \[ kept intentionally inside the character class for readability; removing it would make [^[ visually ambiguous
-    private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^\[\u{1F4C5}\u2705]+/u;
+    private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^\[\u{1F4C5}\u2705\u23EB\u{1F53C}\u{1F53D}\u23EC]+/u;
     private static readonly EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
     private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
     // obsidian-tasks priority emojis: 🔺 highest, ⏫ high, 🔼 medium, 🔽 low, ⏬ lowest.

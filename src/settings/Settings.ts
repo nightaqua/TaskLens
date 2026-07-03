@@ -1,4 +1,5 @@
 export type ColorMode = 'status' | 'course';
+export type TaskListSort = 'urgency' | 'topic' | 'file-name' | 'priority';
 
 export interface SemesterSettings {
     scanFolders: string[];
@@ -24,6 +25,7 @@ export interface SemesterSettings {
     topicColors: Record<string, string>;
 
     showTaskActions: boolean;
+    taskListSort: TaskListSort;
     hasSeenWelcome: boolean;
     hasClickedRibbonIcon: boolean;
 
@@ -62,6 +64,7 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
     appWideAutomation: true,
 
     showTaskActions: false,
+    taskListSort: 'urgency',
     hasSeenWelcome: false,
     hasClickedRibbonIcon: false,
 

@@ -1,4 +1,4 @@
-import { App, Modal, Setting, MarkdownView, ButtonComponent } from 'obsidian';
+import { App, Modal, Setting, MarkdownView, ButtonComponent, setIcon, getAllTags } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
 import { Task, TaskPriority, isTaskPriority, priorityToEmoji } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
@@ -46,6 +46,139 @@ export function resolveActiveMarkdownView(app: App): MarkdownView | null {
     return view;
 }
 
+// ---------------------------------------------------------------------------
+// Natural Language Date Parsing
+// ---------------------------------------------------------------------------
+
+/** Minimal interface for the nldates-obsidian plugin's public API. */
+interface NLDatesPlugin {
+    parseDate(text: string): { moment: { isValid(): boolean; format(fmt: string): string } } | null;
+}
+
+/**
+ * Shape of the undocumented Obsidian runtime plugin registry.
+ * Cast via `unknown` to avoid conflicting with the public App type.
+ */
+interface ObsidianAppWithPlugins {
+    plugins?: {
+        plugins?: Record<string, unknown>;
+    };
+}
+
+/**
+ * Runtime type-guard for the nldates-obsidian plugin object.
+ * Uses an `in`-narrowing check rather than a bare `as` cast (AGENTS.md §2).
+ */
+function asNLDatesPlugin(x: unknown): NLDatesPlugin | null {
+    if (typeof x !== 'object' || x === null) return null;
+    if (typeof (x as Record<string, unknown>)['parseDate'] !== 'function') return null;
+    return x as NLDatesPlugin;
+}
+
+/** Formats a Date to yyyy-mm-dd in local time. */
+function nlFormatDate(d: Date): string {
+    const y = String(d.getFullYear());
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+const NL_WEEKDAYS = [
+    'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+] as const;
+type NLWeekday = typeof NL_WEEKDAYS[number];
+
+/** Built-in NL parser covering the most common relative-date phrases. */
+function parseNLDateInline(s: string): string | null {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const MS = 86_400_000; // ms per day
+
+    if (s === 'today')     return nlFormatDate(today);
+    if (s === 'tomorrow')  return nlFormatDate(new Date(today.getTime() + MS));
+    if (s === 'yesterday') return nlFormatDate(new Date(today.getTime() - MS));
+
+    // "+N days" / "in N days" / "N days"
+    let m = s.match(/^(?:in\s+|[+])?(\d+)\s*d(?:ays?)?$/);
+    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1], 10) * MS));
+
+    // "+N weeks" / "in N weeks" / "N weeks"
+    m = s.match(/^(?:in\s+|[+])?(\d+)\s*w(?:eeks?)?$/);
+    if (m) return nlFormatDate(new Date(today.getTime() + parseInt(m[1], 10) * 7 * MS));
+
+    // "next <weekday>"
+    m = s.match(/^next\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)$/);
+    if (m) {
+        const target = NL_WEEKDAYS.indexOf(m[1] as NLWeekday);
+        const diff = ((target - today.getDay() + 7) % 7) || 7;
+        return nlFormatDate(new Date(today.getTime() + diff * MS));
+    }
+
+    // "next week" → next Monday
+    if (s === 'next week') {
+        const todayDay = today.getDay();
+        const diff = todayDay === 1 ? 7 : ((8 - todayDay) % 7) || 7;
+        return nlFormatDate(new Date(today.getTime() + diff * MS));
+    }
+
+    // "end of week" / "eow" → coming Sunday
+    if (s === 'end of week' || s === 'eow') {
+        const diff = today.getDay() === 0 ? 7 : 7 - today.getDay();
+        return nlFormatDate(new Date(today.getTime() + diff * MS));
+    }
+
+    // "end of month" / "eom" → last day of current month
+    if (s === 'end of month' || s === 'eom') {
+        const eom = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        return nlFormatDate(eom);
+    }
+
+    return null;
+}
+
+/**
+ * Parses a natural-language date string into a yyyy-mm-dd string.
+ *
+ * Resolves in order:
+ *   1. Already a valid yyyy-mm-dd — returned as-is.
+ *   2. nldates-obsidian plugin (if installed) — delegates to its `parseDate()` API.
+ *   3. Built-in inline parser — covers the most common relative-date patterns:
+ *      today, tomorrow, yesterday, +N days, +N weeks, next <weekday>,
+ *      next week, end of week (eow), end of month (eom).
+ *
+ * Returns `null` if the input cannot be resolved to a concrete date.
+ */
+export function parseNLDate(input: string, app: App): string | null {
+    const s = input.trim();
+    if (!s) return null;
+
+    // 1. Already formatted as yyyy-mm-dd — pass through.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // 2. Delegate to nldates-obsidian plugin if installed.
+    // Cast via `unknown` then to a typed shim — `plugins.plugins` is an undocumented runtime
+    // registry absent from the public Obsidian type definitions.
+    const appShim = app as unknown as ObsidianAppWithPlugins;
+    const pluginRegistry = appShim.plugins?.plugins;
+    // Record<string, unknown> is non-nullable — use an explicit guard, not optional-chain, for the key lookup.
+    const nlDates = pluginRegistry !== undefined
+        ? asNLDatesPlugin(pluginRegistry['nldates-obsidian'])
+        : null;
+    if (nlDates) {
+        try {
+            const parsed = nlDates.parseDate(s);
+            if (parsed !== null && parsed.moment.isValid()) {
+                return parsed.moment.format('YYYY-MM-DD');
+            }
+        } catch {
+            // Fall through to inline parser.
+        }
+    }
+
+    // 3. Inline fallback parser.
+    return parseNLDateInline(s.toLowerCase());
+}
+
 export class QuickAddModal extends Modal {
     /** Raw text entered by the user for the task title. */
     private title: string = '';
@@ -76,6 +209,22 @@ export class QuickAddModal extends Modal {
      * though the editor is still visible behind the modal.
      */
     private readonly activeViewAtOpen: MarkdownView | null;
+
+    // -------------------------------------------------------------------------
+    // Tag autocomplete state
+    // -------------------------------------------------------------------------
+
+    /** Floating suggestion list element, or null when hidden. */
+    private tagDropdownEl: HTMLDivElement | null = null;
+
+    /** Filtered tag suggestions currently shown in the dropdown. */
+    private tagSuggestions: string[] = [];
+
+    /** Index of the highlighted suggestion, or -1 for none. */
+    private tagSuggestionIndex: number = -1;
+
+    /** Cursor position in the input where the `#` that opened the dropdown sits. */
+    private tagTriggerPos: number = -1;
 
     constructor(app: App, private readonly taskManager: TaskManager, private readonly editTask?: Task, private readonly settings?: SemesterSettings) {
         super(app);
@@ -140,7 +289,7 @@ export class QuickAddModal extends Modal {
 
                 // Auto-focus so the user can start typing immediately.
                 text.inputEl.focus();
-                text.inputEl.addEventListener('keydown', handleEnter);
+                this.attachTagAutocomplete(text.inputEl, handleEnter);
             });
 
         // --- 2. Destination dropdown (hidden in edit mode) --------
@@ -179,27 +328,73 @@ export class QuickAddModal extends Modal {
             this.selectedFile = this.editTask.filePath;
         }
 
-        // --- 3. Due date picker ---------------------------------------------
+        // --- 3. Due date input (NL-aware) -----------------------------------
         new Setting(contentEl)
             .setName('Due date')
             .addText(text => {
                 text.inputEl.setAttribute("aria-label", "Due date");
-                // Render as a native HTML date input for a built-in calendar picker.
-                text.inputEl.type = 'date';
+                text.inputEl.setAttribute("title", "Due date");
+                // Accept free text: yyyy-mm-dd or natural language ("tomorrow",
+                // "next friday", "in 3 days", "eom", …). The value is resolved
+                // to yyyy-mm-dd on blur and on submit.
+                text.inputEl.type = 'text';
+                text.setPlaceholder('2026-12-31, "tomorrow", "next friday"');
                 text.setValue(this.date);
-                text.onChange(value => { this.date = value; });
+                text.onChange(value => {
+                    this.date = value;
+                    text.inputEl.removeClass('tl-input-error');
+                });
+                text.inputEl.addEventListener('blur', () => {
+                    const raw = this.date;
+                    if (!raw) return;
+                    const resolved = parseNLDate(raw, this.app);
+                    if (resolved) {
+                        this.date = resolved;
+                        text.setValue(resolved);
+                        text.inputEl.removeClass('tl-input-error');
+                    } else {
+                        // Keep raw text visible so the user can correct it
+                        text.inputEl.addClass('tl-input-error');
+                    }
+                });
+                this.attachDatePickerButton(
+                    text.inputEl,
+                    () => this.date,
+                    v => { this.date = v; text.setValue(v); }
+                );
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
-        // --- 3.5 Start date picker ---
+        // --- 3.5 Start date input (NL-aware) --------------------------------
         new Setting(contentEl)
             .setName('Start date')
             .addText(text => {
                 text.inputEl.setAttribute("aria-label", "Start date");
-                // Render as a native HTML date input for a built-in calendar picker.
-                text.inputEl.type = 'date';
+                text.inputEl.setAttribute("title", "Start date");
+                text.inputEl.type = 'text';
+                text.setPlaceholder('2026-12-31, "next monday", "in 3 days"');
                 text.setValue(this.startDate);
-                text.onChange(value => { this.startDate = value; });
+                text.onChange(value => {
+                    this.startDate = value;
+                    text.inputEl.removeClass('tl-input-error');
+                });
+                text.inputEl.addEventListener('blur', () => {
+                    const raw = this.startDate;
+                    if (!raw) return;
+                    const resolved = parseNLDate(raw, this.app);
+                    if (resolved) {
+                        this.startDate = resolved;
+                        text.setValue(resolved);
+                        text.inputEl.removeClass('tl-input-error');
+                    } else {
+                        text.inputEl.addClass('tl-input-error');
+                    }
+                });
+                this.attachDatePickerButton(
+                    text.inputEl,
+                    () => this.startDate,
+                    v => { this.startDate = v; text.setValue(v); }
+                );
                 text.inputEl.addEventListener('keydown', handleEnter);
             });
 
@@ -274,6 +469,15 @@ export class QuickAddModal extends Modal {
     private async handleSubmit(): Promise<void> {
         if (this.isSubmitting) return;
 
+        // Resolve any NL date input that hasn't been normalised by a blur event
+        // (e.g. when the user presses Enter without leaving the date field first).
+        if (this.date) {
+            this.date = parseNLDate(this.date, this.app) ?? '';
+        }
+        if (this.startDate) {
+            this.startDate = parseNLDate(this.startDate, this.app) ?? '';
+        }
+
         // Guard: both a title and a destination are required.
         if (!this.title || !this.selectedFile) return;
 
@@ -338,8 +542,252 @@ export class QuickAddModal extends Modal {
         }
     }
 
+    /**
+     * Appends a small calendar-icon button immediately after `inputEl` that opens
+     * a hidden native date picker. When the user picks a date the text field and
+     * state are updated, and any error styling is cleared.
+     *
+     * Preserves the native date-picker affordance alongside NL text entry.
+     */
+    private attachDatePickerButton(
+        inputEl: HTMLInputElement,
+        getState: () => string,
+        setState: (v: string) => void
+    ): void {
+        // Hidden native date input — provides the browser calendar UI
+        const picker = activeDocument.createElement('input');
+        picker.type = 'date';
+        picker.classList.add('tl-date-picker-hidden');
+        inputEl.insertAdjacentElement('afterend', picker);
+
+        // Visible calendar icon button (inserted between input and picker in DOM order)
+        const btn = activeDocument.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('aria-label', 'Open calendar');
+        btn.classList.add('tl-date-picker-btn');
+        setIcon(btn, 'calendar');
+        inputEl.insertAdjacentElement('afterend', btn);
+
+        btn.addEventListener('click', () => {
+            const cur = getState();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cur)) {
+                picker.value = cur;
+            }
+            // picker.click() opens the native calendar in Obsidian's Electron context
+            picker.click();
+        });
+
+        picker.addEventListener('change', () => {
+            if (!picker.value) return;
+            setState(picker.value);
+            inputEl.value = picker.value;
+            inputEl.removeClass('tl-input-error');
+            // Sync the Setting text component's value tracking
+            inputEl.dispatchEvent(new Event('input'));
+        });
+    }
+
     /** Cleans up the modal's DOM when it is closed. */
     onClose() {
+        this.hideTagDropdown();
         this.contentEl.empty();
+    }
+
+    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Tag autocomplete
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns all unique tag names (without leading `#`) found in the vault,
+     * sorted alphabetically. Uses getAllTags() from the Obsidian API which
+     * unions both inline tags (cache.tags) and frontmatter tags so that
+     * vaults organised by frontmatter get complete suggestions.
+     *
+     * Results are cached for 2 s per dropdown session to avoid a full vault
+     * scan on every keystroke.
+     */
+    private tagsCachedAt = 0;
+    private cachedTagList: string[] = [];
+    private readonly TAG_CACHE_TTL_MS = 2000;
+
+    private getVaultTags(): string[] {
+        const now = Date.now();
+        if (now - this.tagsCachedAt < this.TAG_CACHE_TTL_MS) {
+            return this.cachedTagList;
+        }
+        const tagSet = new Set<string>();
+        for (const file of this.app.vault.getMarkdownFiles()) {
+            const cache = this.app.metadataCache.getFileCache(file);
+            if (!cache) continue;
+            const tags = getAllTags(cache);
+            if (tags) {
+                for (const tag of tags) {
+                    // getAllTags returns tags with leading '#'
+                    const name = tag.startsWith('#') ? tag.slice(1) : tag;
+                    if (name) tagSet.add(name.toLowerCase());
+                }
+            }
+        }
+        this.cachedTagList = Array.from(tagSet).sort();
+        this.tagsCachedAt = now;
+        return this.cachedTagList;
+    }
+
+    /**
+     * Wires up `input` and `keydown` listeners on the title field to drive
+     * the tag autocomplete dropdown.
+     *
+     * The handleEnter callback is passed in so we can suppress it while the
+     * dropdown is open (Enter should select a suggestion, not submit the form).
+     */
+    private attachTagAutocomplete(
+        input: HTMLInputElement,
+        handleEnter: (e: KeyboardEvent) => void
+    ): void {
+        input.addEventListener('input', () => {
+            const pos = input.selectionStart ?? input.value.length;
+            const textBefore = input.value.slice(0, pos);
+
+            // Match a `#` preceded by start-of-string or whitespace, followed
+            // by zero or more word characters up to the cursor.
+            const match = textBefore.match(/(^|[\s])#([\w/-]*)$/);
+            if (match) {
+                const prefix = match[2];
+                const triggerPos = textBefore.lastIndexOf('#');
+                this.showTagDropdown(input, prefix, triggerPos);
+            } else {
+                this.hideTagDropdown();
+            }
+        });
+
+        input.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (!this.tagDropdownEl || this.tagSuggestions.length === 0) {
+                // Dropdown not open — fall through to normal Enter handling
+                if (e.key === 'Enter') handleEnter(e);
+                return;
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.tagSuggestionIndex = Math.min(
+                    this.tagSuggestionIndex + 1,
+                    this.tagSuggestions.length - 1
+                );
+                this.highlightDropdownItem(this.tagSuggestionIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.tagSuggestionIndex = Math.max(this.tagSuggestionIndex - 1, -1);
+                this.highlightDropdownItem(this.tagSuggestionIndex);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (this.tagSuggestionIndex >= 0) {
+                    e.preventDefault();
+                    this.selectTag(input, this.tagSuggestionIndex);
+                } else if (e.key === 'Enter') {
+                    // Nothing highlighted — close dropdown and let Enter submit
+                    this.hideTagDropdown();
+                    handleEnter(e);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.hideTagDropdown();
+            }
+        });
+
+        // Close the dropdown when focus leaves the input. A short delay is
+        // needed so that a mousedown on an item fires before blur hides the list.
+        input.addEventListener('blur', () => {
+            window.setTimeout(() => { this.hideTagDropdown(); }, 150);
+        });
+    }
+
+    /** Renders the floating suggestion list below the input. */
+    private showTagDropdown(
+        input: HTMLInputElement,
+        prefix: string,
+        triggerPos: number
+    ): void {
+        this.hideTagDropdown();
+        this.tagTriggerPos = triggerPos;
+
+        const all = this.getVaultTags();
+        const lc = prefix.toLowerCase();
+        this.tagSuggestions = all.filter(t => t.startsWith(lc));
+        if (this.tagSuggestions.length === 0) return;
+        this.tagSuggestionIndex = -1;
+
+        const dropdown = activeDocument.createElement('div');
+        dropdown.classList.add('tl-tag-dropdown');
+
+        // Set dynamic position via CSS variables so we stay within the
+        // obsidianmd/no-static-styles-assignment rule.
+        const rect = input.getBoundingClientRect();
+        dropdown.setCssProps({
+            '--tl-dd-left':      `${String(Math.round(rect.left))}px`,
+            '--tl-dd-top':       `${String(Math.round(rect.bottom + 2))}px`,
+            '--tl-dd-min-width': `${String(Math.round(rect.width))}px`,
+        });
+
+        for (let i = 0; i < this.tagSuggestions.length; i++) {
+            const item = dropdown.createEl('div', {
+                cls: 'tl-tag-dropdown-item',
+                text: '#' + this.tagSuggestions[i],
+            });
+            // mousedown fires before blur, so we can safely select the tag
+            // without the dropdown disappearing first.
+            item.addEventListener('mousedown', (e: MouseEvent) => {
+                e.preventDefault();
+                this.selectTag(input, i);
+            });
+        }
+
+        activeDocument.body.appendChild(dropdown);
+        this.tagDropdownEl = dropdown;
+    }
+
+    /** Removes the suggestion list from the DOM and resets all autocomplete state. */
+    private hideTagDropdown(): void {
+        if (this.tagDropdownEl) {
+            this.tagDropdownEl.remove();
+            this.tagDropdownEl = null;
+        }
+        this.tagSuggestions       = [];
+        this.tagSuggestionIndex   = -1;
+        this.tagTriggerPos        = -1;
+    }
+
+    /**
+     * Inserts the selected tag into the input, replacing the partial `#…` token
+     * that opened the dropdown, and moves the cursor to after the inserted text.
+     */
+    private selectTag(input: HTMLInputElement, index: number): void {
+        const tag = this.tagSuggestions[index];
+        if (!tag || this.tagTriggerPos < 0) return;
+
+        const cursorEnd = input.selectionStart ?? input.value.length;
+        const before    = input.value.slice(0, this.tagTriggerPos);
+        const after     = input.value.slice(cursorEnd);
+        const insertion = `#${tag} `;
+
+        input.value = before + insertion + after;
+
+        const newCursor = before.length + insertion.length;
+        input.setSelectionRange(newCursor, newCursor);
+
+        // Keep this.title in sync — onChange won't fire for programmatic
+        // assignments to input.value.
+        this.title = input.value;
+        this.updateSubmitButtonState();
+        this.hideTagDropdown();
+        input.focus();
+    }
+
+    /** Adds or removes the `is-selected` highlight class on the given item index. */
+    private highlightDropdownItem(index: number): void {
+        if (!this.tagDropdownEl) return;
+        const items = this.tagDropdownEl.querySelectorAll('.tl-tag-dropdown-item');
+        items.forEach((item, i) => {
+            item.classList.toggle('is-selected', i === index);
+        });
     }
 }

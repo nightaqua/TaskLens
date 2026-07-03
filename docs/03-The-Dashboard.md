@@ -48,4 +48,29 @@ When enabled (**Settings → Appearance → Show task action buttons**), a penci
 
 Buttons are hidden by default to keep the UI clean for users who prefer to edit tasks directly in Markdown.
 
+## Quick Add modal
+
+Open the Quick Add modal from the **+** button in the Dashboard header (keyboard shortcut: configurable in Obsidian's hotkeys panel).
+
+### Tag autocomplete
+
+When typing in the **Task title** field, type `#` to open a tag suggestion dropdown. The dropdown searches all tags in your vault — both inline tags and frontmatter tags — and filters as you type.
+
+**Keyboard navigation:**
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Move selection up / down |
+| `Enter` or `Tab` | Insert the selected tag |
+| `Escape` | Dismiss the dropdown |
+
+Mouse clicks also work. The dropdown closes automatically when you delete the `#` trigger character or move the cursor past the tag fragment.
+
+Nested tags (`#project/feature`) and hyphenated tags (`#sub-team`) are fully supported — the suggestion stays open as you type the full path.
+
+### Date fields
+
+Both the **Due date** and **Start date** fields accept natural language — see [Natural language dates in Quick Add](02-Task-Formats.md#natural-language-dates-in-quick-add) for the full list of supported expressions. A 📅 calendar button on the right of each field opens the native date picker if you prefer to browse a month view.
+
+
 ---

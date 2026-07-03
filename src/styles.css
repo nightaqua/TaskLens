@@ -1748,3 +1748,67 @@
 .tl-timer-chip.is-yellow { color: var(--color-yellow); }
 .tl-timer-chip.is-orange { color: var(--color-orange); }
 .tl-timer-chip.is-red { color: var(--color-red); }
+
+/* =========================================
+   14. NL DATE ENTRY — QUICK ADD (FA-006)
+   ========================================= */
+
+/* Hidden native date input — solely drives the browser calendar picker UI */
+.tl-date-picker-hidden {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+
+/* Calendar icon button next to date text fields */
+.tl-date-picker-btn {
+    padding: 2px 4px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    vertical-align: middle;
+}
+
+.tl-date-picker-btn:hover {
+    color: var(--text-normal);
+}
+
+/* Shown on a date field when blur resolves to an unrecognised string */
+.tl-input-error {
+    border-color: var(--color-red) !important;
+    box-shadow: 0 0 0 1px var(--color-red);
+}
+
+/* =========================================
+   15. TAG AUTOCOMPLETE DROPDOWN (FA-007)
+   ========================================= */
+
+.tl-tag-dropdown {
+    position: fixed;
+    left: var(--tl-dd-left);
+    top: var(--tl-dd-top);
+    min-width: var(--tl-dd-min-width);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    box-shadow: var(--shadow-s);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10000; /* above modal content — Obsidian modal uses ~9000 */
+    padding: 4px 0;
+}
+
+.tl-tag-dropdown-item {
+    padding: 5px 12px;
+    font-size: 0.9em;
+    color: var(--text-normal);
+    white-space: nowrap;
+}
+
+.tl-tag-dropdown-item:hover,
+.tl-tag-dropdown-item.is-selected {
+    background: var(--background-modifier-hover);
+    color: var(--text-accent);
+}

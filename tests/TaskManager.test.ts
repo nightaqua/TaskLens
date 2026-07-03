@@ -279,6 +279,54 @@ describe('TaskManager.processManualUpdate', () => {
         expect(refreshSpy).toHaveBeenCalledOnce();
         expect(refreshSpy).toHaveBeenCalledWith('test.md');
     });
+
+    it('preserves Tasks-plugin ✅ completion stamp and does not overwrite with TaskLens format (CQ-001)', async () => {
+        // Scenario: obsidian-tasks checked off the task and wrote "✅ 2026-06-22".
+        // TaskLens should detect it and NOT replace it with "[completion:: ...]".
+        const lineAfterTasksPlugin = '- [x] My task ✅ 2026-06-22';
+        const mockApp = {
+            vault: {
+                getAbstractFileByPath: vi.fn().mockImplementation((path: string) => createMockFile(path)),
+                read: vi.fn().mockResolvedValue(lineAfterTasksPlugin),
+                modify: vi.fn().mockResolvedValue(undefined)
+            }
+        } as unknown as App;
+
+        const cachedTask = {
+            id: 'test.md:0',
+            title: 'My task',
+            completed: false, // was incomplete in TaskLens cache
+            filePath: 'test.md',
+            lineNumber: 0
+        } as import('../src/models/Task').Task;
+
+        const freshTask = {
+            ...cachedTask,
+            completed: true  // now completed (Tasks plugin flipped it)
+        } as import('../src/models/Task').Task;
+
+        const mockParser = {
+            getTasksFromFile: vi.fn().mockResolvedValue([freshTask])
+        } as unknown as TaskParser;
+
+        const taskManager = new TaskManager(mockParser, mockApp);
+        // Pre-populate internal cache with the uncompleted version
+        (taskManager as unknown as { tasks: typeof cachedTask[] }).tasks = [cachedTask];
+
+        const refreshSpy2 = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue(undefined);
+
+        await taskManager.processManualUpdate(createMockFile('test.md'));
+
+        // vault.modify should NOT have been called (no recurrence on this task)
+        // OR if called, the written content must never contain [completion::
+        const modifyCalls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+        for (const call of modifyCalls) {
+            expect(call[1]).not.toMatch(/completion::/);
+        }
+
+        // refreshFileTask must have been called to keep internal state in sync
+        expect(refreshSpy2).toHaveBeenCalledWith('test.md');
+    });
 });
 
 describe('TaskManager.updateTask', () => {
