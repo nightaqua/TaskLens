@@ -431,9 +431,14 @@ export class TaskManager extends Events {
         }
     }
     async refreshFileTask(filePath: string): Promise<void> {
-        const fileTasks = await this.parser.getTasksFromFile(filePath);
+        // Always drop stale entries first so out-of-scope deletions, moves and
+        // renames still clear correctly. Only re-parse when the path is in scope,
+        // otherwise editing a file outside scanFolders would leak its tasks in.
         this.tasks = this.tasks.filter(t => t.filePath !== filePath);
-        this.tasks.push(...fileTasks);
+        if (this.parser.isPathInScope(filePath)) {
+            const fileTasks = await this.parser.getTasksFromFile(filePath);
+            this.tasks.push(...fileTasks);
+        }
         this.invalidateCache();
         this.applyFiltersAndSort();
         this.trigger('tasks-updated');

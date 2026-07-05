@@ -335,6 +335,58 @@ describe('TaskParser.getFilesToScan', () => {
     });
 });
 
+describe('TaskParser.isPathInScope', () => {
+    const createAppMock = () => {
+        return {
+            vault: { getMarkdownFiles: () => [] },
+        } as unknown as App;
+    };
+
+    it('returns true for any path when scanFolders is empty', () => {
+        const parser = new TaskParser(createAppMock(), { scanFolders: [] } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(true);
+        expect(parser.isPathInScope('Anywhere/Else/Note.md')).toBe(true);
+        expect(parser.isPathInScope('RootFile.md')).toBe(true);
+    });
+
+    it('matches a path recursively inside a scanned folder', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['Projects'],
+            scanRecursively: true,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(true);
+        expect(parser.isPathInScope('Projects/SubProject/Tasks.md')).toBe(true);
+    });
+
+    it('returns false for a path outside the scanned folder', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['Projects'],
+            scanRecursively: true,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('OtherFolder/Notes.md')).toBe(false);
+        // startsWith edge case: sibling file sharing the folder-name prefix
+        expect(parser.isPathInScope('ProjectsTodo.md')).toBe(false);
+    });
+
+    it('matches only direct children when scanRecursively is false', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['Projects'],
+            scanRecursively: false,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(true);
+        expect(parser.isPathInScope('Projects/SubProject/Tasks.md')).toBe(false);
+    });
+
+    it('matches root files when the scanned folder is "/"', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['/'],
+            scanRecursively: false,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('RootFile.md')).toBe(true);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(false);
+    });
+});
+
 describe('TaskParser — priority/recurrence collision', () => {
     const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
     const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; recurrence?: string; priority?: import('../src/models/Task').TaskPriority };

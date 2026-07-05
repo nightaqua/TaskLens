@@ -98,36 +98,44 @@ export class TaskParser {
         if (this.cachedFiles) return this.cachedFiles;
 
         const allMarkdownFiles = this.app.vault.getMarkdownFiles();
-
-        let result: TFile[];
-        if (this.settings.scanFolders.length === 0) {
-            result = allMarkdownFiles;
-        } else {
-            result = allMarkdownFiles.filter(file => {
-                return this.settings.scanFolders.some(folder => {
-                    const normalizedFolder = folder.replace(/^\/|\/$/g, '');
-                    const filePath = file.path;
-
-                    // 1. Direct File Match (e.g. user typed "Projects/Todo.md" or "Todo")
-                    if (filePath === normalizedFolder || filePath === `${normalizedFolder}.md`) {
-                        return true;
-                    }
-
-                    // 2. Folder Match
-                    if (this.settings.scanRecursively) {
-                        // The trailing slash prevents "Math" from matching a folder named "Maths/"
-                        return filePath.startsWith(normalizedFolder + '/');
-                    } else {
-                        // Match ONLY files directly inside this specific folder
-                        const fileFolder = file.parent?.path === '/' ? '' : (file.parent?.path || '');
-                        return fileFolder === normalizedFolder;
-                    }
-                });
-            });
-        }
+        const result = allMarkdownFiles.filter(file => this.isPathInScope(file.path));
 
         this.cachedFiles = result;
         return result;
+    }
+
+    /**
+     * Whether a single file path falls within the configured scan scope
+     * (scanFolders + scanRecursively). An empty scanFolders means "scan
+     * everything", so this returns true for any path in that case.
+     *
+     * This is the shared scope check for both full scans (getFilesToScan)
+     * and incremental refreshes (TaskManager.refreshFileTask).
+     */
+    public isPathInScope(filePath: string): boolean {
+        if (this.settings.scanFolders.length === 0) {
+            return true;
+        }
+
+        return this.settings.scanFolders.some(folder => {
+            const normalizedFolder = folder.replace(/^\/|\/$/g, '');
+
+            // 1. Direct File Match (e.g. user typed "Projects/Todo.md" or "Todo")
+            if (filePath === normalizedFolder || filePath === `${normalizedFolder}.md`) {
+                return true;
+            }
+
+            // 2. Folder Match
+            if (this.settings.scanRecursively) {
+                // The trailing slash prevents "Math" from matching a folder named "Maths/"
+                return filePath.startsWith(normalizedFolder + '/');
+            } else {
+                // Match ONLY files directly inside this specific folder
+                const lastSlash = filePath.lastIndexOf('/');
+                const fileFolder = lastSlash === -1 ? '' : filePath.slice(0, lastSlash);
+                return fileFolder === normalizedFolder;
+            }
+        });
     }
 
     private async parseTasksFromFile(file: TFile): Promise<Task[]> {

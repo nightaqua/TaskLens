@@ -435,6 +435,63 @@ describe('TaskManager.updateTask', () => {
     });
 });
 
+describe('TaskManager.refreshFileTask — path scope (FA-009)', () => {
+    const makeTask = (filePath: string) => ({
+        id: `${filePath}:0`,
+        title: 'A task',
+        completed: false,
+        filePath,
+        lineNumber: 0,
+        originalText: '- [ ] A task',
+    } as import('../src/models/Task').Task);
+
+    it('adds tasks for a file inside scope', async () => {
+        const inScopeTask = makeTask('Projects/Todo.md');
+        const getTasksFromFile = vi.fn().mockResolvedValue([inScopeTask]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+
+        await taskManager.refreshFileTask('Projects/Todo.md');
+
+        expect(taskManager.getAllTasks()).toEqual([inScopeTask]);
+        expect(getTasksFromFile).toHaveBeenCalledWith('Projects/Todo.md');
+    });
+
+    it('does NOT add tasks for a file outside scope and clears its stale entries', async () => {
+        const staleTask = makeTask('Outside/Note.md');
+        const getTasksFromFile = vi.fn().mockResolvedValue([makeTask('Outside/Note.md')]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(false),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        // Seed a stale task from that out-of-scope file (e.g. left over from before scope narrowed)
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [staleTask];
+
+        await taskManager.refreshFileTask('Outside/Note.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+        // Out-of-scope files must never be parsed/re-added
+        expect(getTasksFromFile).not.toHaveBeenCalled();
+    });
+
+    it('scans everything when scanFolders is empty (isPathInScope true)', async () => {
+        const task = makeTask('Anywhere/Note.md');
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile: vi.fn().mockResolvedValue([task]),
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+
+        await taskManager.refreshFileTask('Anywhere/Note.md');
+
+        expect(taskManager.getAllTasks()).toEqual([task]);
+    });
+});
+
 describe('TaskManager.getStatistics', () => {
     it('velocity7Days: task completed exactly 7 days ago is NOT included (boundary is exclusive)', () => {
         // The source checks: diffDays >= 0 && diffDays < 7
