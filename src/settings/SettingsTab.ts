@@ -3,6 +3,7 @@ import TaskLensPlugin from '../main';
 import { WelcomeModal } from '../modals/WelcomeModal';
 import { getTopicColor } from './Settings';
 import { CLASS_SETTINGS } from '../constants';
+import { BMC_BUTTON_DATA_URI } from '../assets/bmcButton';
 
 const validSortModes = ['status', 'course'] as const;
 type SortMode = typeof validSortModes[number];
@@ -234,9 +235,11 @@ export class SettingsTab extends PluginSettingTab {
         const bmcLink = supportDiv.createEl('a', {
             href: 'https://buymeacoffee.com/JoblessDev'
         });
+        bmcLink.setAttribute('target', '_blank');
+        bmcLink.setAttribute('rel', 'noopener');
 
         const bmcImg = bmcLink.createEl('img');
-        bmcImg.setAttribute('src', 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png');
+        bmcImg.setAttribute('src', BMC_BUTTON_DATA_URI);
         bmcImg.setAttribute('width', '200');
         bmcImg.setAttribute('alt', 'Buy Me A Coffee');
     }
