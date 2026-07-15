@@ -240,6 +240,7 @@ describe('TaskManager.processManualUpdate', () => {
     it('resets isInternalChange to false if parser.getTasksFromFile throws', async () => {
         const mockApp = {} as App;
         const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
             getTasksFromFile: vi.fn().mockRejectedValue(new Error('Parser failed'))
         } as unknown as TaskParser;
 
@@ -261,6 +262,7 @@ describe('TaskManager.processManualUpdate', () => {
         // refreshFileTask is called at the bottom of processManualUpdate.
         const mockApp = {} as App;
         const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
             getTasksFromFile: vi.fn().mockResolvedValue([])
         } as unknown as TaskParser;
 
@@ -306,6 +308,7 @@ describe('TaskManager.processManualUpdate', () => {
         } as import('../src/models/Task').Task;
 
         const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
             getTasksFromFile: vi.fn().mockResolvedValue([freshTask])
         } as unknown as TaskParser;
 
@@ -326,6 +329,32 @@ describe('TaskManager.processManualUpdate', () => {
 
         // refreshFileTask must have been called to keep internal state in sync
         expect(refreshSpy2).toHaveBeenCalledWith('test.md');
+    });
+
+    it('is a no-op for a file outside scanFolders scope (FA-010)', async () => {
+        // A manual checkbox edit in an out-of-scope file must never trigger
+        // automation metadata writes, matching the guard already applied to
+        // refreshFileTask (FA-009).
+        const mockApp = {} as App;
+        const isPathInScope = vi.fn().mockReturnValue(false);
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const mockParser = {
+            isPathInScope,
+            getTasksFromFile
+        } as unknown as TaskParser;
+
+        const taskManager = new TaskManager(mockParser, mockApp);
+        const refreshSpy = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue();
+
+        const mockFile = Object.create(TFile.prototype);
+        mockFile.path = 'Outside/test.md';
+
+        await taskManager.processManualUpdate(mockFile);
+
+        expect(isPathInScope).toHaveBeenCalledWith('Outside/test.md');
+        expect(getTasksFromFile).not.toHaveBeenCalled();
+        expect(refreshSpy).not.toHaveBeenCalled();
+        expect((taskManager as unknown as { isInternalChange: boolean }).isInternalChange).toBe(false);
     });
 });
 
