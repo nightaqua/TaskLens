@@ -1,14 +1,18 @@
 import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import TaskLensPlugin from '../main';
 import { WelcomeModal } from '../modals/WelcomeModal';
-import { getTopicColor } from './Settings';
+import { getTopicColor, ColorMode, CourseDetection } from './Settings';
 import { CLASS_SETTINGS } from '../constants';
 import { BMC_BUTTON_DATA_URI } from '../assets/bmcButton';
 
-const validSortModes = ['status', 'course'] as const;
-type SortMode = typeof validSortModes[number];
-function isSortMode(v: unknown): v is SortMode {
-    return validSortModes.includes(v as SortMode);
+const validColorModes: readonly ColorMode[] = ['status', 'course'];
+function isColorMode(v: unknown): v is ColorMode {
+    return validColorModes.includes(v as ColorMode);
+}
+
+const validCourseDetections: readonly CourseDetection[] = ['per-file', 'per-folder', 'frontmatter'];
+function isCourseDetection(v: unknown): v is CourseDetection {
+    return validCourseDetections.includes(v as CourseDetection);
 }
 
 export class SettingsTab extends PluginSettingTab {
@@ -61,7 +65,6 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc('Folders (e.g. Uni/math)\nor specific files (e.g. Projects/todo.md).\n\nOne per line.\nLeave empty to scan entire vault.')
             .addTextArea(text => {
                 text.inputEl.setAttribute("aria-label", "Scan paths");
-                text.inputEl.setAttribute("title", "Scan paths");
                 text.setPlaceholder('Projects\nUni/History\nTo-Do.md')
                     .setValue(this.plugin.settings.scanFolders.join('\n'))
                     .onChange((value) => {
@@ -100,7 +103,6 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc('Inline text used to find the start date. Example: [start:: 2026-02-02]')
             .addText(t => {
                 t.inputEl.setAttribute("aria-label", "Start key");
-                t.inputEl.setAttribute("title", "Start key");
                 return t.setValue(this.plugin.settings.startDateKey).onChange(v => {
                 this.plugin.settings.startDateKey = v;
                 void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
@@ -112,7 +114,6 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc('Inline text used to find the due date. You can combine them in one bracket! Example: [start:: 2026-02-02 due:: 2026-03-03]')
             .addText(t => {
                 t.inputEl.setAttribute("aria-label", "Due key");
-                t.inputEl.setAttribute("title", "Due key");
                 return t.setValue(this.plugin.settings.dueDateKey).onChange(v => {
                 this.plugin.settings.dueDateKey = v;
                 void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
@@ -124,14 +125,13 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc('How to determine a task\'s course or topic name.')
             .addDropdown(d => {
                 d.selectEl.setAttribute("aria-label", "Course detection");
-                d.selectEl.setAttribute("title", "Course detection");
                 return d
                 .addOption('per-file', 'File name')
                 .addOption('per-folder', 'Folder name')
                 .addOption('frontmatter', 'Frontmatter field')
                 .setValue(this.plugin.settings.courseDetection)
                 .onChange((v) => {
-                    this.plugin.settings.courseDetection = v as 'per-file' | 'per-folder' | 'frontmatter';
+                    if (isCourseDetection(v)) this.plugin.settings.courseDetection = v;
                     void this.plugin.saveSettings().then(() => { void this.plugin.taskManager.loadTasks(); });
                     this.renderFrontmatterKeyField(frontmatterKeyContainer);
                 });
@@ -152,13 +152,12 @@ export class SettingsTab extends PluginSettingTab {
             .setName('Color mode')
             .addDropdown(d => {
                 d.selectEl.setAttribute("aria-label", "Color mode");
-                d.selectEl.setAttribute("title", "Color mode");
                 return d
                 .addOption('status', 'By urgency (overdue, active)')
                 .addOption('course', 'By topic (file palette)')
                 .setValue(this.plugin.settings.colorMode)
                 .onChange((v) => {
-                    if (isSortMode(v)) this.plugin.settings.colorMode = v;
+                    if (isColorMode(v)) this.plugin.settings.colorMode = v;
                     void this.plugin.saveSettings().then(() => {
                         this.plugin.refreshViews();
                         this.renderColorPickers(colorPickersContainer);
@@ -253,7 +252,6 @@ export class SettingsTab extends PluginSettingTab {
                 .setDesc('Frontmatter field name to read the course name from.')
                 .addText(t => {
                     t.inputEl.setAttribute("aria-label", "Frontmatter key");
-                    t.inputEl.setAttribute("title", "Frontmatter key");
                     return t
                     .setPlaceholder('Course')
                     .setValue(this.plugin.settings.courseFrontmatterKey)

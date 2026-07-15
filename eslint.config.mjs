@@ -26,6 +26,15 @@ export default defineConfig([
         },
     },
     {
+        // Adopting the declarative settings API (obsidianmd/settings-tab/prefer-setting-definitions)
+        // is a real feature migration, not a mechanical lint fix — tracked as
+        // CQ-014 (pending-approval, .agents/backlog.md) rather than done blind.
+        files: ["src/settings/SettingsTab.ts"],
+        rules: {
+            "obsidianmd/settings-tab/prefer-setting-definitions": "off",
+        },
+    },
+    {
         files: ["tests/**/*.ts", "vitest.config.ts"],
         rules: {
             "@typescript-eslint/no-unsafe-argument": "off",
@@ -34,7 +43,12 @@ export default defineConfig([
             "@typescript-eslint/no-unsafe-call": "off",
             "@typescript-eslint/no-explicit-any": "off",
             "@typescript-eslint/no-extraneous-class": "off",
-            "obsidianmd/prefer-active-doc": "off"
+            "obsidianmd/prefer-active-doc": "off",
+            // Test files construct plain jsdom DOM trees to mimic Obsidian's
+            // workspace hierarchy without loading the real app, so the
+            // createEl/createDiv helpers (added by Obsidian at runtime) are
+            // never available here.
+            "obsidianmd/prefer-create-el": "off"
         }
     }
 ]);

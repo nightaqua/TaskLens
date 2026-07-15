@@ -4,8 +4,7 @@ import { TFile } from 'obsidian';
  * Helper to create mock TFile objects for testing
  */
 export const createMockFile = (path: string): TFile => {
-    // eslint-disable-next-line obsidianmd/no-tfile-tfolder-cast
-    const file = Object.create(TFile.prototype) as TFile;
+    const file: TFile = Object.create(TFile.prototype);
     if (file instanceof TFile) {
         Object.assign(file, { path });
         return file;

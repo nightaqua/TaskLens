@@ -1,10 +1,11 @@
 export type ColorMode = 'status' | 'course';
 export type TaskListSort = 'urgency' | 'topic' | 'file-name' | 'priority';
+export type CourseDetection = 'per-file' | 'per-folder' | 'frontmatter';
 
 export interface SemesterSettings {
     scanFolders: string[];
     scanRecursively: boolean;
-    courseDetection: 'per-file' | 'per-folder' | 'frontmatter';
+    courseDetection: CourseDetection;
     courseFrontmatterKey: string;
     startDateKey: string;
     dueDateKey: string;

@@ -555,16 +555,15 @@ export class QuickAddModal extends Modal {
         setState: (v: string) => void
     ): void {
         // Hidden native date input — provides the browser calendar UI
-        const picker = activeDocument.createElement('input');
-        picker.type = 'date';
-        picker.classList.add('tl-date-picker-hidden');
+        const picker = activeDocument.createEl('input', { type: 'date', cls: 'tl-date-picker-hidden' });
         inputEl.insertAdjacentElement('afterend', picker);
 
         // Visible calendar icon button (inserted between input and picker in DOM order)
-        const btn = activeDocument.createElement('button');
-        btn.type = 'button';
-        btn.setAttribute('aria-label', 'Open calendar');
-        btn.classList.add('tl-date-picker-btn');
+        const btn = activeDocument.createEl('button', {
+            type: 'button',
+            cls: 'tl-date-picker-btn',
+            attr: { 'aria-label': 'Open calendar' },
+        });
         setIcon(btn, 'calendar');
         inputEl.insertAdjacentElement('afterend', btn);
 
@@ -716,8 +715,7 @@ export class QuickAddModal extends Modal {
         if (this.tagSuggestions.length === 0) return;
         this.tagSuggestionIndex = -1;
 
-        const dropdown = activeDocument.createElement('div');
-        dropdown.classList.add('tl-tag-dropdown');
+        const dropdown = activeDocument.createDiv({ cls: 'tl-tag-dropdown' });
 
         // Set dynamic position via CSS variables so we stay within the
         // obsidianmd/no-static-styles-assignment rule.
@@ -729,7 +727,7 @@ export class QuickAddModal extends Modal {
         });
 
         for (let i = 0; i < this.tagSuggestions.length; i++) {
-            const item = dropdown.createEl('div', {
+            const item = dropdown.createDiv({
                 cls: 'tl-tag-dropdown-item',
                 text: '#' + this.tagSuggestions[i],
             });
