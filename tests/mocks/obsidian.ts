@@ -21,6 +21,16 @@ export class Modal {
     close(): void {}
 }
 
+export class Notice {
+    public message: string;
+    /** Test hook — every constructed Notice is recorded here so specs can assert on it. */
+    static instances: Notice[] = [];
+    constructor(message: string, timeout?: number) {
+        this.message = message;
+        Notice.instances.push(this);
+    }
+}
+
 export class SuggestModal<T> {
     public items: T[] = [];
     public item?: T;

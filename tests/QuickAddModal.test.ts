@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { resolveActiveMarkdownView, QuickAddModal, parseNLDate } from '../src/modals/QuickAddModal';
-import { MarkdownView, App } from 'obsidian';
+import { MarkdownView, App, Notice } from 'obsidian';
 import { TaskManager } from '../src/services/TaskManager';
 
 interface QuickAddModalInternals {
@@ -10,6 +10,15 @@ interface QuickAddModalInternals {
     selectedFile: string;
     handleSubmit(): Promise<void>;
 }
+
+/**
+ * The test-only `Notice` mock (see tests/setup.ts) records every constructed
+ * instance on a static `instances` array so specs can assert a Notice was
+ * shown without depending on Obsidian's real UI. The published `obsidian`
+ * type declarations don't know about this field, so bridge it with a narrow
+ * cast local to this test file.
+ */
+const NoticeMock = Notice as unknown as { instances: { message: string }[] };
 
 describe('resolveActiveMarkdownView', () => {
     it('returns the result of getActiveViewOfType directly when it returns a non-null value', () => {
@@ -106,6 +115,83 @@ describe('QuickAddModal.handleSubmit — cursor fallback', () => {
 
         expect(addTask).toHaveBeenCalledWith('Buy milk', null, 'Notes.md', 'weekly', undefined);
         expect(addTask.mock.calls[0][3]).toBe('weekly');
+    });
+});
+
+describe('QuickAddModal.handleSubmit — out-of-scope Notice (FA-011)', () => {
+    it('warns via Notice when inserting at cursor into a file outside scan scope', async () => {
+        const mockMarkdownView = Object.assign(new MarkdownView(null as any), {
+            file: { path: 'Outside/Note.md' },
+            editor: { replaceSelection: vi.fn() },
+        });
+
+        const mockApp = {
+            workspace: {
+                getActiveViewOfType: vi.fn().mockReturnValue(mockMarkdownView),
+                getLeavesOfType: vi.fn().mockReturnValue([])
+            }
+        };
+
+        const refreshFileTask = vi.fn().mockResolvedValue(undefined);
+        const taskManager = {
+            getScannedFiles: vi.fn().mockReturnValue([]),
+            isPathInScope: vi.fn().mockReturnValue(false),
+            refreshFileTask
+        };
+
+        NoticeMock.instances.length = 0;
+
+        const modal = new QuickAddModal(
+            mockApp as unknown as App,
+            taskManager as unknown as TaskManager
+        );
+
+        const internals = modal as unknown as QuickAddModalInternals;
+        internals.title = 'Buy milk';
+        internals.selectedFile = '__CURSOR__';
+
+        await internals.handleSubmit();
+
+        expect(taskManager.isPathInScope).toHaveBeenCalledWith('Outside/Note.md');
+        expect(NoticeMock.instances).toHaveLength(1);
+        expect(NoticeMock.instances[0].message).toContain('outside your scan folders');
+        expect(refreshFileTask).toHaveBeenCalledWith('Outside/Note.md');
+    });
+
+    it('does not show a Notice when the active file is in scan scope', async () => {
+        const mockMarkdownView = Object.assign(new MarkdownView(null as any), {
+            file: { path: 'Inbox/Note.md' },
+            editor: { replaceSelection: vi.fn() },
+        });
+
+        const mockApp = {
+            workspace: {
+                getActiveViewOfType: vi.fn().mockReturnValue(mockMarkdownView),
+                getLeavesOfType: vi.fn().mockReturnValue([])
+            }
+        };
+
+        const refreshFileTask = vi.fn().mockResolvedValue(undefined);
+        const taskManager = {
+            getScannedFiles: vi.fn().mockReturnValue([]),
+            isPathInScope: vi.fn().mockReturnValue(true),
+            refreshFileTask
+        };
+
+        NoticeMock.instances.length = 0;
+
+        const modal = new QuickAddModal(
+            mockApp as unknown as App,
+            taskManager as unknown as TaskManager
+        );
+
+        const internals = modal as unknown as QuickAddModalInternals;
+        internals.title = 'Buy milk';
+        internals.selectedFile = '__CURSOR__';
+
+        await internals.handleSubmit();
+
+        expect(NoticeMock.instances).toHaveLength(0);
     });
 });
 

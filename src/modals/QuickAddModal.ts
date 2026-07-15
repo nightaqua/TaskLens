@@ -1,4 +1,4 @@
-import { App, Modal, Setting, MarkdownView, ButtonComponent, setIcon, getAllTags } from 'obsidian';
+import { App, Modal, Notice, Setting, MarkdownView, ButtonComponent, setIcon, getAllTags } from 'obsidian';
 import { TaskManager } from '../services/TaskManager';
 import { Task, TaskPriority, isTaskPriority, priorityToEmoji } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
@@ -509,7 +509,14 @@ export class QuickAddModal extends Modal {
                 // Rescan so the TaskManager reflects the new entry
                 // without waiting for the next background sweep.
                 if (this.activeViewAtOpen.file) {
-                    await this.taskManager.refreshFileTask(this.activeViewAtOpen.file.path);
+                    const filePath = this.activeViewAtOpen.file.path;
+                    if (!this.taskManager.isPathInScope(filePath)) {
+                        // The line was written, but refreshFileTask (correctly)
+                        // won't surface it anywhere — warn so the user isn't
+                        // left wondering why the task never showed up.
+                        new Notice('Task added, but this file is outside your scan folders — it won\'t appear in TaskLens views.');
+                    }
+                    await this.taskManager.refreshFileTask(filePath);
                 }
             } else {
                 // Fallback: the view was closed before the user submitted.

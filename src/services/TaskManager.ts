@@ -523,6 +523,11 @@ export class TaskManager extends Events {
         return this.parser.getScannedFilePaths();
     }
 
+    /** Whether a file path falls within the configured scan scope. See `TaskParser.isPathInScope`. */
+    isPathInScope(filePath: string): boolean {
+        return this.parser.isPathInScope(filePath);
+    }
+
     getStatistics() {
         if (this.lastTasksRef === this.tasks && this.lastStatsCourseFilter === this.currentCourseFilter && this.cachedStats) {
             return this.cachedStats;
