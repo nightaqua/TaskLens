@@ -70,6 +70,10 @@ export class TaskManager extends Events {
     public async processManualUpdate(file: TFile): Promise<void> {
         if (this.isInternalChange) return;
 
+        // Out-of-scope files must never receive automation metadata writes,
+        // matching the guard already applied in refreshFileTask (FA-009).
+        if (!this.parser.isPathInScope(file.path)) return;
+
         // Snapshot the current in-memory state BEFORE yielding.
         const cachedTasks = this.tasks.filter(t => t.filePath === file.path);
 
