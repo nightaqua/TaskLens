@@ -184,22 +184,17 @@
     min-width: 0; /* NEW: Prevents rigid elements from bursting the container */
 }
 
-/* PATCH 1: Right-panel window button overlap fix */
-.workspace-split.mod-right-split .dashboard-controls .actions-wrapper {
-    padding-right: 80px;
-}
-
-/* Same fix for the top header row: its right-aligned action buttons sit under
-   Obsidian's titlebar min/max/close controls when docked in the right sidebar. */
+/* PATCH 1: Right-panel window button overlap fix. Applies to both the
+   controls row and the top header row, whose right-aligned action buttons
+   sit under Obsidian's titlebar min/max/close controls when docked in the
+   right sidebar. */
+.workspace-split.mod-right-split .dashboard-controls .actions-wrapper,
 .workspace-split.mod-right-split .dashboard-header {
     padding-right: 80px;
 }
 
 @media (max-width: 400px) {
-    .workspace-split.mod-right-split .dashboard-controls .actions-wrapper {
-        padding-right: 60px;
-    }
-
+    .workspace-split.mod-right-split .dashboard-controls .actions-wrapper,
     .workspace-split.mod-right-split .dashboard-header {
         padding-right: 60px;
     }
