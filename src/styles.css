@@ -845,6 +845,30 @@
     min-height: 80px;
 }
 
+/* Collapsible settings groups (toggled via the group's chevron extra button) */
+.tasklens-settings .tasklens-settings-group.is-collapsed .setting-item {
+    display: none;
+}
+
+/* Scan Paths Custom Alignment */
+.tasklens-settings .scan-paths-setting {
+    align-items: flex-start;
+}
+
+.tasklens-settings .scan-paths-setting .setting-item-info {
+    flex: 1 1 50%;
+    max-width: 50%;
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+
+.tasklens-settings .scan-paths-setting .setting-item-control {
+    flex: 0 0 50%;
+    width: 50%;
+    justify-content: flex-end;
+    padding-right: 16px;
+}
+
 /* Adobe-lite Highlight Effect */
 @keyframes pulse-purple {
     0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.7); }
@@ -1540,6 +1564,17 @@
     color: var(--text-muted);
     font-size: 0.9em;
     margin-bottom: 12px;
+}
+
+.tasklens-settings .color-picker-helper {
+    margin-left: 14px;
+    margin-bottom: 12px;
+    font-size: 0.9em;
+}
+
+.tasklens-settings .color-picker-empty {
+    margin-left: 14px;
+    font-style: italic;
 }
 
 /* =========================================

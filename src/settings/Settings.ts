@@ -30,6 +30,14 @@ export interface SemesterSettings {
     hasSeenWelcome: boolean;
     hasClickedRibbonIcon: boolean;
 
+    /** Persists which settings accordion sections were open when the tab was last closed. */
+    settingsTabState: {
+        scanOpen: boolean;
+        parserOpen: boolean;
+        uiOpen: boolean;
+        icsOpen: boolean;
+    };
+
     /** ICS calendar feed URLs — one per entry. Fetched on startup and every 4 hours. */
     icsFeedUrls: string[];
 
@@ -60,6 +68,13 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
     taskListSort: 'urgency',
     hasSeenWelcome: false,
     hasClickedRibbonIcon: false,
+
+    settingsTabState: {
+        scanOpen: true,
+        parserOpen: false,
+        uiOpen: true,
+        icsOpen: false,
+    },
 
     icsFeedUrls: [],
 
