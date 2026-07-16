@@ -69,3 +69,6 @@ test-results/
 # Environment files
 .env
 .env.local
+
+# Windows Explorer metadata
+desktop.ini
