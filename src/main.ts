@@ -68,6 +68,28 @@ export default class TaskLensPlugin extends Plugin {
             })
         );
 
+        // Purge stale task entries on real vault deletes/renames (CQ-010).
+        // Unlike the 'modify' listener above, this is unconditional — it isn't
+        // gated by appWideAutomation since it's just keeping in-memory state
+        // honest, not writing automation metadata. Centralized here (rather than
+        // duplicated per-view like 'modify') because refreshFileTask's
+        // 'tasks-updated' trigger already fans out to every open view.
+        this.registerEvent(
+            this.app.vault.on('delete', (file) => {
+                if (!(file instanceof TFile) || !file.path.endsWith('.md')) return;
+                void this.taskManager.refreshFileTask(file.path);
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on('rename', (file, oldPath) => {
+                if (!(file instanceof TFile)) return;
+                // Purge the old path's tasks, then re-scan the new path if in scope.
+                if (oldPath.endsWith('.md')) void this.taskManager.refreshFileTask(oldPath);
+                if (file.path.endsWith('.md')) void this.taskManager.refreshFileTask(file.path);
+            })
+        );
+
         this.registerView(VIEW_TYPE_DASHBOARD, (leaf) => new DashboardView(leaf, this));
         this.registerView(VIEW_TYPE_TIMELINE, (leaf) => new TimelineView(leaf, this));
         this.registerView(VIEW_TYPE_LIST, (leaf) => new TaskListView(leaf, this));

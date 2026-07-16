@@ -521,6 +521,91 @@ describe('TaskManager.refreshFileTask — path scope (FA-009)', () => {
     });
 });
 
+// main.ts's 'delete'/'rename' vault listeners (CQ-010) call refreshFileTask with the
+// deleted/old/new paths directly — these tests exercise that exact call pattern to
+// verify the mechanism the listeners depend on.
+describe('TaskManager.refreshFileTask — delete/rename support (CQ-010)', () => {
+    const makeTask = (filePath: string) => ({
+        id: `${filePath}:0`,
+        title: 'A task',
+        completed: false,
+        filePath,
+        lineNumber: 0,
+        originalText: '- [ ] A task',
+    } as import('../src/models/Task').Task);
+
+    it('delete purges the file\'s tasks', async () => {
+        const deletedTask = makeTask('Projects/Deleted.md');
+        // The listener passes the path of a file that no longer exists in the vault,
+        // so getTasksFromFile (which does getAbstractFileByPath under the hood) finds nothing.
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [deletedTask];
+
+        await taskManager.refreshFileTask('Projects/Deleted.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+    });
+
+    it('rename purges the old path\'s tasks', async () => {
+        const oldTask = makeTask('Projects/Old.md');
+        // Nothing lives at the old path anymore post-rename.
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [oldTask];
+
+        await taskManager.refreshFileTask('Projects/Old.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+    });
+
+    it('rename re-scans the new path when in scope', async () => {
+        const oldTask = makeTask('Projects/Old.md');
+        const newTask = makeTask('Projects/New.md');
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile: vi.fn()
+                .mockResolvedValueOnce([]) // old path: nothing there anymore
+                .mockResolvedValueOnce([newTask]), // new path: freshly scanned
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [oldTask];
+
+        // Mirrors main.ts's rename handler: purge old path, then re-scan new path.
+        await taskManager.refreshFileTask('Projects/Old.md');
+        await taskManager.refreshFileTask('Projects/New.md');
+
+        expect(taskManager.getAllTasks()).toEqual([newTask]);
+    });
+
+    it('rename to an out-of-scope target does not leak tasks in', async () => {
+        const oldTask = makeTask('Projects/Old.md');
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const isPathInScope = vi.fn((path: string) => path !== 'Outside/New.md');
+        const mockParser = {
+            isPathInScope,
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [oldTask];
+
+        await taskManager.refreshFileTask('Projects/Old.md');
+        await taskManager.refreshFileTask('Outside/New.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+        // The out-of-scope new path must never be parsed
+        expect(getTasksFromFile).not.toHaveBeenCalledWith('Outside/New.md');
+    });
+});
+
 describe('TaskManager.getStatistics', () => {
     it('velocity7Days: task completed exactly 7 days ago is NOT included (boundary is exclusive)', () => {
         // The source checks: diffDays >= 0 && diffDays < 7
