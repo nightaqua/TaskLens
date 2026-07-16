@@ -839,40 +839,7 @@
     margin-bottom: 12px;
 }
 
-.tasklens-settings details summary {
-    margin-bottom: 16px;
-    font-weight: 600;
-    padding-left: 4px;
-}
-
-.tasklens-settings details {
-    margin-left: 12px;
-}
-
-.tasklens-settings details[open] summary ~ .setting-item:first-of-type {
-    margin-top: 12px;
-}
-
-/* Scan Paths Custom Alignment */
-.tasklens-settings .scan-paths-setting {
-    align-items: flex-start;
-}
-
-.tasklens-settings .scan-paths-setting .setting-item-info {
-    flex: 1 1 50%;
-    max-width: 50%;
-    white-space: pre-wrap;
-    line-height: 1.4;
-}
-
-.tasklens-settings .scan-paths-setting .setting-item-control {
-    flex: 0 0 50%;
-    width: 50%;
-    justify-content: flex-end;
-    padding-right: 16px;
-}
-
-.tasklens-settings .scan-paths-setting textarea {
+.tasklens-settings .setting-item textarea {
     width: 100%;
     resize: none;
     min-height: 80px;
@@ -1573,17 +1540,6 @@
     color: var(--text-muted);
     font-size: 0.9em;
     margin-bottom: 12px;
-}
-
-.tasklens-settings .color-picker-helper {
-    margin-left: 14px;
-    margin-bottom: 12px;
-    font-size: 0.9em;
-}
-
-.tasklens-settings .color-picker-empty {
-    margin-left: 14px;
-    font-style: italic;
 }
 
 /* =========================================
