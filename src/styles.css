@@ -839,18 +839,15 @@
     margin-bottom: 12px;
 }
 
-.tasklens-settings details summary {
-    margin-bottom: 16px;
-    font-weight: 600;
-    padding-left: 4px;
+.tasklens-settings .setting-item textarea {
+    width: 100%;
+    resize: none;
+    min-height: 80px;
 }
 
-.tasklens-settings details {
-    margin-left: 12px;
-}
-
-.tasklens-settings details[open] summary ~ .setting-item:first-of-type {
-    margin-top: 12px;
+/* Collapsible settings groups (toggled via the group's chevron extra button) */
+.tasklens-settings .tasklens-settings-group.is-collapsed .setting-item {
+    display: none;
 }
 
 /* Scan Paths Custom Alignment */
@@ -870,12 +867,6 @@
     width: 50%;
     justify-content: flex-end;
     padding-right: 16px;
-}
-
-.tasklens-settings .scan-paths-setting textarea {
-    width: 100%;
-    resize: none;
-    min-height: 80px;
 }
 
 /* Adobe-lite Highlight Effect */

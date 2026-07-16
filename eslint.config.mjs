@@ -26,15 +26,6 @@ export default defineConfig([
         },
     },
     {
-        // Adopting the declarative settings API (obsidianmd/settings-tab/prefer-setting-definitions)
-        // is a real feature migration, not a mechanical lint fix — tracked as
-        // CQ-014 (pending-approval, .agents/backlog.md) rather than done blind.
-        files: ["src/settings/SettingsTab.ts"],
-        rules: {
-            "obsidianmd/settings-tab/prefer-setting-definitions": "off",
-        },
-    },
-    {
         files: ["tests/**/*.ts", "vitest.config.ts"],
         rules: {
             "@typescript-eslint/no-unsafe-argument": "off",
