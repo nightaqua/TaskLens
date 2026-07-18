@@ -20,7 +20,7 @@
   "author": "Selim",
   "license": "PolyForm-Noncommercial-1.0.0",
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.4",
+    "@eslint/eslintrc": "^3.3.6",
     "@eslint/json": "^2.0.1",
     "@types/node": "^26.1.1",
     "@typescript-eslint/parser": "^8.64.0",
