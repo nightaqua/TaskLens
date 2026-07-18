@@ -154,6 +154,27 @@ export default class TaskLensPlugin extends Plugin {
 
             menu.addItem((item) =>
                 item
+                    .setTitle('Open timeline')
+                    .setIcon('clock')
+                    .onClick(() => { void this.activateView(VIEW_TYPE_TIMELINE); })
+            );
+            menu.addItem((item) =>
+                item
+                    .setTitle('Open task list')
+                    .setIcon('list-todo')
+                    .onClick(() => { void this.activateView(VIEW_TYPE_LIST); })
+            );
+            menu.addItem((item) =>
+                item
+                    .setTitle('Open statistics')
+                    .setIcon('bar-chart-3')
+                    .onClick(() => { void this.activateView(VIEW_TYPE_STATS); })
+            );
+
+            menu.addSeparator();
+
+            menu.addItem((item) =>
+                item
                     .setTitle(this.isLayoutLocked ? 'Unlock layout' : 'Lock layout')
                     .setIcon(this.isLayoutLocked ? 'unlock' : 'lock')
                     .onClick(() => { this.toggleLayoutMode(); })
