@@ -846,7 +846,7 @@
 }
 
 /* Collapsible settings groups (toggled via the group's chevron extra button) */
-.tasklens-settings .tasklens-settings-group.is-collapsed .setting-item {
+.tasklens-settings .tasklens-settings-group-collapsed .setting-item {
     display: none;
 }
 
