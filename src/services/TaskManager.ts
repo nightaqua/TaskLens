@@ -1,16 +1,18 @@
 import { TFile, Events, App, normalizePath } from 'obsidian';
-import { Task, TaskGroup, TaskStatus, getTaskStatus } from '../models/Task';
+import { Task, TaskGroup, TaskStatus, TaskPriority, getTaskStatus, priorityToEmoji, PRIORITY_WEIGHT } from '../models/Task';
 import { TaskParser } from './TaskParser';
-import { SemesterSettings, DEFAULT_SETTINGS } from '../settings/Settings';
-import { hasCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
+import { SemesterSettings, DEFAULT_SETTINGS, TaskListSort } from '../settings/Settings';
+import { hasCompletionMetadata, hasExternalCompletionMetadata, hasRecurrenceMetadata, stripCompletionMetadata } from './TaskSanitizer';
 
 export class TaskManager extends Events {
     private tasks: Task[] = [];
     private filteredTasks: Task[] = [];
     private isInternalChange = false;
+    private readonly fileLocks = new Map<string, Promise<void>>();
 
     private currentStatusFilter: TaskStatus = TaskStatus.Open;
     private currentCourseFilter: string | null = null;
+    private currentTaskListSort: TaskListSort = 'urgency';
 
     private cachedStats: ReturnType<typeof this.calculateStatistics> | null = null;
     private lastTasksRef: Task[] | null = null;
@@ -23,6 +25,24 @@ export class TaskManager extends Events {
 
     private escapeRegex(s: string): string {
         return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    /**
+     * Serializes read+write operations per file. Concurrent calls on the same path
+     * queue behind the previous one so two rapid toggles can't both read stale
+     * content and clobber each other's write. The lock is always released in finally.
+     */
+    private async withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
+        const pending = this.fileLocks.get(filePath) ?? Promise.resolve();
+        let resolve!: () => void;
+        const lock = new Promise<void>(r => { resolve = r; });
+        this.fileLocks.set(filePath, pending.then(() => lock));
+        try {
+            await pending;
+            return await fn();
+        } finally {
+            resolve();
+        }
     }
 
     async loadTasks(): Promise<void> {
@@ -49,6 +69,10 @@ export class TaskManager extends Events {
      */
     public async processManualUpdate(file: TFile): Promise<void> {
         if (this.isInternalChange) return;
+
+        // Out-of-scope files must never receive automation metadata writes,
+        // matching the guard already applied in refreshFileTask (FA-009).
+        if (!this.parser.isPathInScope(file.path)) return;
 
         // Snapshot the current in-memory state BEFORE yielding.
         const cachedTasks = this.tasks.filter(t => t.filePath === file.path);
@@ -103,7 +127,7 @@ export class TaskManager extends Events {
         if (task.dueDate) {
             // Advance due:: to next occurrence
             const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
-            const dueRegex = new RegExp(`(\\[?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
+            const dueRegex = new RegExp(`(\\[?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
             clonedLine = clonedLine.replace(dueRegex, `$1${dateStr}$3`);
 
             // If start:: is also present, advance it by the same interval so the
@@ -112,13 +136,13 @@ export class TaskManager extends Events {
                 const windowMs = task.dueDate.getTime() - task.startDate.getTime();
                 const nextStart = new Date(nextDate.getTime() - windowMs);
                 const startKey = this.escapeRegex(this.settings.startDateKey || 'start');
-                const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
+                const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
                 clonedLine = clonedLine.replace(startRegex, `$1${this.formatDate(nextStart)}$3`);
             }
         } else if (task.startDate) {
             // start:: is the only anchor — advance it to the next occurrence
             const startKey = this.escapeRegex(this.settings.startDateKey || 'start');
-            const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2})([\\])]?)`, 'i');
+            const startRegex = new RegExp(`(\\[?${startKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
             clonedLine = clonedLine.replace(startRegex, `$1${dateStr}$3`);
         }
         // Neither date: clone is created with no date, identical to original body.
@@ -162,30 +186,44 @@ export class TaskManager extends Events {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
         if (!(file instanceof TFile)) return;
 
-        const content = await this.app.vault.read(file);
-        const lines = content.split('\n');
-        const originalLine = lines[task.lineNumber];
+        await this.withFileLock(file.path, async () => {
+            const content = await this.app.vault.read(file);
+            const lines = content.split('\n');
+            const originalLine = lines[task.lineNumber];
 
-        // Guard: if the line isn't actually checked, do nothing to avoid data loss.
-        if (!/\[[xX]]/.test(originalLine)) return;
+            // Guard: if the line isn't actually checked, do nothing to avoid data loss.
+            if (!/\[[xX]]/.test(originalLine)) return;
 
-        // Strip any stale completion stamp first (e.g. yyyy-mm-dd from before the
-        // format change, or a stamp left by another plugin). This ensures we always
-        // write a fresh, correctly-formatted stamp rather than silently bailing out.
-        const stripped = hasCompletionMetadata(originalLine)
-            ? stripCompletionMetadata(originalLine)
-            : originalLine;
+            // If another plugin (e.g. obsidian-tasks) already wrote its own completion
+            // marker (✅ YYYY-MM-DD), preserve it — do not strip and replace with our format.
+            if (hasExternalCompletionMetadata(originalLine)) {
+                if (task.recurrence) {
+                    const completionDate = new Date();
+                    this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
+                    await this.app.vault.modify(file, lines.join('\n'));
+                }
+                await this.refreshFileTask(task.filePath);
+                return;
+            }
 
-        const completionDate = new Date();
-        const compStr = this.formatCompletionDate(completionDate);
-        lines[task.lineNumber] = stripped + ` [completion:: ${compStr}]`;
+            // Strip any stale completion stamp first (e.g. yyyy-mm-dd from before the
+            // format change, or a stamp left by another plugin). This ensures we always
+            // write a fresh, correctly-formatted stamp rather than silently bailing out.
+            const stripped = hasCompletionMetadata(originalLine)
+                ? stripCompletionMetadata(originalLine)
+                : originalLine;
 
-        if (task.recurrence) {
-            this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
-        }
+            const completionDate = new Date();
+            const compStr = this.formatCompletionDate(completionDate);
+            lines[task.lineNumber] = stripped + ` [completion:: ${compStr}]`;
 
-        await this.app.vault.modify(file, lines.join('\n'));
-        await this.refreshFileTask(task.filePath);
+            if (task.recurrence) {
+                this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
+            }
+
+            await this.app.vault.modify(file, lines.join('\n'));
+            await this.refreshFileTask(task.filePath);
+        });
     }
 
     /**
@@ -196,20 +234,22 @@ export class TaskManager extends Events {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
         if (!(file instanceof TFile)) return;
 
-        const content = await this.app.vault.read(file);
-        const lines = content.split('\n');
-        const originalLine = lines[task.lineNumber];
+        await this.withFileLock(file.path, async () => {
+            const content = await this.app.vault.read(file);
+            const lines = content.split('\n');
+            const originalLine = lines[task.lineNumber];
 
-        // Guard: line is somehow still checked — do nothing to avoid data loss.
-        if (/\[[xX]]/.test(originalLine)) return;
+            // Guard: line is somehow still checked — do nothing to avoid data loss.
+            if (/\[[xX]]/.test(originalLine)) return;
 
-        const cleaned = stripCompletionMetadata(originalLine);
-        // No-op if nothing changed — avoids a needless vault write and re-render cycle.
-        if (cleaned === originalLine) return;
+            const cleaned = stripCompletionMetadata(originalLine);
+            // No-op if nothing changed — avoids a needless vault write and re-render cycle.
+            if (cleaned === originalLine) return;
 
-        lines[task.lineNumber] = cleaned;
-        await this.app.vault.modify(file, lines.join('\n'));
-        await this.refreshFileTask(task.filePath);
+            lines[task.lineNumber] = cleaned;
+            await this.app.vault.modify(file, lines.join('\n'));
+            await this.refreshFileTask(task.filePath);
+        });
     }
 
     /**
@@ -220,35 +260,37 @@ export class TaskManager extends Events {
         if (!(file instanceof TFile)) return;
         this.isInternalChange = true;
         try {
-            const content = await this.app.vault.read(file);
-            const lines = content.split('\n');
-            const originalLine = lines[task.lineNumber];
+            await this.withFileLock(file.path, async () => {
+                const content = await this.app.vault.read(file);
+                const lines = content.split('\n');
+                const originalLine = lines[task.lineNumber];
 
-            const isCurrentlyCompleted = /\[[xX]]/.test(originalLine);
+                const isCurrentlyCompleted = /\[[xX]]/.test(originalLine);
 
-            if (isCurrentlyCompleted) {
-                let newLine = originalLine.replace(/\[[xX]]/, '[ ]');
-                newLine = stripCompletionMetadata(newLine);
-                lines[task.lineNumber] = newLine;
-            } else {
-                // Guard: don't double-stamp if another plugin already marked completion.
-                if (!hasCompletionMetadata(originalLine)) {
-                    const completionDate = new Date();
-                    const compStr = this.formatCompletionDate(completionDate);
-                    let newLine = originalLine.replace(/\[ ]/, '[x]');
-                    newLine += ` [completion:: ${compStr}]`;
+                if (isCurrentlyCompleted) {
+                    let newLine = originalLine.replace(/\[[xX]]/, '[ ]');
+                    newLine = stripCompletionMetadata(newLine);
                     lines[task.lineNumber] = newLine;
-
-                    if (task.recurrence) {
-                        this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
-                    }
                 } else {
-                    // Another plugin already has completion metadata — just flip the checkbox.
-                    lines[task.lineNumber] = originalLine.replace(/\[ ]/, '[x]');
+                    // Guard: don't double-stamp if another plugin already marked completion.
+                    if (!hasCompletionMetadata(originalLine)) {
+                        const completionDate = new Date();
+                        const compStr = this.formatCompletionDate(completionDate);
+                        let newLine = originalLine.replace(/\[ ]/, '[x]');
+                        newLine += ` [completion:: ${compStr}]`;
+                        lines[task.lineNumber] = newLine;
+
+                        if (task.recurrence) {
+                            this.spliceCloneIfNeeded(lines, task, this.buildClonedLine(originalLine, task, completionDate));
+                        }
+                    } else {
+                        // Another plugin already has completion metadata — just flip the checkbox.
+                        lines[task.lineNumber] = originalLine.replace(/\[ ]/, '[x]');
+                    }
                 }
-            }
-            await this.app.vault.modify(file, lines.join('\n'));
-            await this.refreshFileTask(task.filePath);
+                await this.app.vault.modify(file, lines.join('\n'));
+                await this.refreshFileTask(task.filePath);
+            });
         } finally {
             this.isInternalChange = false;
         }
@@ -297,17 +339,19 @@ export class TaskManager extends Events {
         if (!(file instanceof TFile)) return;
         this.isInternalChange = true;
         try {
-            const content = await this.app.vault.read(file);
-            const lines = content.split('\n');
+            await this.withFileLock(file.path, async () => {
+                const content = await this.app.vault.read(file);
+                const lines = content.split('\n');
 
-            // Safety check: ensure the line hasn't moved
-            if (lines[task.lineNumber] && lines[task.lineNumber].includes(task.title)) {
-                lines.splice(task.lineNumber, 1); // Remove the line
-                await this.app.vault.modify(file, lines.join('\n'));
-                await this.refreshFileTask(task.filePath);
-            } else {
-                console.warn('Task line mismatch, skipping delete to prevent data loss.');
-            }
+                // Safety check: ensure the line hasn't moved
+                if (lines[task.lineNumber] && lines[task.lineNumber].includes(task.title)) {
+                    lines.splice(task.lineNumber, 1); // Remove the line
+                    await this.app.vault.modify(file, lines.join('\n'));
+                    await this.refreshFileTask(task.filePath);
+                } else {
+                    console.warn('Task line mismatch, skipping delete to prevent data loss.');
+                }
+            });
         } finally {
             this.isInternalChange = false;
         }
@@ -316,65 +360,91 @@ export class TaskManager extends Events {
     /**
      * Update a task's title and/or due date
      */
-    async updateTask(task: Task, newTitle: string, newDate: Date | null | undefined): Promise<void> {
+    async updateTask(task: Task, newTitle: string, newDate: Date | null | undefined, newPriority?: TaskPriority): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(task.filePath);
         if (!(file instanceof TFile)) return;
         this.isInternalChange = true;
         try {
-            const content = await this.app.vault.read(file);
-            const lines = content.split('\n');
-            if (!lines[task.lineNumber]) return;
+            await this.withFileLock(file.path, async () => {
+                const content = await this.app.vault.read(file);
+                const lines = content.split('\n');
+                if (!lines[task.lineNumber]) return;
 
-            const originalLine = lines[task.lineNumber];
-            const match = originalLine.match(/^(\s*[-*]\s\[.\]\s)(.*)$/);
-            if (!match) return;
+                const originalLine = lines[task.lineNumber];
+                const match = originalLine.match(/^(\s*[-*]\s\[.\]\s)(.*)$/);
+                if (!match) return;
 
-            const prefix = match[1];
-            const body = match[2];
+                const prefix = match[1];
+                // Strip any existing priority emoji so it doesn't get folded into the title
+                // (the parser stores titles without the emoji). We re-insert it below.
+                const body = match[2].replace(/[\u{1F53A}\u{23EB}\u{1F53C}\u{1F53D}\u{23EC}]/gu, '').replace(/\s+/g, ' ').trim();
 
-            // Isolate the bare title by stripping all known metadata tokens from a copy
-            // of the body. We replace only the title portion in the original body so that
-            // start::, repeat::, completion:: and any other metadata survive untouched.
-            const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*[\])]?/gi;
-            const titleOnly = body.replace(metaPattern, '').replace(/\s+/g, ' ').trim();
+                // Isolate the bare title by stripping all known metadata tokens from a copy
+                // of the body. We replace only the title portion in the original body so that
+                // start::, repeat::, completion:: and any other metadata survive untouched.
+                const metaPattern = /\[?\(?(?:due|start|completion|repeat)::[^\])]*[\])]?/gi;
+                const titleOnly = body.replace(metaPattern, '').replace(/\s+/g, ' ').trim();
 
-            let newBody: string;
-            if (titleOnly.length > 0) {
-                // Replace just the title substring; leave everything else intact
-                newBody = body.replace(titleOnly, newTitle);
-            } else {
-                // Edge case: couldn't isolate a title — use new title as the full body
-                newBody = newTitle;
-            }
-
-            // Update, append, or explicitly remove the due:: field
-            if (newDate) {
-                const dateStr = this.formatDate(newDate);
-                const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
-                const dueRegex = new RegExp(`(\\[?\\(?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
-                if (dueRegex.test(newBody)) {
-                    newBody = newBody.replace(dueRegex, `$1${dateStr}$3`);
+                let newBody: string;
+                if (titleOnly.length > 0) {
+                    // Replace just the title substring; leave everything else intact
+                    newBody = body.replace(titleOnly, newTitle);
                 } else {
-                    newBody = `${newBody} [${this.settings.dueDateKey || 'due'}:: ${dateStr}]`;
+                    // Edge case: couldn't isolate a title — use new title as the full body
+                    newBody = newTitle;
                 }
-            } else if (newDate === null) {
-                // Strip the due:: tag entirely
-                const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
-                const dueRegex = new RegExp(`\\[?\\(?${dueKey}::\\s*(?:\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})[\\])]?`, 'i');
-                newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
-            }
 
-            lines[task.lineNumber] = `${prefix}${newBody}`;
-            await this.app.vault.modify(file, lines.join('\n'));
-            await this.refreshFileTask(task.filePath);
+                // Update, append, or explicitly remove the due:: field
+                if (newDate) {
+                    const dateStr = this.formatDate(newDate);
+                    const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
+                    const dueRegex = new RegExp(`(\\[?\\(?${dueKey}::\\s*)(\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})([\\])]?)`, 'i');
+                    if (dueRegex.test(newBody)) {
+                        newBody = newBody.replace(dueRegex, `$1${dateStr}$3`);
+                    } else {
+                        newBody = `${newBody} [${this.settings.dueDateKey || 'due'}:: ${dateStr}]`;
+                    }
+                } else if (newDate === null) {
+                    // Strip the due:: tag entirely
+                    const dueKey = this.escapeRegex(this.settings.dueDateKey || 'due');
+                    const dueRegex = new RegExp(`\\[?\\(?${dueKey}::\\s*(?:\\d{4}-\\d{2}-\\d{2}|\\d{2}-\\d{2}-\\d{4})[\\])]?`, 'i');
+                    newBody = newBody.replace(dueRegex, '').replace(/\s+/g, ' ').trim();
+                }
+
+                // Re-insert the priority emoji at the end of the title, before any metadata.
+                // An explicit newPriority wins; otherwise preserve the task's existing priority.
+                const effectivePriority = newPriority !== undefined ? newPriority : task.priority;
+                const priorityEmoji = priorityToEmoji(effectivePriority);
+                if (priorityEmoji) {
+                    const metaStart = newBody.indexOf('[');
+                    if (metaStart === -1) {
+                        newBody = `${newBody.trimEnd()} ${priorityEmoji}`;
+                    } else {
+                        const head = newBody.slice(0, metaStart).trimEnd();
+                        const tail = newBody.slice(metaStart);
+                        newBody = `${head} ${priorityEmoji} ${tail}`;
+                    }
+                }
+
+                lines[task.lineNumber] = `${prefix}${newBody}`;
+                await this.app.vault.modify(file, lines.join('\n'));
+                await this.refreshFileTask(task.filePath);
+            });
         } finally {
             this.isInternalChange = false;
         }
     }
     async refreshFileTask(filePath: string): Promise<void> {
-        const fileTasks = await this.parser.getTasksFromFile(filePath);
+        // Always drop stale entries first. Only re-parse when the path is in scope,
+        // otherwise editing a file outside scanFolders would leak its tasks in.
+        // Deletes and renames are handled by main.ts's 'delete'/'rename' listeners
+        // (CQ-010), which call this with the old path (purge only, nothing found
+        // there) and, on rename, the new path too (purge-then-rescan).
         this.tasks = this.tasks.filter(t => t.filePath !== filePath);
-        this.tasks.push(...fileTasks);
+        if (this.parser.isPathInScope(filePath)) {
+            const fileTasks = await this.parser.getTasksFromFile(filePath);
+            this.tasks.push(...fileTasks);
+        }
         this.invalidateCache();
         this.applyFiltersAndSort();
         this.trigger('tasks-updated');
@@ -453,6 +523,11 @@ export class TaskManager extends Events {
 
     getScannedFiles(): string[] {
         return this.parser.getScannedFilePaths();
+    }
+
+    /** Whether a file path falls within the configured scan scope. See `TaskParser.isPathInScope`. */
+    isPathInScope(filePath: string): boolean {
+        return this.parser.isPathInScope(filePath);
     }
 
     getStatistics() {
@@ -554,6 +629,16 @@ export class TaskManager extends Events {
     }
 
 
+    setTaskListSort(sort: TaskListSort): void {
+        this.currentTaskListSort = sort;
+        this.applyFiltersAndSort();
+        this.trigger('tasks-updated');
+    }
+
+    getTaskListSort(): TaskListSort {
+        return this.currentTaskListSort;
+    }
+
     getCurrentFilters() {
         return {
             status: this.currentStatusFilter,
@@ -561,19 +646,24 @@ export class TaskManager extends Events {
         };
     }
 
-    async addTask(title: string, date: Date | null, filePath: string, recurrence?: string): Promise<void> {
+    async addTask(title: string, date: Date | null, filePath: string, recurrence?: string, priority?: TaskPriority): Promise<void> {
         const normalizedPath = normalizePath(filePath);
         const file = this.app.vault.getAbstractFileByPath(normalizedPath);
         if (!(file instanceof TFile)) return;
         this.isInternalChange = true;
         try {
-            const content = await this.app.vault.read(file);
-            let taskLine = `\n- [ ] ${title}`;
-            if (date) taskLine += ` [${this.settings.dueDateKey || 'due'}:: ${this.formatDate(date)}]`;
-            if (recurrence) taskLine += ` [repeat:: ${recurrence}]`;
+            await this.withFileLock(file.path, async () => {
+                const content = await this.app.vault.read(file);
+                let taskLine = `\n- [ ] ${title}`;
+                // Priority emoji goes at the end of the title text, before date/recurrence metadata.
+                const priorityEmoji = priorityToEmoji(priority);
+                if (priorityEmoji) taskLine += ` ${priorityEmoji}`;
+                if (date) taskLine += ` [${this.settings.dueDateKey || 'due'}:: ${this.formatDate(date)}]`;
+                if (recurrence) taskLine += ` [repeat:: ${recurrence}]`;
 
-            await this.app.vault.modify(file, content + taskLine);
-            await this.refreshFileTask(normalizedPath);
+                await this.app.vault.modify(file, content + taskLine);
+                await this.refreshFileTask(normalizedPath);
+            });
         } finally {
             this.isInternalChange = false;
         }
@@ -664,6 +754,40 @@ export class TaskManager extends Events {
         });
 
         this.filteredTasks.sort((a, b) => {
+            if (this.currentTaskListSort === 'topic') {
+                const cmp = a.fileName.localeCompare(b.fileName);
+                if (cmp !== 0) return cmp;
+                // secondary: urgency within topic
+                const wA = this.getStatusWeight(a);
+                const wB = this.getStatusWeight(b);
+                if (wA !== wB) return wA - wB;
+                if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+                if (a.dueDate) return -1;
+                if (b.dueDate) return 1;
+                return 0;
+            }
+            if (this.currentTaskListSort === 'priority') {
+                const pA = PRIORITY_WEIGHT[a.priority ?? 'normal'];
+                const pB = PRIORITY_WEIGHT[b.priority ?? 'normal'];
+                if (pA !== pB) return pA - pB;
+                // secondary: urgency within same priority level
+                const wA = this.getStatusWeight(a);
+                const wB = this.getStatusWeight(b);
+                if (wA !== wB) return wA - wB;
+                if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+                if (a.dueDate) return -1;
+                if (b.dueDate) return 1;
+                return 0;
+            }
+            if (this.currentTaskListSort === 'file-name') {
+                const cmp = a.filePath.localeCompare(b.filePath);
+                if (cmp !== 0) return cmp;
+                if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+                if (a.dueDate) return -1;
+                if (b.dueDate) return 1;
+                return 0;
+            }
+            // default: urgency
             const weightA = this.getStatusWeight(a);
             const weightB = this.getStatusWeight(b);
             if (weightA !== weightB) return weightA - weightB;

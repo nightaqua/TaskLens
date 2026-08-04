@@ -136,6 +136,7 @@ export class TimelineView extends ItemView implements RefreshableView {
                     this.render();
                 },
                 onRefresh: () => { void this.plugin.taskManager.loadTasks(); },
+                onScrollToToday: () => { this.timelineComponent?.scrollToToday(); },
             }
         );
         this.headerComponent.render();
@@ -152,7 +153,8 @@ export class TimelineView extends ItemView implements RefreshableView {
             (newStart: Date) => {
                 this.viewportStart = newStart;
                 this.app.workspace.requestSaveLayout();
-            }
+            },
+            this.plugin.icsFeedManager.getEvents()
         );
         this.timelineComponent.render();
 

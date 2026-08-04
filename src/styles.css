@@ -184,13 +184,18 @@
     min-width: 0; /* NEW: Prevents rigid elements from bursting the container */
 }
 
-/* PATCH 1: Right-panel window button overlap fix */
-.workspace-split.mod-right-split .dashboard-controls .actions-wrapper {
+/* PATCH 1: Right-panel window button overlap fix. Applies to both the
+   controls row and the top header row, whose right-aligned action buttons
+   sit under Obsidian's titlebar min/max/close controls when docked in the
+   right sidebar. */
+.workspace-split.mod-right-split .dashboard-controls .actions-wrapper,
+.workspace-split.mod-right-split .dashboard-header {
     padding-right: 80px;
 }
 
 @media (max-width: 400px) {
-    .workspace-split.mod-right-split .dashboard-controls .actions-wrapper {
+    .workspace-split.mod-right-split .dashboard-controls .actions-wrapper,
+    .workspace-split.mod-right-split .dashboard-header {
         padding-right: 60px;
     }
 }
@@ -834,18 +839,15 @@
     margin-bottom: 12px;
 }
 
-.tasklens-settings details summary {
-    margin-bottom: 16px;
-    font-weight: 600;
-    padding-left: 4px;
+.tasklens-settings .setting-item textarea {
+    width: 100%;
+    resize: none;
+    min-height: 80px;
 }
 
-.tasklens-settings details {
-    margin-left: 12px;
-}
-
-.tasklens-settings details[open] summary ~ .setting-item:first-of-type {
-    margin-top: 12px;
+/* Collapsible settings groups (toggled via the group's chevron extra button) */
+.tasklens-settings .tasklens-settings-group-collapsed .setting-item {
+    display: none;
 }
 
 /* Scan Paths Custom Alignment */
@@ -865,12 +867,6 @@
     width: 50%;
     justify-content: flex-end;
     padding-right: 16px;
-}
-
-.tasklens-settings .scan-paths-setting textarea {
-    width: 100%;
-    resize: none;
-    min-height: 80px;
 }
 
 /* Adobe-lite Highlight Effect */
@@ -1000,6 +996,53 @@
 .tasklens-dashboard-content .dashboard-timeline-view, 
 .tasklens-dashboard-content .dashboard-stats {
     margin-bottom: 16px; 
+}
+
+
+/* ── ICS Calendar Event Overlay ───────────────────────────────────────────── */
+
+/* Separator label that announces the ICS row band */
+.tasklens-dashboard-content .timeline-ics-separator {
+    grid-column-start: var(--tl-col-start);
+    grid-column-end: span var(--tl-col-span);
+    grid-row: var(--tl-row);
+    padding: 2px 8px;
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    opacity: 0.7;
+    pointer-events: none;
+    align-self: end;
+}
+
+/* ICS event bar — read-only, visually distinct from task bars */
+.tasklens-dashboard-content .timeline-ics-bar {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.80em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 2px 4px;
+    opacity: 0.82;
+    z-index: 5;
+    color: var(--text-on-accent);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    background-color: var(--color-purple, #7c3aed);
+    border-left: 3px solid rgba(255,255,255,0.3);
+    grid-column-start: var(--tl-col-start);
+    grid-column-end: span var(--tl-col-span);
+    grid-row: var(--tl-row);
+    cursor: default;
+}
+
+.tasklens-dashboard-content .timeline-ics-bar:hover {
+    opacity: 1;
+    filter: brightness(1.08);
+    z-index: 10;
 }
 
 .timeline-task-bar.is-clamped-left {
@@ -1633,3 +1676,135 @@
    ========================================= */
 
 .tasklens-dashboard-content .task-item.has-topic-color { border-left-color: var(--tl-task-color); }
+/* =========================================
+   12. SORT BAR — TASK LIST (FA-001)
+   ========================================= */
+
+.tasklens-dashboard-content .tasklist-sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px 6px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.tasklens-dashboard-content .tasklist-sort-label {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+
+.tasklens-dashboard-content .tasklist-sort-btn {
+    font-size: 0.78em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--background-modifier-border);
+    background: transparent;
+    color: var(--text-muted);
+    transition: background 0.15s, color 0.15s;
+}
+
+.tasklens-dashboard-content .tasklist-sort-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.tasklens-dashboard-content .tasklist-sort-btn.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+/* =========================================
+   13. TIMER CHIPS — TASK LIST (FA-002)
+   ========================================= */
+
+/* Keep the title and any timer chips on one inline row. */
+.task-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tl-timer-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+    background: var(--background-secondary);
+}
+
+.tl-timer-chip.is-green { color: var(--color-green); }
+.tl-timer-chip.is-yellow { color: var(--color-yellow); }
+.tl-timer-chip.is-orange { color: var(--color-orange); }
+.tl-timer-chip.is-red { color: var(--color-red); }
+
+/* =========================================
+   14. NL DATE ENTRY — QUICK ADD (FA-006)
+   ========================================= */
+
+/* Hidden native date input — solely drives the browser calendar picker UI */
+.tl-date-picker-hidden {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+
+/* Calendar icon button next to date text fields */
+.tl-date-picker-btn {
+    padding: 2px 4px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    vertical-align: middle;
+}
+
+.tl-date-picker-btn:hover {
+    color: var(--text-normal);
+}
+
+/* Shown on a date field when blur resolves to an unrecognised string */
+.tl-input-error {
+    border-color: var(--color-red) !important;
+    box-shadow: 0 0 0 1px var(--color-red);
+}
+
+/* =========================================
+   15. TAG AUTOCOMPLETE DROPDOWN (FA-007)
+   ========================================= */
+
+.tl-tag-dropdown {
+    position: fixed;
+    left: var(--tl-dd-left);
+    top: var(--tl-dd-top);
+    min-width: var(--tl-dd-min-width);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    box-shadow: var(--shadow-s);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10000; /* above modal content — Obsidian modal uses ~9000 */
+    padding: 4px 0;
+}
+
+.tl-tag-dropdown-item {
+    padding: 5px 12px;
+    font-size: 0.9em;
+    color: var(--text-normal);
+    white-space: nowrap;
+}
+
+.tl-tag-dropdown-item:hover,
+.tl-tag-dropdown-item.is-selected {
+    background: var(--background-modifier-hover);
+    color: var(--text-accent);
+}

@@ -1,9 +1,11 @@
 export type ColorMode = 'status' | 'course';
+export type TaskListSort = 'urgency' | 'topic' | 'file-name' | 'priority';
+export type CourseDetection = 'per-file' | 'per-folder' | 'frontmatter';
 
 export interface SemesterSettings {
     scanFolders: string[];
     scanRecursively: boolean;
-    courseDetection: 'per-file' | 'per-folder' | 'frontmatter';
+    courseDetection: CourseDetection;
     courseFrontmatterKey: string;
     startDateKey: string;
     dueDateKey: string;
@@ -24,6 +26,7 @@ export interface SemesterSettings {
     topicColors: Record<string, string>;
 
     showTaskActions: boolean;
+    taskListSort: TaskListSort;
     hasSeenWelcome: boolean;
     hasClickedRibbonIcon: boolean;
 
@@ -32,7 +35,11 @@ export interface SemesterSettings {
         scanOpen: boolean;
         parserOpen: boolean;
         uiOpen: boolean;
+        icsOpen: boolean;
     };
+
+    /** ICS calendar feed URLs — one per entry. Fetched on startup and every 4 hours. */
+    icsFeedUrls: string[];
 
     savedFocusLayout?: unknown;
 }
@@ -58,6 +65,7 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
     appWideAutomation: true,
 
     showTaskActions: false,
+    taskListSort: 'urgency',
     hasSeenWelcome: false,
     hasClickedRibbonIcon: false,
 
@@ -65,7 +73,10 @@ export const DEFAULT_SETTINGS: SemesterSettings = {
         scanOpen: true,
         parserOpen: false,
         uiOpen: true,
+        icsOpen: false,
     },
+
+    icsFeedUrls: [],
 
     savedFocusLayout: null
 };

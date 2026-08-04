@@ -1,5 +1,5 @@
 import { App, TFile, CachedMetadata, normalizePath } from 'obsidian';
-import { Task } from '../models/Task';
+import { Task, TaskPriority, emojiToPriority } from '../models/Task';
 import { SemesterSettings } from '../settings/Settings';
 
 export class TaskParser {
@@ -15,6 +15,11 @@ export class TaskParser {
     private static readonly REPEAT_REGEX = /\[?\(?repeat::\s*([^\]]+)[\])]?/gi;
     // 5. NOTES — TaskLens format: [notes:: ...]
     private static readonly NOTES_REGEX = /\[?\(?notes::\s*([^\])]+)[\])]?/gi;
+    // 6. TIMER TAGS — #countdown / #elapsed / #countdown-elapsed.
+    // Group 1 is the leading boundary (start or whitespace) so it can be preserved on strip.
+    // The negative lookahead (no lookbehind — iOS Safari) prevents matching inside longer
+    // tags like #countdownfoo; #countdown-elapsed is listed first so it wins over #countdown.
+    private static readonly TIMER_TAG_REGEX = /(^|\s)#(countdown-elapsed|countdown|elapsed)(?![\w-])/gi;
 
     private escapeRegex(s: string): string {
         return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -34,11 +39,13 @@ export class TaskParser {
 
     // Fallback emoji regexes
     // eslint-disable-next-line no-useless-escape -- \[ kept intentionally inside the character class for readability; removing it would make [^[ visually ambiguous
-    private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^\[\u{1F4C5}\u2705]+)/u;
+    private static readonly EMOJI_RECUR_MATCH_REGEX = /[\u{1F501}\u{1F504}]\s*([^\[\u{1F4C5}\u2705\u23EB\u{1F53C}\u{1F53D}\u23EC]+)/u;
     // eslint-disable-next-line no-useless-escape -- \[ kept intentionally inside the character class for readability; removing it would make [^[ visually ambiguous
-    private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^\[\u{1F4C5}\u2705]+/u;
+    private static readonly EMOJI_RECUR_REPLACE_REGEX = /[\u{1F501}\u{1F504}]\s*[^\[\u{1F4C5}\u2705\u23EB\u{1F53C}\u{1F53D}\u23EC]+/u;
     private static readonly EMOJI_DATE_MATCH_REGEX = /\u{1F4C5}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/u;
     private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
+    // obsidian-tasks priority emojis: 🔺 highest, ⏫ high, 🔼 medium, 🔽 low, ⏬ lowest.
+    private static readonly PRIORITY_REGEX = /[\u{1F53A}\u{23EB}\u{1F53C}\u{1F53D}\u{23EC}]/gu;
 
     // NOTE: All gi-flagged static regexes above (START_REGEX, DUE_REGEX, COMP_REGEX, REPEAT_REGEX)
     // carry lastIndex state between calls because they are shared class-level objects.
@@ -91,36 +98,44 @@ export class TaskParser {
         if (this.cachedFiles) return this.cachedFiles;
 
         const allMarkdownFiles = this.app.vault.getMarkdownFiles();
-
-        let result: TFile[];
-        if (this.settings.scanFolders.length === 0) {
-            result = allMarkdownFiles;
-        } else {
-            result = allMarkdownFiles.filter(file => {
-                return this.settings.scanFolders.some(folder => {
-                    const normalizedFolder = folder.replace(/^\/|\/$/g, '');
-                    const filePath = file.path;
-
-                    // 1. Direct File Match (e.g. user typed "Projects/Todo.md" or "Todo")
-                    if (filePath === normalizedFolder || filePath === `${normalizedFolder}.md`) {
-                        return true;
-                    }
-
-                    // 2. Folder Match
-                    if (this.settings.scanRecursively) {
-                        // The trailing slash prevents "Math" from matching a folder named "Maths/"
-                        return filePath.startsWith(normalizedFolder + '/');
-                    } else {
-                        // Match ONLY files directly inside this specific folder
-                        const fileFolder = file.parent?.path === '/' ? '' : (file.parent?.path || '');
-                        return fileFolder === normalizedFolder;
-                    }
-                });
-            });
-        }
+        const result = allMarkdownFiles.filter(file => this.isPathInScope(file.path));
 
         this.cachedFiles = result;
         return result;
+    }
+
+    /**
+     * Whether a single file path falls within the configured scan scope
+     * (scanFolders + scanRecursively). An empty scanFolders means "scan
+     * everything", so this returns true for any path in that case.
+     *
+     * This is the shared scope check for both full scans (getFilesToScan)
+     * and incremental refreshes (TaskManager.refreshFileTask).
+     */
+    public isPathInScope(filePath: string): boolean {
+        if (this.settings.scanFolders.length === 0) {
+            return true;
+        }
+
+        return this.settings.scanFolders.some(folder => {
+            const normalizedFolder = folder.replace(/^\/|\/$/g, '');
+
+            // 1. Direct File Match (e.g. user typed "Projects/Todo.md" or "Todo")
+            if (filePath === normalizedFolder || filePath === `${normalizedFolder}.md`) {
+                return true;
+            }
+
+            // 2. Folder Match
+            if (this.settings.scanRecursively) {
+                // The trailing slash prevents "Math" from matching a folder named "Maths/"
+                return filePath.startsWith(normalizedFolder + '/');
+            } else {
+                // Match ONLY files directly inside this specific folder
+                const lastSlash = filePath.lastIndexOf('/');
+                const fileFolder = lastSlash === -1 ? '' : filePath.slice(0, lastSlash);
+                return fileFolder === normalizedFolder;
+            }
+        });
     }
 
     private async parseTasksFromFile(file: TFile): Promise<Task[]> {
@@ -137,7 +152,7 @@ export class TaskParser {
             if (taskMatch) {
                 const completed = taskMatch[2].toLowerCase() === 'x';
                 const taskText = taskMatch[3];
-                const { title, startDate, dueDate, completionDate, recurrence, notes } = this.parseTaskMetadata(taskText);
+                const { title, startDate, dueDate, completionDate, recurrence, notes, timerMode, priority } = this.parseTaskMetadata(taskText);
 
                 const task: Task = {
                     id: `${file.path}:${String(i)}`,
@@ -151,6 +166,8 @@ export class TaskParser {
                     completionDate, // Added
                     recurrence,     // Added
                     notes,          // Added
+                    timerMode,      // Added
+                    priority,       // Added
                     originalText: line
                 };
                 tasks.push(task);
@@ -177,13 +194,15 @@ export class TaskParser {
         }
     }
 
-    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string } {
+    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; timerMode?: 'countdown' | 'elapsed' | 'both'; priority?: TaskPriority } {
         let title = taskText;
         let startDate: Date | undefined;
         let dueDate: Date | undefined;
         let completionDate: Date | undefined;
         let recurrence: string | undefined;
         let notes: string | undefined;
+        let timerMode: 'countdown' | 'elapsed' | 'both' | undefined;
+        let priority: TaskPriority | undefined;
 
         /**
          * Normalise a parsed date string to a local-midnight Date.
@@ -258,8 +277,45 @@ export class TaskParser {
             }
         }
 
+        // 7. TIMER TAGS — collect every #countdown / #elapsed / #countdown-elapsed
+        // occurrence, then strip them from the title (preserving the leading boundary).
+        let hasCountdown = false;
+        let hasElapsed = false;
+        TaskParser.TIMER_TAG_REGEX.lastIndex = 0;
+        let timerMatch: RegExpExecArray | null;
+        while ((timerMatch = TaskParser.TIMER_TAG_REGEX.exec(taskText)) !== null) {
+            const tag = timerMatch[2].toLowerCase();
+            if (tag === 'countdown-elapsed') {
+                hasCountdown = true;
+                hasElapsed = true;
+            } else if (tag === 'countdown') {
+                hasCountdown = true;
+            } else if (tag === 'elapsed') {
+                hasElapsed = true;
+            }
+        }
+        if (hasCountdown && hasElapsed) {
+            timerMode = 'both';
+        } else if (hasCountdown) {
+            timerMode = 'countdown';
+        } else if (hasElapsed) {
+            timerMode = 'elapsed';
+        }
+        if (timerMode) {
+            title = title.replace(TaskParser.TIMER_TAG_REGEX, '$1');
+        }
+
+        // 8. PRIORITY — obsidian-tasks emoji (🔺⏫🔼🔽⏬). No emoji → undefined (normal).
+        // Read the first priority emoji, then strip all of them from the visible title.
+        TaskParser.PRIORITY_REGEX.lastIndex = 0;
+        const priorityMatch = TaskParser.PRIORITY_REGEX.exec(taskText);
+        if (priorityMatch) {
+            priority = emojiToPriority(priorityMatch[0]);
+            title = title.replace(TaskParser.PRIORITY_REGEX, '');
+        }
+
         title = title.replace(/\s+/g, ' ').trim();
 
-        return { title, startDate, dueDate, completionDate, recurrence, notes };
+        return { title, startDate, dueDate, completionDate, recurrence, notes, timerMode, priority };
     }
 }

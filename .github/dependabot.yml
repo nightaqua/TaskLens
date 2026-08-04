@@ -7,6 +7,12 @@ updates:
     target-branch: "dev"
     labels:
       - "dependencies"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -15,3 +21,7 @@ updates:
     target-branch: "dev"
     labels:
       - "dependencies"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

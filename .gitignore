@@ -37,16 +37,23 @@ docs/announcement-*.md
 
 # --- Testing ---
 coverage/
+# ESLint report written by the code-quality agent (repo-local, never commit)
+eslint-report.json
 
 # --- Temporary ---
 tmp/
 temp/
 
 # AI agent working files
-.claude/
 .jules/
 .Jules/
 .iloom/
+# Agent coordination dir — local-only operational files, never commit
+.agents/
+# Claude Code project config (contains symlink to agent definitions)
+.claude/
+# Git worktrees for isolated agent workspaces (GM-005)
+.worktrees/
 
 # TypeScript incremental build info
 tsconfig.tsbuildinfo
@@ -62,3 +69,6 @@ test-results/
 # Environment files
 .env
 .env.local
+
+# Windows Explorer metadata
+desktop.ini

@@ -21,6 +21,16 @@ export class Modal {
     close(): void {}
 }
 
+export class Notice {
+    public message: string;
+    /** Test hook — every constructed Notice is recorded here so specs can assert on it. */
+    static instances: Notice[] = [];
+    constructor(message: string, timeout?: number) {
+        this.message = message;
+        Notice.instances.push(this);
+    }
+}
+
 export class SuggestModal<T> {
     public items: T[] = [];
     public item?: T;
@@ -52,3 +62,20 @@ export class ViewStateResult {
 }
 
 export function setIcon(el: HTMLElement, iconId: string): void {}
+
+/**
+ * Returns all tags (inline + frontmatter) from a CachedMetadata object.
+ * Mirrors the Obsidian API: https://docs.obsidian.md/Reference/TypeScript+API/getAllTags
+ */
+export function getAllTags(cache: Record<string, unknown>): string[] | null {
+    const result: string[] = [];
+    const inlineTags = cache.tags as Array<{ tag: string }> | undefined;
+    if (inlineTags) {
+        for (const t of inlineTags) result.push(t.tag);
+    }
+    const fmTags = (cache.frontmatter as Record<string, unknown> | undefined)?.tags;
+    if (Array.isArray(fmTags)) {
+        for (const t of fmTags as string[]) result.push(t.startsWith('#') ? t : '#' + t);
+    }
+    return result.length > 0 ? result : null;
+}

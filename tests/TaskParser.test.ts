@@ -7,7 +7,7 @@ describe('TaskParser.parseTaskMetadata', () => {
     // Create a dummy instance. Since parseTaskMetadata doesn't use `this.app` or `this.settings`,
     // we can pass null or empty objects casted to unknown.
     const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
-    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string };
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; timerMode?: 'countdown' | 'elapsed' | 'both'; priority?: import('../src/models/Task').TaskPriority };
 
     const getLocalMidnight = (dateStr: string) => new Date(`${dateStr}T00:00:00`);
 
@@ -169,6 +169,43 @@ describe('TaskParser.parseTaskMetadata', () => {
         expect(result.title).toBe('Buy milk');
         expect(result.dueDate).toEqual(getLocalMidnight('2023-10-15'));
     });
+
+    it('should parse #countdown tag and strip it from the title', () => {
+        const result = parseTaskMetadata('Submit report #countdown [due:: 2024-05-10]');
+        expect(result.title).toBe('Submit report');
+        expect(result.timerMode).toBe('countdown');
+        expect(result.dueDate).toEqual(getLocalMidnight('2024-05-10'));
+    });
+
+    it('should parse #elapsed tag and strip it from the title', () => {
+        const result = parseTaskMetadata('Track habit #elapsed [start:: 2024-05-10]');
+        expect(result.title).toBe('Track habit');
+        expect(result.timerMode).toBe('elapsed');
+        expect(result.startDate).toEqual(getLocalMidnight('2024-05-10'));
+    });
+
+    it('should parse #countdown-elapsed tag as both', () => {
+        const result = parseTaskMetadata('Exam #countdown-elapsed');
+        expect(result.title).toBe('Exam');
+        expect(result.timerMode).toBe('both');
+    });
+
+    it('should treat separate #countdown and #elapsed tags as both', () => {
+        const result = parseTaskMetadata('Sprint #countdown #elapsed');
+        expect(result.title).toBe('Sprint');
+        expect(result.timerMode).toBe('both');
+    });
+
+    it('should leave timerMode undefined when no timer tag is present', () => {
+        const result = parseTaskMetadata('Plain task');
+        expect(result.timerMode).toBeUndefined();
+    });
+
+    it('should not match timer tags embedded in longer tags', () => {
+        const result = parseTaskMetadata('Note #countdownish #elapsedaily');
+        expect(result.timerMode).toBeUndefined();
+        expect(result.title).toBe('Note #countdownish #elapsedaily');
+    });
 });
 describe('TaskParser.getFilesToScan', () => {
     // Helper to create mock TFile objects
@@ -295,5 +332,82 @@ describe('TaskParser.getFilesToScan', () => {
         const paths = result.map(f => f.path);
         expect(paths).toContain('Projects/Todo.md');
         expect(paths).toContain('OtherFolder/Notes.md');
+    });
+});
+
+describe('TaskParser.isPathInScope', () => {
+    const createAppMock = () => {
+        return {
+            vault: { getMarkdownFiles: () => [] },
+        } as unknown as App;
+    };
+
+    it('returns true for any path when scanFolders is empty', () => {
+        const parser = new TaskParser(createAppMock(), { scanFolders: [] } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(true);
+        expect(parser.isPathInScope('Anywhere/Else/Note.md')).toBe(true);
+        expect(parser.isPathInScope('RootFile.md')).toBe(true);
+    });
+
+    it('matches a path recursively inside a scanned folder', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['Projects'],
+            scanRecursively: true,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(true);
+        expect(parser.isPathInScope('Projects/SubProject/Tasks.md')).toBe(true);
+    });
+
+    it('returns false for a path outside the scanned folder', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['Projects'],
+            scanRecursively: true,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('OtherFolder/Notes.md')).toBe(false);
+        // startsWith edge case: sibling file sharing the folder-name prefix
+        expect(parser.isPathInScope('ProjectsTodo.md')).toBe(false);
+    });
+
+    it('matches only direct children when scanRecursively is false', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['Projects'],
+            scanRecursively: false,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(true);
+        expect(parser.isPathInScope('Projects/SubProject/Tasks.md')).toBe(false);
+    });
+
+    it('matches root files when the scanned folder is "/"', () => {
+        const parser = new TaskParser(createAppMock(), {
+            scanFolders: ['/'],
+            scanRecursively: false,
+        } as unknown as SemesterSettings);
+        expect(parser.isPathInScope('RootFile.md')).toBe(true);
+        expect(parser.isPathInScope('Projects/Todo.md')).toBe(false);
+    });
+});
+
+describe('TaskParser — priority/recurrence collision', () => {
+    const parser = new TaskParser({} as unknown as App, {} as unknown as SemesterSettings);
+    const parseTaskMetadata = ((parser as unknown) as Record<string, (...args: unknown[]) => unknown>)['parseTaskMetadata'].bind(parser) as (taskText: string) => { title: string; recurrence?: string; priority?: import('../src/models/Task').TaskPriority };
+
+    it('should not absorb priority emoji into recurrence rule', () => {
+        const result = parseTaskMetadata('Stand-up 🔁 every weekday ⏫');
+        expect(result.recurrence).toBe('every weekday');
+        expect(result.priority).toBe('high');
+        expect(result.title).toBe('Stand-up');
+    });
+
+    it('should not absorb high-priority emoji into recurrence rule', () => {
+        const result = parseTaskMetadata('Daily review 🔁 every day 🔼');
+        expect(result.recurrence).toBe('every day');
+        expect(result.priority).toBe('high');
+        expect(result.title).toBe('Daily review');
+    });
+
+    it('should strip duplicate priority emojis from title', () => {
+        const result = parseTaskMetadata('Urgent task ⏫⏫');
+        expect(result.title).toBe('Urgent task');
+        expect(result.priority).toBe('high');
     });
 });

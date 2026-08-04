@@ -26,6 +26,17 @@ export default defineConfig([
         },
     },
     {
+        // manifest.json's minAppVersion is 1.13.0 because setDestructive()
+        // (ConfirmModal.ts) requires it — not because the declarative settings
+        // renderer is live everywhere at that version. Desktop hasn't shipped
+        // getSettingDefinitions() support yet, so display() is still the real
+        // fallback there and isn't dead code despite what this rule assumes.
+        files: ["src/settings/SettingsTab.ts"],
+        rules: {
+            "obsidianmd/settings-tab/no-deprecated-display": "off",
+        },
+    },
+    {
         files: ["tests/**/*.ts", "vitest.config.ts"],
         rules: {
             "@typescript-eslint/no-unsafe-argument": "off",
@@ -34,7 +45,12 @@ export default defineConfig([
             "@typescript-eslint/no-unsafe-call": "off",
             "@typescript-eslint/no-explicit-any": "off",
             "@typescript-eslint/no-extraneous-class": "off",
-            "obsidianmd/prefer-active-doc": "off"
+            "obsidianmd/prefer-active-doc": "off",
+            // Test files construct plain jsdom DOM trees to mimic Obsidian's
+            // workspace hierarchy without loading the real app, so the
+            // createEl/createDiv helpers (added by Obsidian at runtime) are
+            // never available here.
+            "obsidianmd/prefer-create-el": "off"
         }
     }
 ]);

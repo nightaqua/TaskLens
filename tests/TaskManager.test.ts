@@ -240,6 +240,7 @@ describe('TaskManager.processManualUpdate', () => {
     it('resets isInternalChange to false if parser.getTasksFromFile throws', async () => {
         const mockApp = {} as App;
         const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
             getTasksFromFile: vi.fn().mockRejectedValue(new Error('Parser failed'))
         } as unknown as TaskParser;
 
@@ -261,6 +262,7 @@ describe('TaskManager.processManualUpdate', () => {
         // refreshFileTask is called at the bottom of processManualUpdate.
         const mockApp = {} as App;
         const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
             getTasksFromFile: vi.fn().mockResolvedValue([])
         } as unknown as TaskParser;
 
@@ -278,6 +280,81 @@ describe('TaskManager.processManualUpdate', () => {
         // no addCompletionMetadata / removeCompletionMetadata branch was taken
         expect(refreshSpy).toHaveBeenCalledOnce();
         expect(refreshSpy).toHaveBeenCalledWith('test.md');
+    });
+
+    it('preserves Tasks-plugin ✅ completion stamp and does not overwrite with TaskLens format (CQ-001)', async () => {
+        // Scenario: obsidian-tasks checked off the task and wrote "✅ 2026-06-22".
+        // TaskLens should detect it and NOT replace it with "[completion:: ...]".
+        const lineAfterTasksPlugin = '- [x] My task ✅ 2026-06-22';
+        const mockApp = {
+            vault: {
+                getAbstractFileByPath: vi.fn().mockImplementation((path: string) => createMockFile(path)),
+                read: vi.fn().mockResolvedValue(lineAfterTasksPlugin),
+                modify: vi.fn().mockResolvedValue(undefined)
+            }
+        } as unknown as App;
+
+        const cachedTask = {
+            id: 'test.md:0',
+            title: 'My task',
+            completed: false, // was incomplete in TaskLens cache
+            filePath: 'test.md',
+            lineNumber: 0
+        } as import('../src/models/Task').Task;
+
+        const freshTask = {
+            ...cachedTask,
+            completed: true  // now completed (Tasks plugin flipped it)
+        } as import('../src/models/Task').Task;
+
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile: vi.fn().mockResolvedValue([freshTask])
+        } as unknown as TaskParser;
+
+        const taskManager = new TaskManager(mockParser, mockApp);
+        // Pre-populate internal cache with the uncompleted version
+        (taskManager as unknown as { tasks: typeof cachedTask[] }).tasks = [cachedTask];
+
+        const refreshSpy2 = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue(undefined);
+
+        await taskManager.processManualUpdate(createMockFile('test.md'));
+
+        // vault.modify should NOT have been called (no recurrence on this task)
+        // OR if called, the written content must never contain [completion::
+        const modifyCalls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+        for (const call of modifyCalls) {
+            expect(call[1]).not.toMatch(/completion::/);
+        }
+
+        // refreshFileTask must have been called to keep internal state in sync
+        expect(refreshSpy2).toHaveBeenCalledWith('test.md');
+    });
+
+    it('is a no-op for a file outside scanFolders scope (FA-010)', async () => {
+        // A manual checkbox edit in an out-of-scope file must never trigger
+        // automation metadata writes, matching the guard already applied to
+        // refreshFileTask (FA-009).
+        const mockApp = {} as App;
+        const isPathInScope = vi.fn().mockReturnValue(false);
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const mockParser = {
+            isPathInScope,
+            getTasksFromFile
+        } as unknown as TaskParser;
+
+        const taskManager = new TaskManager(mockParser, mockApp);
+        const refreshSpy = vi.spyOn(taskManager, 'refreshFileTask').mockResolvedValue();
+
+        const mockFile = Object.create(TFile.prototype);
+        mockFile.path = 'Outside/test.md';
+
+        await taskManager.processManualUpdate(mockFile);
+
+        expect(isPathInScope).toHaveBeenCalledWith('Outside/test.md');
+        expect(getTasksFromFile).not.toHaveBeenCalled();
+        expect(refreshSpy).not.toHaveBeenCalled();
+        expect((taskManager as unknown as { isInternalChange: boolean }).isInternalChange).toBe(false);
     });
 });
 
@@ -387,6 +464,148 @@ describe('TaskManager.updateTask', () => {
     });
 });
 
+describe('TaskManager.refreshFileTask — path scope (FA-009)', () => {
+    const makeTask = (filePath: string) => ({
+        id: `${filePath}:0`,
+        title: 'A task',
+        completed: false,
+        filePath,
+        lineNumber: 0,
+        originalText: '- [ ] A task',
+    } as import('../src/models/Task').Task);
+
+    it('adds tasks for a file inside scope', async () => {
+        const inScopeTask = makeTask('Projects/Todo.md');
+        const getTasksFromFile = vi.fn().mockResolvedValue([inScopeTask]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+
+        await taskManager.refreshFileTask('Projects/Todo.md');
+
+        expect(taskManager.getAllTasks()).toEqual([inScopeTask]);
+        expect(getTasksFromFile).toHaveBeenCalledWith('Projects/Todo.md');
+    });
+
+    it('does NOT add tasks for a file outside scope and clears its stale entries', async () => {
+        const staleTask = makeTask('Outside/Note.md');
+        const getTasksFromFile = vi.fn().mockResolvedValue([makeTask('Outside/Note.md')]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(false),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        // Seed a stale task from that out-of-scope file (e.g. left over from before scope narrowed)
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [staleTask];
+
+        await taskManager.refreshFileTask('Outside/Note.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+        // Out-of-scope files must never be parsed/re-added
+        expect(getTasksFromFile).not.toHaveBeenCalled();
+    });
+
+    it('scans everything when scanFolders is empty (isPathInScope true)', async () => {
+        const task = makeTask('Anywhere/Note.md');
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile: vi.fn().mockResolvedValue([task]),
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+
+        await taskManager.refreshFileTask('Anywhere/Note.md');
+
+        expect(taskManager.getAllTasks()).toEqual([task]);
+    });
+});
+
+// main.ts's 'delete'/'rename' vault listeners (CQ-010) call refreshFileTask with the
+// deleted/old/new paths directly — these tests exercise that exact call pattern to
+// verify the mechanism the listeners depend on.
+describe('TaskManager.refreshFileTask — delete/rename support (CQ-010)', () => {
+    const makeTask = (filePath: string) => ({
+        id: `${filePath}:0`,
+        title: 'A task',
+        completed: false,
+        filePath,
+        lineNumber: 0,
+        originalText: '- [ ] A task',
+    } as import('../src/models/Task').Task);
+
+    it('delete purges the file\'s tasks', async () => {
+        const deletedTask = makeTask('Projects/Deleted.md');
+        // The listener passes the path of a file that no longer exists in the vault,
+        // so getTasksFromFile (which does getAbstractFileByPath under the hood) finds nothing.
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [deletedTask];
+
+        await taskManager.refreshFileTask('Projects/Deleted.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+    });
+
+    it('rename purges the old path\'s tasks', async () => {
+        const oldTask = makeTask('Projects/Old.md');
+        // Nothing lives at the old path anymore post-rename.
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [oldTask];
+
+        await taskManager.refreshFileTask('Projects/Old.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+    });
+
+    it('rename re-scans the new path when in scope', async () => {
+        const oldTask = makeTask('Projects/Old.md');
+        const newTask = makeTask('Projects/New.md');
+        const mockParser = {
+            isPathInScope: vi.fn().mockReturnValue(true),
+            getTasksFromFile: vi.fn()
+                .mockResolvedValueOnce([]) // old path: nothing there anymore
+                .mockResolvedValueOnce([newTask]), // new path: freshly scanned
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [oldTask];
+
+        // Mirrors main.ts's rename handler: purge old path, then re-scan new path.
+        await taskManager.refreshFileTask('Projects/Old.md');
+        await taskManager.refreshFileTask('Projects/New.md');
+
+        expect(taskManager.getAllTasks()).toEqual([newTask]);
+    });
+
+    it('rename to an out-of-scope target does not leak tasks in', async () => {
+        const oldTask = makeTask('Projects/Old.md');
+        const getTasksFromFile = vi.fn().mockResolvedValue([]);
+        const isPathInScope = vi.fn((path: string) => path !== 'Outside/New.md');
+        const mockParser = {
+            isPathInScope,
+            getTasksFromFile,
+        } as unknown as TaskParser;
+        const taskManager = new TaskManager(mockParser, {} as App);
+        (taskManager as unknown as { tasks: import('../src/models/Task').Task[] }).tasks = [oldTask];
+
+        await taskManager.refreshFileTask('Projects/Old.md');
+        await taskManager.refreshFileTask('Outside/New.md');
+
+        expect(taskManager.getAllTasks()).toEqual([]);
+        // The out-of-scope new path must never be parsed
+        expect(getTasksFromFile).not.toHaveBeenCalledWith('Outside/New.md');
+    });
+});
+
 describe('TaskManager.getStatistics', () => {
     it('velocity7Days: task completed exactly 7 days ago is NOT included (boundary is exclusive)', () => {
         // The source checks: diffDays >= 0 && diffDays < 7
@@ -420,5 +639,109 @@ describe('TaskManager.getStatistics', () => {
         // diffDays === 7 does NOT satisfy diffDays < 7, so the task is excluded
         expect(totalVelocity).toBe(0);
     });
+
+    describe('buildClonedLine (via toggleTaskCompletion) — dd-mm-yyyy date format (RV-004)', () => {
+        function makeApp(fileContent: string) {
+            return {
+                vault: {
+                    getAbstractFileByPath: vi.fn().mockImplementation((path: string) => createMockFile(path)),
+                    read: vi.fn().mockResolvedValue(fileContent),
+                    modify: vi.fn().mockResolvedValue(undefined),
+                }
+            } as unknown as App;
+        }
+
+        it('advances due:: date in dd-mm-yyyy format when task is completed (weekly recurrence)', async () => {
+            // Before fix: regex only matched yyyy-mm-dd, so the clone kept the original date.
+            const originalContent = '- [ ] Write report [due:: 22-06-2026] [repeat:: weekly]';
+            const mockApp = makeApp(originalContent);
+            const tm = new TaskManager({} as TaskParser, mockApp);
+            vi.spyOn(tm, 'refreshFileTask').mockResolvedValue(undefined);
+
+            const task = {
+                id: 'test.md:0',
+                title: 'Write report',
+                completed: false,
+                filePath: 'test.md',
+                lineNumber: 0,
+                dueDate: new Date('2026-06-22T00:00:00'),
+                startDate: undefined,
+                recurrence: 'weekly',
+                originalText: originalContent,
+            } as unknown as import('../src/models/Task').Task;
+
+            await tm.toggleTaskCompletion(task);
+
+            const calls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+            expect(calls.length).toBe(1);
+            const writtenContent: string = calls[0][1];
+            const lines = writtenContent.split('\n');
+            // line 0 is the completed original; line 1 is the cloned next occurrence
+            expect(lines.length).toBeGreaterThanOrEqual(2);
+            const clonedLine = lines[1];
+            // Clone must be open and have the NEXT week's date (2026-06-29 in yyyy-mm-dd)
+            expect(clonedLine).toContain('[ ]');
+            expect(clonedLine).toContain('due:: 2026-06-29');
+        });
+
+        it('advances start:: date in dd-mm-yyyy format when start is the only anchor (daily recurrence)', async () => {
+            const originalContent = '- [ ] Morning run [start:: 22-06-2026] [repeat:: daily]';
+            const mockApp = makeApp(originalContent);
+            const tm = new TaskManager({} as TaskParser, mockApp);
+            vi.spyOn(tm, 'refreshFileTask').mockResolvedValue(undefined);
+
+            const task = {
+                id: 'test.md:0',
+                title: 'Morning run',
+                completed: false,
+                filePath: 'test.md',
+                lineNumber: 0,
+                dueDate: undefined,
+                startDate: new Date('2026-06-22T00:00:00'),
+                recurrence: 'daily',
+                originalText: originalContent,
+            } as unknown as import('../src/models/Task').Task;
+
+            await tm.toggleTaskCompletion(task);
+
+            const calls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+            expect(calls.length).toBe(1);
+            const clonedLine: string = calls[0][1].split('\n')[1];
+            expect(clonedLine).toContain('[ ]');
+            expect(clonedLine).toContain('start:: 2026-06-23');
+        });
+
+        it('advances both due:: and start:: when both are in dd-mm-yyyy format (weekly recurrence)', async () => {
+            // due = 22-06-2026, start = 15-06-2026 (7 days before due, window = 7 days)
+            const originalContent = '- [ ] Team sync [start:: 15-06-2026] [due:: 22-06-2026] [repeat:: weekly]';
+            const mockApp = makeApp(originalContent);
+            const tm = new TaskManager({} as TaskParser, mockApp);
+            vi.spyOn(tm, 'refreshFileTask').mockResolvedValue(undefined);
+
+            const task = {
+                id: 'test.md:0',
+                title: 'Team sync',
+                completed: false,
+                filePath: 'test.md',
+                lineNumber: 0,
+                dueDate: new Date('2026-06-22T00:00:00'),
+                startDate: new Date('2026-06-15T00:00:00'),
+                recurrence: 'weekly',
+                originalText: originalContent,
+            } as unknown as import('../src/models/Task').Task;
+
+            await tm.toggleTaskCompletion(task);
+
+            const calls = (mockApp.vault.modify as import('vitest').Mock).mock.calls;
+            expect(calls.length).toBe(1);
+            const clonedLine: string = calls[0][1].split('\n')[1];
+            expect(clonedLine).toContain('[ ]');
+            // due advances by 1 week: 2026-06-29
+            expect(clonedLine).toContain('due:: 2026-06-29');
+            // start advances by same window (7 days before new due): 2026-06-22
+            expect(clonedLine).toContain('start:: 2026-06-22');
+        });
+    });
+
 });
 });

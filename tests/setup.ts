@@ -11,6 +11,10 @@ vi.mock('obsidian', () => {
         },
         App: class {},
         Modal: class {
+            app: unknown;
+            constructor(app: unknown) {
+                this.app = app;
+            }
             open() {}
             close() {}
         },
@@ -26,7 +30,16 @@ vi.mock('obsidian', () => {
             editor = { replaceSelection: () => {} };
             file = { path: '' };
         },
-        setIcon: vi.fn()
+        Notice: class MockNotice {
+            message: string;
+            static instances: { message: string }[] = [];
+            constructor(message: string) {
+                this.message = message;
+                MockNotice.instances.push(this);
+            }
+        },
+        setIcon: vi.fn(),
+        normalizePath: (p: string) => p.replace(/\\/g, '/').replace(/\/+/g, '/').trim()
     };
 });
 

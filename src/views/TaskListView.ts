@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import TaskLensPlugin from '../main';
+import { TaskListSort } from '../settings/Settings';
 import { TaskListComponent } from './TaskListComponent';
 import { Task } from '../models/Task';
 import { HeaderComponent, HeaderState } from './HeaderComponent';
@@ -20,6 +21,7 @@ export class TaskListView extends ItemView {
     private tabContainer: HTMLElement | null = null;
     private isOpen = false;
     private headerComponent: HeaderComponent | null = null;
+    private listComponent: TaskListComponent | null = null;
     private headerState: HeaderState = { title: null, isCollapsed: false };
 
     private readonly onTasksUpdated = (): void => {
@@ -78,6 +80,8 @@ export class TaskListView extends ItemView {
     onClose(): Promise<void> {
         this.isOpen = false;
         this.plugin.taskManager.off('tasks-updated', this.onTasksUpdated);
+        this.listComponent?.destroy();
+        this.listComponent = null;
         cleanUpViewDOM(this.leafRootEl, this.tabContainer);
         return Promise.resolve();
     }
@@ -85,6 +89,7 @@ export class TaskListView extends ItemView {
     render(): void {
         if (!this.isOpen || !this.contentEl.isConnected) return;
 
+        this.listComponent?.destroy();
         this.contentEl.empty();
 
         this.headerComponent = new HeaderComponent(
@@ -118,7 +123,9 @@ export class TaskListView extends ItemView {
         );
         this.headerComponent.render();
 
-        const list = new TaskListComponent(this.contentEl, this.app, {
+        this.renderSortBar(this.contentEl);
+
+        this.listComponent = new TaskListComponent(this.contentEl, this.app, {
             onToggle: (t: Task) => { void this.plugin.taskManager.toggleTaskCompletion(t); },
             onEdit: (t: Task) => {
                 new QuickAddModal(this.app, this.plugin.taskManager, t, this.plugin.settings).open();
@@ -127,6 +134,37 @@ export class TaskListView extends ItemView {
                 void this.plugin.taskManager.deleteTask(t);
             }
         }, this.plugin.settings);
-        list.render(this.plugin.taskManager.getGroupedFilteredTasks());
+        this.listComponent.render(this.plugin.taskManager.getGroupedFilteredTasks());
+    }
+
+    private renderSortBar(container: HTMLElement): void {
+        const SORT_LABELS: Record<TaskListSort, string> = {
+            'urgency': 'Urgency',
+            'topic': 'Topic',
+            'file-name': 'File Name',
+            'priority': 'Priority',
+        };
+        const SORT_ORDER: TaskListSort[] = ['urgency', 'topic', 'file-name', 'priority'];
+
+        const bar = container.createDiv('tasklist-sort-bar');
+        const label = bar.createSpan({ cls: 'tasklist-sort-label', text: 'Sort:' });
+        label.setAttribute('aria-hidden', 'true');
+
+        const currentSort = this.plugin.taskManager.getTaskListSort();
+
+        SORT_ORDER.forEach(mode => {
+            const btn = bar.createEl('button', {
+                cls: 'tasklist-sort-btn',
+                text: SORT_LABELS[mode],
+            });
+            btn.setAttribute('aria-pressed', String(mode === currentSort));
+            if (mode === currentSort) btn.addClass('is-active');
+
+            btn.addEventListener('click', () => {
+                this.plugin.settings.taskListSort = mode;
+                void this.plugin.saveSettings();
+                this.plugin.taskManager.setTaskListSort(mode);
+            });
+        });
     }
 }

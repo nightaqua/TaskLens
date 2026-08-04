@@ -1,4 +1,5 @@
 import { Task, TaskGroup, getTaskStatus, TaskStatus } from '../models/Task';
+import { IcsEvent } from '../services/IcsParser';
 import { App, setIcon } from 'obsidian';
 import { SemesterSettings, getTopicColor } from '../settings/Settings';
 import { openTaskInEditor } from './TaskListComponent';
@@ -7,6 +8,7 @@ import { TaskManager } from '../services/TaskManager';
 export class TimelineComponent {
     private readonly container: HTMLElement;
     private readonly groups: TaskGroup[];
+    private readonly icsEvents: IcsEvent[];
     private readonly daysToShow: number;
     private readonly app: App;
     private readonly settings: SemesterSettings;
@@ -39,11 +41,13 @@ export class TimelineComponent {
         daysToShow: number = 10,
         settings: SemesterSettings,
         viewportStart?: Date,
-        onViewportChange?: (newStart: Date) => void
+        onViewportChange?: (newStart: Date) => void,
+        icsEvents?: IcsEvent[]
     ) {
         this.container = container;
         this.app = app;
         this.groups = groups;
+        this.icsEvents = icsEvents ?? [];
         this.daysToShow = daysToShow;
         this.settings = settings;
         this.onViewportChange = onViewportChange ?? null;
@@ -123,7 +127,6 @@ export class TimelineComponent {
 
         const navHandle = navSection.createDiv('ribbon-handle ribbon-handle--nav');
         navHandle.setAttribute('aria-label', 'Navigate timeline');
-        navHandle.setAttribute('title', 'Navigate timeline');
         navHandle.setAttribute('role', 'button');
         navHandle.setAttribute('tabindex', '0');
         navHandle.setAttribute('aria-expanded', this.ribbonNavOpen ? 'true' : 'false');
@@ -185,7 +188,6 @@ export class TimelineComponent {
         const prevBtn = navControls.createEl('button', { cls: 'vp-jump' });
         prevBtn.setText('‹‹');
         prevBtn.setAttribute('aria-label', 'Jump back 6 months');
-        prevBtn.setAttribute('title', 'Jump back 6 months');
         prevBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.ribbonNavOpen = true;
@@ -200,7 +202,6 @@ export class TimelineComponent {
         const nextBtn = navControls.createEl('button', { cls: 'vp-jump' });
         nextBtn.setText('››');
         nextBtn.setAttribute('aria-label', 'Jump forward 6 months');
-        nextBtn.setAttribute('title', 'Jump forward 6 months');
         nextBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.ribbonNavOpen = true;
@@ -234,7 +235,6 @@ export class TimelineComponent {
                 const countSuffix = count > 1 ? ` \xd7${String(count)}` : '';
                 chip.setText(isPast ? `\u2190 ${label}${countSuffix}` : `${label}${countSuffix} \u2192`);
                 chip.setAttribute('aria-label', `Jump to ${label}`);
-                chip.setAttribute('title', `Jump to ${label}`);
                 chip.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.ribbonNavOpen = true;
@@ -265,7 +265,6 @@ export class TimelineComponent {
 
         const syncHandle = syncSection.createDiv('ribbon-handle ribbon-handle--sync');
         syncHandle.setAttribute('aria-label', 'Scroll to today');
-        syncHandle.setAttribute('title', 'Scroll to today');
         syncHandle.setAttribute('role', 'button');
         syncHandle.setAttribute('tabindex', '0');
         const syncIconWrap = syncHandle.createDiv('ribbon-handle-icon');
@@ -276,7 +275,6 @@ export class TimelineComponent {
         syncExpand.setAttribute('role', 'button');
         syncExpand.setAttribute('tabindex', '0');
         syncExpand.setAttribute('aria-label', 'Scroll to today');
-        syncExpand.setAttribute('title', 'Scroll to today');
         const syncExpandIcon = syncExpand.createDiv('ribbon-sync-expand-icon');
         setIcon(syncExpandIcon, 'rotate-ccw');
         syncExpand.createSpan({ cls: 'ribbon-sync-expand-label' }).setText('Today');
@@ -457,11 +455,12 @@ export class TimelineComponent {
             bar.setAttribute('role', 'button');
             bar.setAttribute('tabindex', '0');
             bar.setAttribute('aria-label', `Open task in editor: ${task.title}`);
-            bar.setAttribute('title', `Open task in editor: ${task.title}`);
             bar.setCssProps({
                 '--tl-col-start': String(startIdx + 1),
                 '--tl-col-span': String((dueIdx - startIdx) + 1),
-                '--tl-row': String(rowIndex + 2)
+                '--tl-row': String(rowIndex + 2),
+                // Suppress Obsidian's built-in aria-label tooltip; we show our own richer tooltip via mouseenter.
+                '--no-tooltip': 'true'
             });
 
             if (taskStart < allDays[0]) bar.addClass('is-clamped-left');
@@ -497,6 +496,76 @@ export class TimelineComponent {
                 }
             });
         });
+
+
+        // ── ICS calendar event overlay ─────────────────────────────────────────
+        // Rendered after task bars so they occupy a separate row band at the bottom.
+        // Events are read-only — no click handler opens an editor.
+        const visibleIcsEvents = this.icsEvents.filter(ev => {
+            const evEndMs = ev.end.getTime();
+            const evStartMs = ev.start.getTime();
+            return evEndMs >= windowStartMs && evStartMs <= windowEndMs;
+        });
+
+        if (visibleIcsEvents.length > 0) {
+            // ICS events get their own row-packing namespace, starting below all task rows
+            const icsRowOffset = rowEndTimes.length + 2; // +2 because grid row 1 = header
+            const icsRowEndTimes: number[] = [];
+
+            // Separator label row
+            const sepBar = grid.createDiv('timeline-ics-separator');
+            sepBar.setText('Calendar events');
+            sepBar.setCssProps({
+                '--tl-col-start': '1',
+                '--tl-col-span': String(allDays.length),
+                '--tl-row': String(icsRowOffset),
+            });
+
+            visibleIcsEvents.forEach(ev => {
+                // For all-day ICS events the DTEND is exclusive (next day); subtract 1 ms for display
+                const displayEnd = ev.allDay ? new Date(ev.end.getTime() - 1) : ev.end;
+
+                const evStart = new Date(ev.start);
+                const evEnd = new Date(displayEnd);
+                evStart.setHours(0, 0, 0, 0);
+                evEnd.setHours(0, 0, 0, 0);
+
+                let startIdx = dayIndexMap.get(evStart.toDateString()) ?? -1;
+                let endIdx = dayIndexMap.get(evEnd.toDateString()) ?? -1;
+
+                if (startIdx === -1 && evStart < allDays[0]) startIdx = 0;
+                if (endIdx === -1 && evEnd > allDays[allDays.length - 1]) endIdx = allDays.length - 1;
+                if (startIdx === -1 || endIdx === -1) return;
+
+                let icsRow = icsRowEndTimes.findIndex(t => t < evStart.getTime());
+                if (icsRow === -1) {
+                    icsRow = icsRowEndTimes.length;
+                    icsRowEndTimes.push(evEnd.getTime());
+                } else {
+                    icsRowEndTimes[icsRow] = evEnd.getTime();
+                }
+
+                const bar = grid.createDiv('timeline-ics-bar');
+                bar.setText(ev.summary);
+                bar.setAttribute('aria-label', `Calendar: ${ev.summary}`);
+                bar.setCssProps({
+                    '--tl-col-start': String(startIdx + 1),
+                    '--tl-col-span': String((endIdx - startIdx) + 1),
+                    '--tl-row': String(icsRowOffset + 1 + icsRow),
+                    '--no-tooltip': 'true',
+                });
+
+                if (evStart < allDays[0]) bar.addClass('is-clamped-left');
+                if (evEnd > allDays[allDays.length - 1]) bar.addClass('is-clamped-right');
+
+                // Tooltip shows event summary + date range
+                bar.addEventListener('mouseenter', (e) => {
+                    this.showIcsTooltip(e, ev);
+                });
+                bar.addEventListener('mouseleave', () => { this.hideTooltip(); });
+                bar.addEventListener('mousemove', (e) => { this.moveTooltip(e); });
+            });
+        }
 
         this.setupEventListeners(this.scrollContainer);
     }
@@ -552,7 +621,6 @@ export class TimelineComponent {
         overlay.setAttribute('role', 'button');
         overlay.setAttribute('tabindex', '0');
         overlay.setAttribute('aria-label', label);
-        overlay.setAttribute('title', label);
         overlay.createDiv('nav-arrow').setText(direction === 'left' ? '‹' : '›');
 
         const triggerScroll = (e: Event) => {
@@ -611,6 +679,22 @@ export class TimelineComponent {
         if (task.notes) {
             this.tooltipEl.createDiv('tooltip-notes').setText(task.notes);
         }
+        this.tooltipEl.setCssProps({ display: 'block' });
+        this.moveTooltip(e);
+    }
+
+
+    private showIcsTooltip(e: MouseEvent, ev: IcsEvent): void {
+        if (!this.tooltipEl) {
+            this.tooltipEl = activeDocument.body.createDiv('dashboard-tooltip');
+        }
+        this.tooltipEl.empty();
+        this.tooltipEl.createDiv('tooltip-title').setText(ev.summary);
+        const fmt = (d: Date) =>
+            d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const displayEnd = ev.allDay ? new Date(ev.end.getTime() - 1) : ev.end;
+        this.tooltipEl.createDiv('tooltip-date').setText(`📅 ${fmt(ev.start)} → ${fmt(displayEnd)}`);
+        this.tooltipEl.createDiv('tooltip-meta').setText('🗓 Calendar event (read-only)');
         this.tooltipEl.setCssProps({ display: 'block' });
         this.moveTooltip(e);
     }
