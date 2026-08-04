@@ -1,6 +1,6 @@
 {
   "name": "tasklens",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Widget-based dashboard for Obsidian",
   "main": "main.js",
   "scripts": {
