@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0]
+
+### New features
+
+- **ICS calendar feed export.** TaskLens can now export tasks as a standard `.ics` calendar feed, letting due dates show up in any calendar app that supports ICS subscriptions (FA-008).
+- **Quick Add natural language parsing.** The Quick Add modal now parses natural language dates and phrasing (e.g. "next Friday", "in 3 days") directly in the title field instead of requiring the structured date pickers (FA-003).
+- **Collapsible group headers in task list.** Task list groups (by status, topic, etc.) can now be collapsed and expanded individually, with state persisted across sessions (FA-006).
+- **Inline tag/project filters on board view.** The Kanban board view now has inline filter controls for tags and projects, matching the filtering already available in the task list (FA-007).
+- **Ribbon menu additions.** The ribbon menu now includes entries to open the Timeline, Task List, and Statistics views directly, alongside the existing Dashboard entry.
+
+### Bug fixes
+
+- **`processManualUpdate` scope guard.** Manual edits outside TaskLens's managed metadata no longer trigger unintended automation side effects; the update handler now checks that the edit falls within its expected scope before acting (FA-010).
+- **Quick Add out-of-scope notice.** The Quick Add modal now surfaces a notice when a typed task falls outside the currently configured scan paths, instead of silently creating a task that will never be picked up (FA-011).
+- **Confirmation modal for destructive actions.** Deleting a task now prompts for confirmation before writing the change back to the source file (FA-001).
+- **Settings page `display()` fallback restored.** Reintroduced a fallback path for `display()` so the settings tab renders correctly on pre-1.13 desktop Obsidian builds.
+- **Right-sidebar titlebar offset fix.** Section toggles in the right sidebar no longer overlap with Obsidian's window control buttons (CQ-009).
+
+### Code quality & accessibility
+
+- CSS variable deduplication across `styles.css`.
+- Type guard renames for clarity and consistency with the rest of the codebase.
+- Additional accessibility improvements across settings and modals.
+- `eslint-plugin-obsidianmd` integrated into the lint pipeline for Obsidian API compliance checks.
+
+### Dependencies
+
+- Multiple Dependabot dependency updates.
+
+---
+
 ## [1.3.2]
 
 ### Fixes & compliance
