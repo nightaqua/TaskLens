@@ -22,7 +22,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
     "@eslint/json": "^2.1.0",
-    "@types/node": "^26.5.0",
+    "@types/node": "^26.6.1",
     "@typescript-eslint/parser": "^8.70.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.10.0",
