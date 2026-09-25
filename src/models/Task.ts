@@ -92,6 +92,15 @@ export interface Task {
     /** Extracted notes content, e.g. [notes:: ...] (optional) */
     notes?: string;
 
+    /**
+     * Reminder date recognised from the obsidian-reminder plugin's ⏰ YYYY-MM-DD HH:mm
+     * field (time portion is parsed but not retained, matching completionDate).
+     * Display/compatibility only — TaskLens does not act on this itself (no OS
+     * notifications, no scheduling); it exists so the raw stamp isn't shown as
+     * literal title text in vaults that already use obsidian-reminder.
+     */
+    reminderDate?: Date;
+
     /** obsidian-tasks priority level (🔺⏫🔽⏬) — undefined means normal priority. */
     priority?: TaskPriority;
 

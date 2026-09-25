@@ -1,5 +1,5 @@
-import { ItemView, WorkspaceLeaf, setIcon, ViewStateResult } from 'obsidian';
-import { TaskStatus } from '../models/Task';
+import { ItemView, WorkspaceLeaf, setIcon, ViewStateResult, Notice } from 'obsidian';
+import { Task, TaskStatus } from '../models/Task';
 import { TaskManager } from '../services/TaskManager';
 import TaskLensPlugin, { RefreshableView } from '../main';
 import { TimelineComponent } from './TimelineComponent';
@@ -21,6 +21,53 @@ function isTaskStatus(v: unknown): v is TaskStatus {
 
 function isHeaderState(v: unknown): v is HeaderState {
     return typeof v === 'object' && v !== null;
+}
+
+/**
+ * Pure due-soon detection, exported for testing since DashboardView itself can't be
+ * unit-tested (it extends ItemView and calls the Obsidian API directly — see AGENTS.md
+ * §10). Given the full task list and the set of task ids already notified this
+ * session, returns a one-line Notice message covering every open task whose due date
+ * is today or earlier and that hasn't been notified yet, plus the ids to mark as seen
+ * — or null when there's nothing new to report. Session-scoped only (an in-memory
+ * Set, not persisted): every plugin/Obsidian reload starts fresh, and a task is never
+ * re-notified while this view instance stays open, even if it becomes overdue after
+ * already being reported as due-today.
+ */
+export function computeDueSoonNotice(
+    tasks: Task[],
+    alreadyNotified: ReadonlySet<string>,
+    now: Date = new Date()
+): { message: string; newIds: string[] } | null {
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    const newIds: string[] = [];
+    let overdueCount = 0;
+    let dueTodayCount = 0;
+
+    for (const task of tasks) {
+        if (task.completed || !task.dueDate || alreadyNotified.has(task.id)) continue;
+
+        const due = new Date(task.dueDate);
+        due.setHours(0, 0, 0, 0);
+        if (due > today) continue;
+
+        newIds.push(task.id);
+        if (due < today) {
+            overdueCount++;
+        } else {
+            dueTodayCount++;
+        }
+    }
+
+    if (newIds.length === 0) return null;
+
+    const parts: string[] = [];
+    if (overdueCount > 0) parts.push(`${String(overdueCount)} overdue`);
+    if (dueTodayCount > 0) parts.push(`${String(dueTodayCount)} due today`);
+
+    return { message: `TaskLens: ${parts.join(', ')}`, newIds };
 }
 
 // Applies chromeless styling to the leaf and optionally hides tabs when the layout is locked
@@ -76,6 +123,9 @@ export class DashboardView extends ItemView implements RefreshableView {
     private lastViewportStart: Date | null = null;
     private forceScrollToToday: boolean = false;
 
+    // Session-scoped due-soon notice tracking — see computeDueSoonNotice doc comment.
+    private readonly notifiedDueSoonIds = new Set<string>();
+
     private readonly onTasksUpdated = (): void => {
         if (this.renderTimer) window.clearTimeout(this.renderTimer);
 
@@ -86,6 +136,7 @@ export class DashboardView extends ItemView implements RefreshableView {
             }
 
             this.render();
+            this.checkDueSoonNotice();
 
             if (this.timelineComponent) {
                 if (this.forceScrollToToday) {
@@ -97,6 +148,14 @@ export class DashboardView extends ItemView implements RefreshableView {
             }
         }, 500);
     };
+
+    /** Thin wrapper around computeDueSoonNotice: fires the Notice, updates the seen set. */
+    private checkDueSoonNotice(): void {
+        const result = computeDueSoonNotice(this.taskManager.getAllTasks(), this.notifiedDueSoonIds);
+        if (!result) return;
+        result.newIds.forEach(id => { this.notifiedDueSoonIds.add(id); });
+        new Notice(result.message);
+    }
 
     constructor(leaf: WorkspaceLeaf, private readonly plugin: TaskLensPlugin) {
         super(leaf);
@@ -190,6 +249,7 @@ export class DashboardView extends ItemView implements RefreshableView {
 
         void this.taskManager.loadTasks().then(() => {
             this.render();
+            this.checkDueSoonNotice();
             this.forceScrollToToday = true;
             window.setTimeout(() => {
                 if (this.timelineComponent) {

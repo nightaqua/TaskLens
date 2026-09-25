@@ -46,6 +46,12 @@ export class TaskParser {
     private static readonly EMOJI_DATE_REPLACE_REGEX = /\u{1F4C5}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s*/gu;
     // obsidian-tasks priority emojis: 🔺 highest, ⏫ high, 🔼 medium, 🔽 low, ⏬ lowest.
     private static readonly PRIORITY_REGEX = /[\u{1F53A}\u{23EB}\u{1F53C}\u{1F53D}\u{23EC}]/gu;
+    // obsidian-reminder plugin field: ⏰ YYYY-MM-DD HH:mm (time optional here, though the
+    // plugin always writes it). Recognised for display/compatibility only — see
+    // Task.reminderDate doc comment. Placed immediately before the due-date field in
+    // obsidian-reminder's own convention, but matched independently of it.
+    private static readonly EMOJI_REMINDER_MATCH_REGEX = /\u{23F0}\s*(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})(?:\s+\d{2}:\d{2})?/u;
+    private static readonly EMOJI_REMINDER_REPLACE_REGEX = /\u{23F0}\s*(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})(?:\s+\d{2}:\d{2})?\s*/gu;
 
     // NOTE: All gi-flagged static regexes above (START_REGEX, DUE_REGEX, COMP_REGEX, REPEAT_REGEX)
     // carry lastIndex state between calls because they are shared class-level objects.
@@ -152,7 +158,7 @@ export class TaskParser {
             if (taskMatch) {
                 const completed = taskMatch[2].toLowerCase() === 'x';
                 const taskText = taskMatch[3];
-                const { title, startDate, dueDate, completionDate, recurrence, notes, timerMode, priority } = this.parseTaskMetadata(taskText);
+                const { title, startDate, dueDate, completionDate, recurrence, notes, timerMode, priority, reminderDate } = this.parseTaskMetadata(taskText);
 
                 const task: Task = {
                     id: `${file.path}:${String(i)}`,
@@ -168,6 +174,7 @@ export class TaskParser {
                     notes,          // Added
                     timerMode,      // Added
                     priority,       // Added
+                    reminderDate,   // Added
                     originalText: line
                 };
                 tasks.push(task);
@@ -194,7 +201,7 @@ export class TaskParser {
         }
     }
 
-    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; timerMode?: 'countdown' | 'elapsed' | 'both'; priority?: TaskPriority } {
+    private parseTaskMetadata(taskText: string): { title: string; startDate?: Date; dueDate?: Date; completionDate?: Date; recurrence?: string; notes?: string; timerMode?: 'countdown' | 'elapsed' | 'both'; priority?: TaskPriority; reminderDate?: Date } {
         let title = taskText;
         let startDate: Date | undefined;
         let dueDate: Date | undefined;
@@ -203,6 +210,7 @@ export class TaskParser {
         let notes: string | undefined;
         let timerMode: 'countdown' | 'elapsed' | 'both' | undefined;
         let priority: TaskPriority | undefined;
+        let reminderDate: Date | undefined;
 
         /**
          * Normalise a parsed date string to a local-midnight Date.
@@ -277,6 +285,15 @@ export class TaskParser {
             }
         }
 
+        // 6b. REMINDER ⏰ (obsidian-reminder plugin) — display/compatibility only.
+        // Independent of the due-date fields above; matched against the original
+        // taskText so it's found regardless of which due-date branch (if any) fired.
+        const reminderMatch = taskText.match(TaskParser.EMOJI_REMINDER_MATCH_REGEX);
+        if (reminderMatch) {
+            reminderDate = parseDate(reminderMatch[1]);
+            title = title.replace(TaskParser.EMOJI_REMINDER_REPLACE_REGEX, '');
+        }
+
         // 7. TIMER TAGS — collect every #countdown / #elapsed / #countdown-elapsed
         // occurrence, then strip them from the title (preserving the leading boundary).
         let hasCountdown = false;
@@ -316,6 +333,6 @@ export class TaskParser {
 
         title = title.replace(/\s+/g, ' ').trim();
 
-        return { title, startDate, dueDate, completionDate, recurrence, notes, timerMode, priority };
+        return { title, startDate, dueDate, completionDate, recurrence, notes, timerMode, priority, reminderDate };
     }
 }
