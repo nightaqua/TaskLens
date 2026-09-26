@@ -31,28 +31,16 @@ data.json
 *.swp
 *.swo
 
-# Private maintainer notes and release drafts (local only — never commit)
-docs/00-ForMe.md
-docs/announcement-*.md
-
 # --- Testing ---
 coverage/
-# ESLint report written by the code-quality agent (repo-local, never commit)
+# ESLint JSON report (local only)
 eslint-report.json
 
 # --- Temporary ---
 tmp/
 temp/
 
-# AI agent working files
-.jules/
-.Jules/
-.iloom/
-# Agent coordination dir — local-only operational files, never commit
-.agents/
-# Claude Code project config (contains symlink to agent definitions)
-.claude/
-# Git worktrees for isolated agent workspaces (GM-005)
+# Git worktrees
 .worktrees/
 
 # TypeScript incremental build info
