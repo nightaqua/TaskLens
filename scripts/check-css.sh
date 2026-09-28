@@ -1,6 +1,6 @@
 #!/bin/bash
 # Check that src/styles.css contains no `cursor: pointer` rules.
-# AGENTS.md §8: interactive elements must use default cursor; pointer is reserved
+# Obsidian convention: interactive elements use the default cursor; pointer is reserved
 # for hyperlinks. See commit 6aa13ca for context.
 set -euo pipefail
 
@@ -9,7 +9,7 @@ PATTERN='cursor[[:space:]]*:[[:space:]]*pointer'
 
 if grep -En "$PATTERN" "$CSS_FILE"; then
     echo ""
-    echo "ERROR: cursor: pointer found in $CSS_FILE (violates AGENTS.md §8)."
+    echo "ERROR: cursor: pointer found in $CSS_FILE (pointer is reserved for links)."
     echo "Use the default cursor on interactive elements."
     exit 1
 fi

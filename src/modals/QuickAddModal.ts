@@ -67,7 +67,7 @@ interface ObsidianAppWithPlugins {
 
 /**
  * Runtime type-guard for the nldates-obsidian plugin object.
- * Uses an `in`-narrowing check rather than a bare `as` cast (AGENTS.md §2).
+ * Uses an `in`-narrowing check rather than a bare `as` cast.
  */
 function asNLDatesPlugin(x: unknown): NLDatesPlugin | null {
     if (typeof x !== 'object' || x === null) return null;

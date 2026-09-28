@@ -120,7 +120,7 @@ export default class TaskLensPlugin extends Plugin {
 
     onunload() {
         this.icsFeedManager.stopAutoRefresh();
-        // Sentinel: Detach leaves on unload — AGENTS.md §5
+        // Detach leaves on unload so no plugin views linger after it is disabled
         ALL_VIEW_TYPES.forEach(type => {
             this.app.workspace.detachLeavesOfType(type);
         });

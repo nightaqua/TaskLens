@@ -6,7 +6,7 @@ These are confirmed observations that require attention in future patches.
 
 - `DashboardView.render()` is 250+ lines and handles too many
   responsibilities. Needs manual extraction into sub-methods.
-  Do not delegate to an agent — DOM construction interdependencies
+  Keep this a hands-on refactor — DOM construction interdependencies
   break silently when reorganised without manual testing.
 
 - `TimelineComponent.render()` is 173 lines. Same concern — grid
