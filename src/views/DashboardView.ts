@@ -25,8 +25,8 @@ function isHeaderState(v: unknown): v is HeaderState {
 
 /**
  * Pure due-soon detection, exported for testing since DashboardView itself can't be
- * unit-tested (it extends ItemView and calls the Obsidian API directly — see AGENTS.md
- * §10). Given the full task list and the set of task ids already notified this
+ * unit-tested (it extends ItemView and calls the Obsidian API directly, which has no
+ * mock environment). Given the full task list and the set of task ids already notified this
  * session, returns a one-line Notice message covering every open task whose due date
  * is today or earlier and that hasn't been notified yet, plus the ids to mark as seen
  * — or null when there's nothing new to report. Session-scoped only (an in-memory
