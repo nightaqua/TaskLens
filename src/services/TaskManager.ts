@@ -71,7 +71,7 @@ export class TaskManager extends Events {
         if (this.isInternalChange) return;
 
         // Out-of-scope files must never receive automation metadata writes,
-        // matching the guard already applied in refreshFileTask (FA-009).
+        // matching the guard already applied in refreshFileTask.
         if (!this.parser.isPathInScope(file.path)) return;
 
         // Snapshot the current in-memory state BEFORE yielding.
@@ -437,8 +437,8 @@ export class TaskManager extends Events {
     async refreshFileTask(filePath: string): Promise<void> {
         // Always drop stale entries first. Only re-parse when the path is in scope,
         // otherwise editing a file outside scanFolders would leak its tasks in.
-        // Deletes and renames are handled by main.ts's 'delete'/'rename' listeners
-        // (CQ-010), which call this with the old path (purge only, nothing found
+        // Deletes and renames are handled by main.ts's 'delete'/'rename' listeners,
+        // which call this with the old path (purge only, nothing found
         // there) and, on rename, the new path too (purge-then-rescan).
         this.tasks = this.tasks.filter(t => t.filePath !== filePath);
         if (this.parser.isPathInScope(filePath)) {

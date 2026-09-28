@@ -118,7 +118,7 @@ describe('QuickAddModal.handleSubmit — cursor fallback', () => {
     });
 });
 
-describe('QuickAddModal.handleSubmit — out-of-scope Notice (FA-011)', () => {
+describe('QuickAddModal.handleSubmit — out-of-scope Notice', () => {
     it('warns via Notice when inserting at cursor into a file outside scan scope', async () => {
         const mockMarkdownView = Object.assign(new MarkdownView(null as any), {
             file: { path: 'Outside/Note.md' },
@@ -412,9 +412,9 @@ describe('parseNLDate — nldates-obsidian plugin bridge', () => {
     });
 });
 
-// FA-007 — tag autocomplete unit tests
+// Tag autocomplete unit tests
 // ---------------------------------------------------------------------------
-describe('FA-007 tag autocomplete — trigger regex', () => {
+describe('Tag autocomplete — trigger regex', () => {
     // The regex that drives the dropdown — must match #tags at cursor including
     // nested (#project/sub) and hyphenated (#sub-team) patterns.
     const TRIGGER_RE = /(^|[\s])#([\w/-]*)$/;
@@ -451,7 +451,7 @@ describe('FA-007 tag autocomplete — trigger regex', () => {
     });
 });
 
-describe('FA-007 tag autocomplete — getAllTags mock unions inline + frontmatter', () => {
+describe('Tag autocomplete — getAllTags mock unions inline + frontmatter', () => {
     it('returns both inline tags and frontmatter tags', () => {
         // Verify the obsidian mock getAllTags unions both sources — this is the
         // behaviour QuickAddModal.getVaultTags() relies on for complete suggestions.

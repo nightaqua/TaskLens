@@ -68,7 +68,7 @@ export default class TaskLensPlugin extends Plugin {
             })
         );
 
-        // Purge stale task entries on real vault deletes/renames (CQ-010).
+        // Purge stale task entries on real vault deletes/renames.
         // Unlike the 'modify' listener above, this is unconditional — it isn't
         // gated by appWideAutomation since it's just keeping in-memory state
         // honest, not writing automation metadata. Centralized here (rather than
