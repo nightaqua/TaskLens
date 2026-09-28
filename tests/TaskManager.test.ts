@@ -282,7 +282,7 @@ describe('TaskManager.processManualUpdate', () => {
         expect(refreshSpy).toHaveBeenCalledWith('test.md');
     });
 
-    it('preserves Tasks-plugin ✅ completion stamp and does not overwrite with TaskLens format (CQ-001)', async () => {
+    it('preserves Tasks-plugin ✅ completion stamp and does not overwrite with TaskLens format', async () => {
         // Scenario: obsidian-tasks checked off the task and wrote "✅ 2026-06-22".
         // TaskLens should detect it and NOT replace it with "[completion:: ...]".
         const lineAfterTasksPlugin = '- [x] My task ✅ 2026-06-22';
@@ -331,10 +331,10 @@ describe('TaskManager.processManualUpdate', () => {
         expect(refreshSpy2).toHaveBeenCalledWith('test.md');
     });
 
-    it('is a no-op for a file outside scanFolders scope (FA-010)', async () => {
+    it('is a no-op for a file outside scanFolders scope', async () => {
         // A manual checkbox edit in an out-of-scope file must never trigger
         // automation metadata writes, matching the guard already applied to
-        // refreshFileTask (FA-009).
+        // refreshFileTask.
         const mockApp = {} as App;
         const isPathInScope = vi.fn().mockReturnValue(false);
         const getTasksFromFile = vi.fn().mockResolvedValue([]);
@@ -464,7 +464,7 @@ describe('TaskManager.updateTask', () => {
     });
 });
 
-describe('TaskManager.refreshFileTask — path scope (FA-009)', () => {
+describe('TaskManager.refreshFileTask — path scope', () => {
     const makeTask = (filePath: string) => ({
         id: `${filePath}:0`,
         title: 'A task',
@@ -521,10 +521,10 @@ describe('TaskManager.refreshFileTask — path scope (FA-009)', () => {
     });
 });
 
-// main.ts's 'delete'/'rename' vault listeners (CQ-010) call refreshFileTask with the
+// main.ts's 'delete'/'rename' vault listeners call refreshFileTask with the
 // deleted/old/new paths directly — these tests exercise that exact call pattern to
 // verify the mechanism the listeners depend on.
-describe('TaskManager.refreshFileTask — delete/rename support (CQ-010)', () => {
+describe('TaskManager.refreshFileTask — delete/rename support', () => {
     const makeTask = (filePath: string) => ({
         id: `${filePath}:0`,
         title: 'A task',
@@ -640,7 +640,7 @@ describe('TaskManager.getStatistics', () => {
         expect(totalVelocity).toBe(0);
     });
 
-    describe('buildClonedLine (via toggleTaskCompletion) — dd-mm-yyyy date format (RV-004)', () => {
+    describe('buildClonedLine (via toggleTaskCompletion) — dd-mm-yyyy date format', () => {
         function makeApp(fileContent: string) {
             return {
                 vault: {

@@ -82,72 +82,48 @@ This guide covers how to set up your local development environment for TaskLens,
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
-
-* **Node.js**: Version 16 or higher (The project types currently target Node `^20.11.5`).
-* **npm**: Comes bundled with Node.js.
-* **Obsidian**: Version 0.15.0 or higher.
-
-The project dependencies are kept up-to-date to ensure stable builds, currently utilizing **TypeScript `^5.3.3**` and **esbuild `^0.19.11**`.
+* **Node.js** 22 (the version CI uses) and **npm**.
+* **Obsidian** 1.13.0 or newer (the plugin's `minAppVersion`).
 
 ## Initial Setup
 
-1. **Clone the repository** into your local workspace.
-2. **Navigate to the directory**:
-```bash
-cd TaskLens
-```
+1. **Clone the repository** and enter it:
+   ```bash
+   git clone https://github.com/nightaqua/TaskLens.git
+   cd TaskLens
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
+## Building and Checking
 
-3. **Install dependencies**:
-```bash
-npm install
-```
+* **Development build:** `npm run dev` (watches for changes and rebuilds, with inline source maps).
+* **Production build:** `npm run build` (type-checks with `tsc`, then bundles with esbuild).
+* **Tests:** `npm run test` (Vitest).
+* **Lint:** `npx eslint .` (the project expects zero warnings).
+* **CSS lint:** `npm run lint:css`.
 
+CI runs lint, tests and a production build on every pull request, so please run them locally first.
 
-**
+## Version Management
 
-## Building the Plugin
-
-TaskLens includes custom scripts to ensure your build environment is configured correctly.
-
-### 1. The Verification Script (Optional)
-
-Instead of a raw build command, it is possible to use the verification scripts. These scripts check your Node/npm versions, verify all files are present, run TypeScript validation, compile the plugin, and confirm the output files.
-
-* **Windows**: Run `verify-build.bat`
-* **Mac/Linux**: Run `./verify-build.sh` (you may need to run `chmod +x verify-build.sh` first)
-
-> [!warning] I initially created this script to help myself with development. 
-> Your windows defender may block it. I just left these here because I use it, you do *not* have to.
-
-### 2. Manual Build Commands
-
-If you prefer standard npm scripts:
-
-* **Development Build**: `npm run dev` (Watches for file changes and rebuilds automatically).
-* **Production Build**: `npm run build`.
-
-### 3. Version Management
-
-When cutting a new release, use the included `version-bump.mjs` script. This automatically syncs the version numbers between your `package.json` and Obsidian's required `manifest.json`.
+Versions are bumped with `npm version <patch|minor|major>`. The `version` script (`version-bump.mjs`) keeps `package.json`, `manifest.json` and `versions.json` in sync, so never edit version numbers by hand.
 
 ## Build Output
 
-After a successful build, the following files will be generated in your project directory:
+A build produces these files in the project root:
 
 ```text
 TaskLens/
-├── main.js          ← Compiled plugin (created by build)
-├── main.js.map      ← Source map (if dev build)
-├── styles.css       ← Dashboard styles
+├── main.js          ← Compiled plugin
+├── styles.css       ← Plugin styles (generated from src/styles.css)
 ├── manifest.json    ← Plugin metadata
 └── ...
 ```
 
-**
-
-To test the plugin locally, copy `main.js`, `styles.css`, and `manifest.json` into your test vault at `YourVault/.obsidian/plugins/TaskLens/`.
+To test the plugin locally, copy `main.js`, `styles.css`, and `manifest.json` into your test vault at `YourVault/.obsidian/plugins/tasklens/`.
 
 ---
 
@@ -175,8 +151,6 @@ if (rightLeaf) {
 ```
 
 
-**
-
 ### 3. DOM Element Creation
 
 * **Previous Error**: `Argument of type 'string[]' is not assignable to parameter of type 'string | DomElementInfo | undefined'.`
@@ -186,8 +160,6 @@ const card = statsContainer.createDiv('stat-card');
 card.addClass(stat.className);
 ```
 
-
-**
 
 ### 4. Global Script Errors
 

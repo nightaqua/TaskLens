@@ -1677,7 +1677,7 @@
 
 .tasklens-dashboard-content .task-item.has-topic-color { border-left-color: var(--tl-task-color); }
 /* =========================================
-   12. SORT BAR — TASK LIST (FA-001)
+   12. SORT BAR — TASK LIST
    ========================================= */
 
 .tasklens-dashboard-content .tasklist-sort-bar {
@@ -1716,7 +1716,7 @@
 }
 
 /* =========================================
-   13. TIMER CHIPS — TASK LIST (FA-002)
+   13. TIMER CHIPS — TASK LIST
    ========================================= */
 
 /* Keep the title and any timer chips on one inline row. */
@@ -1746,7 +1746,7 @@
 .tl-timer-chip.is-red { color: var(--color-red); }
 
 /* =========================================
-   14. NL DATE ENTRY — QUICK ADD (FA-006)
+   14. NL DATE ENTRY — QUICK ADD
    ========================================= */
 
 /* Hidden native date input — solely drives the browser calendar picker UI */
@@ -1778,7 +1778,7 @@
 }
 
 /* =========================================
-   15. TAG AUTOCOMPLETE DROPDOWN (FA-007)
+   15. TAG AUTOCOMPLETE DROPDOWN
    ========================================= */
 
 .tl-tag-dropdown {
